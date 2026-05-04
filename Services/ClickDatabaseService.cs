@@ -1,0 +1,78 @@
+using System;
+using Microsoft.Data.Sqlite;
+using System.Collections.Generic;
+using XAssistant.Models;
+using System.IO;
+
+namespace XAssistant.Services;
+
+public class ClickDatabaseService
+{
+    private static readonly string ConnectionString =
+       $"Data Source={Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "click_data.db")}";
+    public ClickDatabaseService()
+    {
+        using var connection = new SqliteConnection(ConnectionString);
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = @"
+            CREATE TABLE IF NOT EXISTS ClickRecords (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Button TEXT NOT NULL,
+                ClickTime TEXT NOT NULL
+            );
+        ";
+        command.ExecuteNonQuery();
+    }
+
+    public void SaveClick(MouseClickRecord record)
+    {
+        using var connection = new SqliteConnection(ConnectionString);
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = "INSERT INTO ClickRecords (Button, ClickTime) VALUES (@b, @t)";
+        command.Parameters.AddWithValue("@b", record.Button);
+        command.Parameters.AddWithValue("@t", record.ClickTime.ToString("o")); // ISO 8601
+        command.ExecuteNonQuery();
+    }
+
+    // 后续分析用：获取所有记录或聚合数据
+    public List<MouseClickRecord> GetAllRecords()
+    {
+        var records = new List<MouseClickRecord>();
+        using var connection = new SqliteConnection(ConnectionString);
+        connection.Open();
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id, Button, ClickTime FROM ClickRecords ORDER BY ClickTime";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            records.Add(new MouseClickRecord
+            {
+                Id = reader.GetInt64(0),
+                Button = reader.GetString(1),
+                ClickTime = DateTime.Parse(reader.GetString(2))
+            });
+        }
+        return records;
+    }
+
+
+    public Dictionary<string, int> GetClickCounts()
+    {
+        var counts = new Dictionary<string, int>
+    {
+        { "Left", 0 },
+        { "Middle", 0 },
+        { "Right", 0 }
+    };
+        using var connection = new SqliteConnection(ConnectionString);
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT Button, COUNT(*) FROM ClickRecords GROUP BY Button";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            counts[reader.GetString(0)] = reader.GetInt32(1);
+        return counts;
+    }
+}
