@@ -9,14 +9,18 @@ public class ConfigurationService
 {
     private const string ConfigFileName = "appsettings.json";
     private readonly string _configFilePath;
+
     private AppSettings _appSettings;
 
     public AppSettings Settings => _appSettings;
 
     public ConfigurationService()
     {
-        // 配置文件放在程序所在目录（和 exe 同级）
-        _configFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ConfigFileName);
+        // 将配置文件保存到当前用户的 ApplicationData 目录下
+        string appDataFolder = AppDataPathHelper.GetAppDataFolder();
+        Directory.CreateDirectory(appDataFolder); // 如果目录不存在则创建
+
+        _configFilePath = Path.Combine(appDataFolder, ConfigFileName);
         _appSettings = Load();
     }
 

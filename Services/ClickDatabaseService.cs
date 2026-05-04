@@ -8,8 +8,19 @@ namespace XAssistant.Services;
 
 public class ClickDatabaseService
 {
-    private static readonly string ConnectionString =
-       $"Data Source={Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "click_data.db")}";
+
+
+    private static readonly string ConnectionString = InitializeConnectionString();
+    private static string InitializeConnectionString()
+    {
+        // 获取 AppData 目录，不存在则创建
+        string appDataFolder = AppDataPathHelper.GetAppDataFolder();
+        Directory.CreateDirectory(appDataFolder);
+
+        string dbPath = Path.Combine(appDataFolder, "click_data.db");
+        return $"Data Source={dbPath}";
+    }
+
     public ClickDatabaseService()
     {
         using var connection = new SqliteConnection(ConnectionString);
