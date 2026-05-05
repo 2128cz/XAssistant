@@ -39,6 +39,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             "ClickCounter" => App.Services.GetRequiredService<ClickCounterViewModel>(),
             "KeyCounter" => App.Services.GetRequiredService<KeyCounterViewModel>(),
+            "Usage" => App.Services.GetRequiredService<UsageViewModel>(),
             _ => CurrentViewModel,
         };
     }

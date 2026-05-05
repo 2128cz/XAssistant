@@ -38,6 +38,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ClickCounterViewModel>();
         services.AddSingleton<KeyCounterViewModel>();
         services.AddSingleton<MainWindowViewModel>();
+        services.AddSingleton<UsageViewModel>();
 
         var provider = services.BuildServiceProvider();
         Services = provider;

@@ -21,6 +21,10 @@
         Command="{Binding NavigateCommand}"
         CommandParameter="KeyCounter"
         Content="键盘记录" />
+      <Button
+        Command="{Binding NavigateCommand}"
+        CommandParameter="Usage"
+        Content="使用统计" />
 
       <Separator Margin="0,20,0,5" />
       <CheckBox
