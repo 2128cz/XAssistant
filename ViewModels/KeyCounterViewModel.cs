@@ -5,6 +5,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using XAssistant.Services.Interfaces;
+using WpfApplication = System.Windows.Application;
 
 namespace XAssistant.ViewModels;
 
@@ -44,7 +45,7 @@ public partial class KeyCounterViewModel : ViewModelBase
     private void OnKeyPressed(string key)
     {
         // WPF 调度到 UI 线程
-        Application.Current.Dispatcher.InvokeAsync(() =>
+        WpfApplication.Current.Dispatcher.InvokeAsync(() =>
         {
             var item = KeyCounts.FirstOrDefault(x => x.Key == key);
             if (item != null)
