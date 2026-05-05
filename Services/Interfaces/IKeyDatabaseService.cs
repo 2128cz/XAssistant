@@ -1,0 +1,10 @@
+using System.Collections.Generic;
+using XAssistant.Models;
+
+namespace XAssistant.Services.Interfaces;
+
+public interface IKeyDatabaseService
+{
+    void SaveKeyPress(KeyPressRecord record);
+    Dictionary<string, int> GetKeyCounts();
+}

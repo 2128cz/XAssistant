@@ -1,11 +1,11 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Windows.Input; // 注意 Avalonia 也有 Input，用 System.Windows.Input 明确按钮
+using XAssistant.Services.Interfaces;
 
 namespace XAssistant.Services;
 
-public class MouseClickHookService : IDisposable
+public class MouseClickHookService : IMouseClickHookService, IDisposable
 {
     public event Action<string>? MouseClicked; // 传入按钮名称 "Left"/"Middle"/"Right"
 
@@ -24,10 +24,22 @@ public class MouseClickHookService : IDisposable
 
     public void Start()
     {
-        using var curProcess = Process.GetCurrentProcess();
-        using var curModule = curProcess.MainModule!;
-        _hookId = SetWindowsHookEx(WH_MOUSE_LL, _proc,
-            GetModuleHandle(curModule.ModuleName), 0);
+        // 防止重复启动，导致多个钩子并存
+        if (_hookId != IntPtr.Zero)
+            return; // 已有一个钩子在运行
+
+        // 获取模块名（优化后写法，避免 using 风险）
+        string? moduleName = Process.GetCurrentProcess().MainModule?.ModuleName;
+        if (string.IsNullOrEmpty(moduleName))
+            throw new InvalidOperationException("无法获取主模块名称，钩子安装失败。");
+
+        _hookId = SetWindowsHookEx(WH_MOUSE_LL, _proc, GetModuleHandle(moduleName), 0);
+
+        if (_hookId == IntPtr.Zero)
+        {
+            int error = Marshal.GetLastWin32Error();
+            throw new InvalidOperationException($"SetWindowsHookEx 失败，错误代码：{error}");
+        }
     }
 
     public void Stop()
@@ -63,16 +75,24 @@ public class MouseClickHookService : IDisposable
     private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr SetWindowsHookEx(int idHook,
-        LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+    private static extern IntPtr SetWindowsHookEx(
+        int idHook,
+        LowLevelMouseProc lpfn,
+        IntPtr hMod,
+        uint dwThreadId
+    );
 
     [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool UnhookWindowsHookEx(IntPtr hhk);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode,
-        IntPtr wParam, IntPtr lParam);
+    private static extern IntPtr CallNextHookEx(
+        IntPtr hhk,
+        int nCode,
+        IntPtr wParam,
+        IntPtr lParam
+    );
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern IntPtr GetModuleHandle(string lpModuleName);

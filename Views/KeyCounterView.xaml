@@ -1,0 +1,54 @@
+<UserControl
+  x:Class="XAssistant.Views.KeyCounterView"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="clr-namespace:XAssistant.ViewModels"
+  xmlns:converters="clr-namespace:XAssistant.Converters"
+  xmlns:scm="clr-namespace:System.ComponentModel;assembly=WindowsBase"
+>
+  <UserControl.Resources>
+    <converters:InvertableBooleanToVisibilityConverter x:Key="BoolToVis" />
+
+    <!-- 定义排序集合视图 -->
+    <CollectionViewSource x:Key="SortedKeyCounts" Source="{Binding KeyCounts}">
+      <CollectionViewSource.SortDescriptions>
+        <scm:SortDescription PropertyName="Length" Direction="Ascending" />
+        <scm:SortDescription PropertyName="Key" Direction="Ascending" />
+      </CollectionViewSource.SortDescriptions>
+    </CollectionViewSource>
+  </UserControl.Resources>
+
+  <DockPanel>
+    <!-- 顶部按钮区：Spacing 改为用 Margin 控制间距 -->
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="10">
+      <Button
+        Content="开始录制"
+        Command="{Binding StartRecordingCommand}"
+        Visibility="{Binding IsRecording, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"
+        Margin="0,0,10,0"
+      />
+      <Button
+        Content="停止录制"
+        Command="{Binding StopRecordingCommand}"
+        Visibility="{Binding IsRecording, Converter={StaticResource BoolToVis}}"
+        Margin="0,0,10,0"
+      />
+      <TextBlock
+        Text="{Binding IsRecording, StringFormat='录制状态: {0}'}"
+        VerticalAlignment="Center"
+      />
+    </StackPanel>
+
+    <!-- 数据表格 -->
+    <DataGrid
+      ItemsSource="{Binding Source={StaticResource SortedKeyCounts}}"
+      AutoGenerateColumns="False"
+      ColumnWidth="*"
+    >
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="按键" Binding="{Binding Key}" />
+        <DataGridTextColumn Header="次数" Binding="{Binding Count}" />
+      </DataGrid.Columns>
+    </DataGrid>
+  </DockPanel>
+</UserControl>

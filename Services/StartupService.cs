@@ -1,9 +1,10 @@
 using System;
 using System.Runtime.Versioning;
 using Microsoft.Win32;
+using XAssistant.Services.Interfaces;
 
 [SupportedOSPlatform("windows")]
-public class StartupService
+public class StartupService : IStartupService
 {
     private const string RunKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
     private readonly string _appName;
@@ -13,7 +14,8 @@ public class StartupService
     {
         _appName = appName;
         // 如果获取不到路径，直接抛异常，因为后续功能没法用
-        _exePath = Environment.ProcessPath
+        _exePath =
+            Environment.ProcessPath
             ?? throw new InvalidOperationException("无法获取当前进程的可执行文件路径。");
     }
 

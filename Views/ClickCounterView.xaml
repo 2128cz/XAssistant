@@ -1,0 +1,33 @@
+<UserControl
+  x:Class="XAssistant.Views.ClickCounterView"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="clr-namespace:XAssistant.ViewModels"
+  xmlns:converters="clr-namespace:XAssistant.Converters"
+>
+  <UserControl.Resources>
+    <converters:InverseBoolConverter x:Key="InverseBool" />
+  </UserControl.Resources>
+
+  <StackPanel Margin="20" VerticalAlignment="Top">
+    <TextBlock Text="左键点击: " FontSize="16" />
+    <TextBlock Text="{Binding LeftClickCount}" FontSize="20" FontWeight="Bold" />
+    <TextBlock Text="中键点击: " FontSize="16" />
+    <TextBlock Text="{Binding MiddleClickCount}" FontSize="20" FontWeight="Bold" />
+    <TextBlock Text="右键点击: " FontSize="16" />
+    <TextBlock Text="{Binding RightClickCount}" FontSize="20" FontWeight="Bold" />
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10">
+      <Button
+        Content="开始记录"
+        Command="{Binding StartRecordingCommand}"
+        IsEnabled="{Binding IsRecording, Converter={StaticResource InverseBool}}"
+      />
+      <Button
+        Content="停止记录"
+        Command="{Binding StopRecordingCommand}"
+        IsEnabled="{Binding IsRecording}"
+      />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

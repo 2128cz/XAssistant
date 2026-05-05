@@ -2,10 +2,11 @@ using System;
 using System.IO;
 using System.Text.Json;
 using XAssistant.Models;
+using XAssistant.Services.Interfaces;
 
 namespace XAssistant.Services;
 
-public class ConfigurationService
+public class ConfigurationService : IConfigurationService
 {
     private const string ConfigFileName = "appsettings.json";
     private readonly string _configFilePath;
@@ -34,7 +35,9 @@ public class ConfigurationService
                 return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
             }
         }
-        catch { /* 配置文件损坏时用默认值覆盖 */ }
+        catch
+        { /* 配置文件损坏时用默认值覆盖 */
+        }
 
         // 文件不存在或解析失败，创建默认配置并保存
         var defaultSettings = new AppSettings();
@@ -59,6 +62,14 @@ public class ConfigurationService
     }
 
     public bool GetRecordingAutoStart() => _appSettings.Recording.AutoStartRecording;
+
+    public void SetKeyRecordingAutoStart(bool enabled)
+    {
+        _appSettings.Recording.AutoStartKeyRecording = enabled;
+        Save();
+    }
+
+    public bool GetKeyRecordingAutoStart() => _appSettings.Recording.AutoStartKeyRecording;
 
     public void SetAutoStart(bool enabled)
     {

@@ -1,16 +1,16 @@
 using System;
-using Microsoft.Data.Sqlite;
 using System.Collections.Generic;
-using XAssistant.Models;
 using System.IO;
+using Microsoft.Data.Sqlite;
+using XAssistant.Models;
+using XAssistant.Services.Interfaces;
 
 namespace XAssistant.Services;
 
-public class ClickDatabaseService
+public class ClickDatabaseService : IClickDatabaseService
 {
-
-
     private static readonly string ConnectionString = InitializeConnectionString();
+
     private static string InitializeConnectionString()
     {
         // 获取 AppData 目录，不存在则创建
@@ -26,7 +26,8 @@ public class ClickDatabaseService
         using var connection = new SqliteConnection(ConnectionString);
         connection.Open();
         var command = connection.CreateCommand();
-        command.CommandText = @"
+        command.CommandText =
+            @"
             CREATE TABLE IF NOT EXISTS ClickRecords (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 Button TEXT NOT NULL,
@@ -58,25 +59,26 @@ public class ClickDatabaseService
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            records.Add(new MouseClickRecord
-            {
-                Id = reader.GetInt64(0),
-                Button = reader.GetString(1),
-                ClickTime = DateTime.Parse(reader.GetString(2))
-            });
+            records.Add(
+                new MouseClickRecord
+                {
+                    Id = reader.GetInt64(0),
+                    Button = reader.GetString(1),
+                    ClickTime = DateTime.Parse(reader.GetString(2)),
+                }
+            );
         }
         return records;
     }
 
-
     public Dictionary<string, int> GetClickCounts()
     {
         var counts = new Dictionary<string, int>
-    {
-        { "Left", 0 },
-        { "Middle", 0 },
-        { "Right", 0 }
-    };
+        {
+            { "Left", 0 },
+            { "Middle", 0 },
+            { "Right", 0 },
+        };
         using var connection = new SqliteConnection(ConnectionString);
         connection.Open();
         using var cmd = connection.CreateCommand();

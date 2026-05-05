@@ -9,13 +9,14 @@ namespace XAssistant.Services
         {
             string folderName;
 #if DEBUG
-            folderName = "XAssistant_Dev";   // 开发版专用文件夹
+            folderName = "XAssistant_Dev"; // 开发版专用文件夹
 #else
-            folderName = "XAssistant";       // 生产版专用文件夹
+            folderName = "XAssistant"; // 生产版专用文件夹
 #endif
             string path = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                folderName);
+                folderName
+            );
             Directory.CreateDirectory(path);
             return path;
         }
