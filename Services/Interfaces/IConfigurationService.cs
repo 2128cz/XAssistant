@@ -6,16 +6,6 @@ namespace XAssistant.Services.Interfaces;
 public interface IConfigurationService
 {
     /// <summary>
-    /// 获取是否开机自启动的配置。
-    /// </summary>
-    bool GetAutoStart();
-
-    /// <summary>
-    /// 设置是否开机自启动。
-    /// </summary>
-    void SetAutoStart(bool enabled);
-
-    /// <summary>
     /// 获取上次程序退出时是否处于录制状态的配置。
     /// </summary>
     bool GetRecordingAutoStart();

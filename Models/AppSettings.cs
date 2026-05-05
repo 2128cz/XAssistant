@@ -15,5 +15,4 @@ public class RecordingSettings
 public class GeneralSettings
 {
     public bool StartMinimized { get; set; }
-    public bool StartWithWindows { get; set; } // 开机自启
 }

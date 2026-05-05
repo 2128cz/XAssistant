@@ -70,12 +70,4 @@ public class ConfigurationService : IConfigurationService
     }
 
     public bool GetKeyRecordingAutoStart() => _appSettings.Recording.AutoStartKeyRecording;
-
-    public void SetAutoStart(bool enabled)
-    {
-        _appSettings.General.StartWithWindows = enabled;
-        Save();
-    }
-
-    public bool GetAutoStart() => _appSettings.General.StartWithWindows;
 }

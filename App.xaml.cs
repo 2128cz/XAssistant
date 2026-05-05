@@ -23,7 +23,11 @@ public partial class App : Application
         services.AddSingleton<IMouseClickHookService, MouseClickHookService>();
         services.AddSingleton<IClickDatabaseService, ClickDatabaseService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
+#if DEBUG
+        services.AddSingleton<IStartupService>(_ => new StartupService("XAssistant_Dev"));
+#else
         services.AddSingleton<IStartupService>(_ => new StartupService("XAssistant"));
+#endif
         services.AddSingleton<IKeyboardHookService, KeyboardHookService>();
         services.AddSingleton<IKeyDatabaseService, KeyDatabaseService>();
         services.AddSingleton<ClickCounterViewModel>();

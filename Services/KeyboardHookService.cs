@@ -58,10 +58,6 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
                 var kb = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
                 string keyName = GetKeyNameFromScanCode(kb.scanCode, kb.flags);
 
-                // 忽略修饰键
-                if (keyName is "Ctrl" or "Alt" or "Shift" or "Win")
-                    return CallNextHookEx(_hookId, nCode, wParam, lParam);
-
                 if (isKeyDown)
                 {
                     // 如果该键已经处于按下状态，则为长按重复，直接忽略
