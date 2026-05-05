@@ -27,6 +27,36 @@ public partial class ClickCounterViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isRecording;
 
+    // 今天
+    [ObservableProperty]
+    private int _leftClickToday;
+
+    [ObservableProperty]
+    private int _middleClickToday;
+
+    [ObservableProperty]
+    private int _rightClickToday;
+
+    // 昨天
+    [ObservableProperty]
+    private int _leftClickYesterday;
+
+    [ObservableProperty]
+    private int _middleClickYesterday;
+
+    [ObservableProperty]
+    private int _rightClickYesterday;
+
+    // 前天
+    [ObservableProperty]
+    private int _leftClickDayBeforeYesterday;
+
+    [ObservableProperty]
+    private int _middleClickDayBeforeYesterday;
+
+    [ObservableProperty]
+    private int _rightClickDayBeforeYesterday;
+
     public ClickCounterViewModel(
         IMouseClickHookService hookService,
         IClickDatabaseService dbService,
@@ -43,6 +73,8 @@ public partial class ClickCounterViewModel : ViewModelBase
         MiddleClickCount = counts["Middle"];
         RightClickCount = counts["Right"];
 
+        RefreshDailyCounts();
+
         _hookService.MouseClicked += OnMouseClicked;
 
         // 根据配置自动开始录制
@@ -52,12 +84,32 @@ public partial class ClickCounterViewModel : ViewModelBase
         }
     }
 
+    public void RefreshDailyCounts()
+    {
+        var today = _dbService.GetClickCountsByDate(DateTime.Today);
+        LeftClickToday = today["Left"];
+        MiddleClickToday = today["Middle"];
+        RightClickToday = today["Right"];
+
+        var yesterday = _dbService.GetClickCountsByDate(DateTime.Today.AddDays(-1));
+        LeftClickYesterday = yesterday["Left"];
+        MiddleClickYesterday = yesterday["Middle"];
+        RightClickYesterday = yesterday["Right"];
+
+        var dayBefore = _dbService.GetClickCountsByDate(DateTime.Today.AddDays(-2));
+        LeftClickDayBeforeYesterday = dayBefore["Left"];
+        MiddleClickDayBeforeYesterday = dayBefore["Middle"];
+        RightClickDayBeforeYesterday = dayBefore["Right"];
+    }
+
+    private DateTime _lastRefreshDate = DateTime.Today;
+
     private void OnMouseClicked(string button)
     {
-        if (!IsRecording) // 不录制时直接忽略
+        if (!IsRecording)
             return;
 
-        // 更新计数
+        // 总量始终实时递增
         switch (button)
         {
             case "Left":
@@ -71,9 +123,30 @@ public partial class ClickCounterViewModel : ViewModelBase
                 break;
         }
 
-        // 持久化到 SQLite
-        var record = new MouseClickRecord { Button = button, ClickTime = DateTime.Now };
-        _dbService.SaveClick(record);
+        _dbService.SaveClick(new MouseClickRecord { Button = button, ClickTime = DateTime.Now });
+
+        // 检查是否跨天，如跨天则刷新所有每日计数，然后归零今天
+        if (DateTime.Today != _lastRefreshDate)
+        {
+            RefreshDailyCounts(); // 此时获取到的已经是新一天的数据，今天自动为0
+            _lastRefreshDate = DateTime.Today;
+        }
+        else
+        {
+            // 同一天内，仅内存递增今天计数（不再查库）
+            switch (button)
+            {
+                case "Left":
+                    LeftClickToday++;
+                    break;
+                case "Middle":
+                    MiddleClickToday++;
+                    break;
+                case "Right":
+                    RightClickToday++;
+                    break;
+            }
+        }
     }
 
     [RelayCommand]

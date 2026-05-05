@@ -10,14 +10,80 @@
   </UserControl.Resources>
 
   <StackPanel Margin="20" VerticalAlignment="Top">
-    <TextBlock Text="左键点击: " FontSize="16" />
-    <TextBlock Text="{Binding LeftClickCount}" FontSize="20" FontWeight="Bold" />
-    <TextBlock Text="中键点击: " FontSize="16" />
-    <TextBlock Text="{Binding MiddleClickCount}" FontSize="20" FontWeight="Bold" />
-    <TextBlock Text="右键点击: " FontSize="16" />
-    <TextBlock Text="{Binding RightClickCount}" FontSize="20" FontWeight="Bold" />
+    <!-- 总计 -->
+    <TextBlock Text="总左键点击：" FontSize="16" />
+    <TextBlock
+      Text="{Binding LeftClickCount, StringFormat={}{0:N0}}"
+      FontSize="20"
+      FontWeight="Bold"
+    />
+    <TextBlock Text="总中键点击：" FontSize="16" />
+    <TextBlock
+      Text="{Binding MiddleClickCount, StringFormat={}{0:N0}}"
+      FontSize="20"
+      FontWeight="Bold"
+    />
+    <TextBlock Text="总右键点击：" FontSize="16" />
+    <TextBlock
+      Text="{Binding RightClickCount, StringFormat={}{0:N0}}"
+      FontSize="20"
+      FontWeight="Bold"
+    />
 
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10">
+    <!-- 每日统计 -->
+    <GroupBox Header="今天" Margin="0,15,0,0">
+      <StackPanel>
+        <TextBlock>
+          <Run Text="左键：" />
+          <Run Text="{Binding LeftClickToday, StringFormat={}{0:N0}}" />
+        </TextBlock>
+        <TextBlock>
+          <Run Text="中键：" />
+          <Run Text="{Binding MiddleClickToday, StringFormat={}{0:N0}}" />
+        </TextBlock>
+        <TextBlock>
+          <Run Text="右键：" />
+          <Run Text="{Binding RightClickToday, StringFormat={}{0:N0}}" />
+        </TextBlock>
+      </StackPanel>
+    </GroupBox>
+
+    <GroupBox Header="昨天" Margin="0,10,0,0">
+      <StackPanel>
+        <TextBlock>
+          <Run Text="左键：" />
+          <Run Text="{Binding LeftClickYesterday, StringFormat={}{0:N0}}" />
+        </TextBlock>
+        <TextBlock>
+          <Run Text="中键：" />
+          <Run Text="{Binding MiddleClickYesterday, StringFormat={}{0:N0}}" />
+        </TextBlock>
+        <TextBlock>
+          <Run Text="右键：" />
+          <Run Text="{Binding RightClickYesterday, StringFormat={}{0:N0}}" />
+        </TextBlock>
+      </StackPanel>
+    </GroupBox>
+
+    <GroupBox Header="前天" Margin="0,10,0,0">
+      <StackPanel>
+        <TextBlock>
+          <Run Text="左键：" />
+          <Run Text="{Binding LeftClickDayBeforeYesterday, StringFormat={}{0:N0}}" />
+        </TextBlock>
+        <TextBlock>
+          <Run Text="中键：" />
+          <Run Text="{Binding MiddleClickDayBeforeYesterday, StringFormat={}{0:N0}}" />
+        </TextBlock>
+        <TextBlock>
+          <Run Text="右键：" />
+          <Run Text="{Binding RightClickDayBeforeYesterday, StringFormat={}{0:N0}}" />
+        </TextBlock>
+      </StackPanel>
+    </GroupBox>
+
+    <!-- 开始/停止按钮 -->
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15">
       <Button
         Content="开始记录"
         Command="{Binding StartRecordingCommand}"

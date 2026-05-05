@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using Microsoft.Data.Sqlite;
@@ -46,11 +47,32 @@ public class KeyDatabaseService : IKeyDatabaseService
 
     public Dictionary<string, int> GetKeyCounts()
     {
+        return GetKeyCounts(null, null);
+    }
+
+    public Dictionary<string, int> GetKeyCounts(DateTime? from, DateTime? to)
+    {
         var counts = new Dictionary<string, int>();
         using var connection = new SqliteConnection(ConnectionString);
         connection.Open();
         var cmd = connection.CreateCommand();
-        cmd.CommandText = "SELECT Key, COUNT(*) FROM KeyPressRecords GROUP BY Key";
+
+        if (from.HasValue && to.HasValue)
+        {
+            cmd.CommandText =
+                @"
+                SELECT Key, COUNT(*) 
+                FROM KeyPressRecords 
+                WHERE PressTime >= @from AND PressTime < @to 
+                GROUP BY Key";
+            cmd.Parameters.AddWithValue("@from", from.Value.ToString("o"));
+            cmd.Parameters.AddWithValue("@to", to.Value.ToString("o"));
+        }
+        else
+        {
+            cmd.CommandText = "SELECT Key, COUNT(*) FROM KeyPressRecords GROUP BY Key";
+        }
+
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
             counts[reader.GetString(0)] = reader.GetInt32(1);

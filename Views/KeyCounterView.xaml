@@ -9,8 +9,26 @@
   <UserControl.Resources>
     <converters:InvertableBooleanToVisibilityConverter x:Key="BoolToVis" />
 
-    <!-- 定义排序集合视图 -->
-    <CollectionViewSource x:Key="SortedKeyCounts" Source="{Binding KeyCounts}">
+    <!-- 四个排序视图 -->
+    <CollectionViewSource x:Key="SortedTotal" Source="{Binding KeyCounts}">
+      <CollectionViewSource.SortDescriptions>
+        <scm:SortDescription PropertyName="Length" Direction="Ascending" />
+        <scm:SortDescription PropertyName="Key" Direction="Ascending" />
+      </CollectionViewSource.SortDescriptions>
+    </CollectionViewSource>
+    <CollectionViewSource x:Key="SortedToday" Source="{Binding TodayKeyCounts}">
+      <CollectionViewSource.SortDescriptions>
+        <scm:SortDescription PropertyName="Length" Direction="Ascending" />
+        <scm:SortDescription PropertyName="Key" Direction="Ascending" />
+      </CollectionViewSource.SortDescriptions>
+    </CollectionViewSource>
+    <CollectionViewSource x:Key="SortedYesterday" Source="{Binding YesterdayKeyCounts}">
+      <CollectionViewSource.SortDescriptions>
+        <scm:SortDescription PropertyName="Length" Direction="Ascending" />
+        <scm:SortDescription PropertyName="Key" Direction="Ascending" />
+      </CollectionViewSource.SortDescriptions>
+    </CollectionViewSource>
+    <CollectionViewSource x:Key="SortedDayBefore" Source="{Binding DayBeforeYesterdayKeyCounts}">
       <CollectionViewSource.SortDescriptions>
         <scm:SortDescription PropertyName="Length" Direction="Ascending" />
         <scm:SortDescription PropertyName="Key" Direction="Ascending" />
@@ -19,7 +37,7 @@
   </UserControl.Resources>
 
   <DockPanel>
-    <!-- 顶部按钮区：Spacing 改为用 Margin 控制间距 -->
+    <!-- 顶部按钮区 -->
     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="10">
       <Button
         Content="开始录制"
@@ -39,16 +57,56 @@
       />
     </StackPanel>
 
-    <!-- 数据表格 -->
-    <DataGrid
-      ItemsSource="{Binding Source={StaticResource SortedKeyCounts}}"
-      AutoGenerateColumns="False"
-      ColumnWidth="*"
-    >
-      <DataGrid.Columns>
-        <DataGridTextColumn Header="按键" Binding="{Binding Key}" />
-        <DataGridTextColumn Header="次数" Binding="{Binding Count}" />
-      </DataGrid.Columns>
-    </DataGrid>
+    <!-- Tab 切换区 -->
+    <TabControl SelectedIndex="{Binding SelectedTabIndex}">
+      <TabItem Header="总计">
+        <DataGrid
+          ItemsSource="{Binding Source={StaticResource SortedTotal}}"
+          AutoGenerateColumns="False"
+          ColumnWidth="*"
+        >
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="按键" Binding="{Binding Key}" />
+            <DataGridTextColumn Header="次数" Binding="{Binding Count}" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </TabItem>
+      <TabItem Header="今天">
+        <DataGrid
+          ItemsSource="{Binding Source={StaticResource SortedToday}}"
+          AutoGenerateColumns="False"
+          ColumnWidth="*"
+        >
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="按键" Binding="{Binding Key}" />
+            <DataGridTextColumn Header="次数" Binding="{Binding Count}" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </TabItem>
+      <TabItem Header="昨天">
+        <DataGrid
+          ItemsSource="{Binding Source={StaticResource SortedYesterday}}"
+          AutoGenerateColumns="False"
+          ColumnWidth="*"
+        >
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="按键" Binding="{Binding Key}" />
+            <DataGridTextColumn Header="次数" Binding="{Binding Count}" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </TabItem>
+      <TabItem Header="前天">
+        <DataGrid
+          ItemsSource="{Binding Source={StaticResource SortedDayBefore}}"
+          AutoGenerateColumns="False"
+          ColumnWidth="*"
+        >
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="按键" Binding="{Binding Key}" />
+            <DataGridTextColumn Header="次数" Binding="{Binding Count}" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </TabItem>
+    </TabControl>
   </DockPanel>
 </UserControl>

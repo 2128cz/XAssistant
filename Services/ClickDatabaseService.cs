@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.IO;
 using Microsoft.Data.Sqlite;
 using XAssistant.Models;
@@ -46,6 +44,35 @@ public class ClickDatabaseService : IClickDatabaseService
         command.Parameters.AddWithValue("@b", record.Button);
         command.Parameters.AddWithValue("@t", record.ClickTime.ToString("o")); // ISO 8601
         command.ExecuteNonQuery();
+    }
+
+    public Dictionary<string, int> GetClickCountsByDate(DateTime date)
+    {
+        var counts = new Dictionary<string, int>
+        {
+            { "Left", 0 },
+            { "Middle", 0 },
+            { "Right", 0 },
+        };
+
+        string dateStr = date.ToString("yyyy-MM-dd");
+        using var connection = new SqliteConnection(ConnectionString);
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        // SQLite 的 date() 函数可以将 ISO 8601 字符串提取日期部分
+        cmd.CommandText =
+            @"
+        SELECT Button, COUNT(*)
+        FROM ClickRecords
+        WHERE date(ClickTime) = @date
+        GROUP BY Button";
+        cmd.Parameters.AddWithValue("@date", dateStr);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            counts[reader.GetString(0)] = reader.GetInt32(1);
+
+        return counts;
     }
 
     // 后续分析用：获取所有记录或聚合数据

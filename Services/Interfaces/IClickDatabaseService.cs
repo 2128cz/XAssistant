@@ -19,4 +19,6 @@ public interface IClickDatabaseService
     /// </summary>
     /// <returns>键为按键名称（"Left","Middle","Right"），值为累计次数</returns>
     Dictionary<string, int> GetClickCounts();
+
+    Dictionary<string, int> GetClickCountsByDate(DateTime date);
 }

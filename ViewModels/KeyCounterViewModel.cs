@@ -14,12 +14,25 @@ public partial class KeyCounterViewModel : ViewModelBase
     private readonly IKeyboardHookService _hookService;
     private readonly IKeyDatabaseService _dbService;
     private readonly IConfigurationService _configService;
+    private DateTime _currentDate = DateTime.Today;
 
-    // 用于绑定列表显示（按键名 + 次数）
+    // 总计
     public ObservableCollection<KeyCountItem> KeyCounts { get; } = new();
+
+    // 今天
+    public ObservableCollection<KeyCountItem> TodayKeyCounts { get; } = new();
+
+    // 昨天
+    public ObservableCollection<KeyCountItem> YesterdayKeyCounts { get; } = new();
+
+    // 前天
+    public ObservableCollection<KeyCountItem> DayBeforeYesterdayKeyCounts { get; } = new();
 
     [ObservableProperty]
     private bool _isRecording;
+
+    [ObservableProperty]
+    private int _selectedTabIndex;
 
     public KeyCounterViewModel(
         IKeyboardHookService hookService,
@@ -33,8 +46,7 @@ public partial class KeyCounterViewModel : ViewModelBase
 
         _hookService.KeyPressed += OnKeyPressed;
 
-        // 加载历史统计
-        LoadCounts();
+        LoadAllCounts();
 
         if (_configService.GetKeyRecordingAutoStart())
         {
@@ -44,29 +56,74 @@ public partial class KeyCounterViewModel : ViewModelBase
 
     private void OnKeyPressed(string key)
     {
-        // WPF 调度到 UI 线程
-        WpfApplication.Current.Dispatcher.InvokeAsync(() =>
-        {
-            var item = KeyCounts.FirstOrDefault(x => x.Key == key);
-            if (item != null)
-                item.Count++;
-            else
-                KeyCounts.Add(new KeyCountItem { Key = key, Count = 1 });
-        });
-
-        // 持久化（可在任意线程）
         var record = new Models.KeyPressRecord { Key = key, PressTime = DateTime.Now };
+
+        // 持久化到数据库
         _dbService.SaveKeyPress(record);
+
+        // 检测是否跨天
+        DateTime today = DateTime.Today;
+        if (today > _currentDate)
+        {
+            _currentDate = today;
+            // 重新加载所有时间段数据
+            LoadAllCounts();
+        }
+        else
+        {
+            // 未跨天，增量更新内存集合
+            WpfApplication.Current.Dispatcher.InvokeAsync(() =>
+            {
+                // 更新总计
+                UpdateCollection(KeyCounts, key);
+                // 更新今天
+                UpdateCollection(TodayKeyCounts, key);
+            });
+        }
     }
 
-    private void LoadCounts()
+    private void UpdateCollection(ObservableCollection<KeyCountItem> collection, string key)
     {
-        var dict = _dbService.GetKeyCounts();
-        KeyCounts.Clear();
-        foreach (var kv in dict.OrderByDescending(x => x.Value))
+        var item = collection.FirstOrDefault(x => x.Key == key);
+        if (item != null)
+            item.Count++;
+        else
+            collection.Add(new KeyCountItem { Key = key, Count = 1 });
+    }
+
+    private void LoadAllCounts()
+    {
+        WpfApplication.Current.Dispatcher.Invoke(() =>
         {
-            KeyCounts.Add(new KeyCountItem { Key = kv.Key, Count = kv.Value });
-        }
+            // 总计
+            var totalDict = _dbService.GetKeyCounts();
+            KeyCounts.Clear();
+            foreach (var kv in totalDict.OrderByDescending(x => x.Value))
+                KeyCounts.Add(new KeyCountItem { Key = kv.Key, Count = kv.Value });
+
+            // 今天
+            var todayDict = _dbService.GetKeyCounts(DateTime.Today, DateTime.Today.AddDays(1));
+            TodayKeyCounts.Clear();
+            foreach (var kv in todayDict.OrderByDescending(x => x.Value))
+                TodayKeyCounts.Add(new KeyCountItem { Key = kv.Key, Count = kv.Value });
+
+            // 昨天
+            var yesterdayDict = _dbService.GetKeyCounts(DateTime.Today.AddDays(-1), DateTime.Today);
+            YesterdayKeyCounts.Clear();
+            foreach (var kv in yesterdayDict.OrderByDescending(x => x.Value))
+                YesterdayKeyCounts.Add(new KeyCountItem { Key = kv.Key, Count = kv.Value });
+
+            // 前天
+            var dayBeforeDict = _dbService.GetKeyCounts(
+                DateTime.Today.AddDays(-2),
+                DateTime.Today.AddDays(-1)
+            );
+            DayBeforeYesterdayKeyCounts.Clear();
+            foreach (var kv in dayBeforeDict.OrderByDescending(x => x.Value))
+                DayBeforeYesterdayKeyCounts.Add(
+                    new KeyCountItem { Key = kv.Key, Count = kv.Value }
+                );
+        });
     }
 
     [RelayCommand]
