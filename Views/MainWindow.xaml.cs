@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Windows;
-using XAssistant; // 引入 App 类以访问 IsShuttingDown
 
 namespace XAssistant.Views;
 

@@ -4,32 +4,32 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:vm="clr-namespace:XAssistant.ViewModels"
   Title="XAssistant"
-  Height="720"
   Width="1280"
->
+  Height="720">
+
   <DockPanel>
-    <!-- 左侧菜单 -->
-    <StackPanel DockPanel.Dock="Left" Width="200" Background="#F0F0F0">
+    <!--  左侧菜单  -->
+    <StackPanel
+      Width="200"
+      Background="#F0F0F0"
+      DockPanel.Dock="Left">
       <Button
-        Content="鼠标点击记录"
         Command="{Binding NavigateCommand}"
         CommandParameter="ClickCounter"
-      />
+        Content="鼠标点击记录" />
       <Button
-        Content="键盘记录"
         Command="{Binding NavigateCommand}"
         CommandParameter="KeyCounter"
-      />
+        Content="键盘记录" />
 
       <Separator Margin="0,20,0,5" />
       <CheckBox
-        Content="开机自动启动"
-        IsChecked="{Binding IsStartWithWindowsEnabled}"
         Margin="10,5"
-      />
+        Content="开机自动启动"
+        IsChecked="{Binding IsStartWithWindowsEnabled}" />
     </StackPanel>
 
-    <!-- 右侧内容区，根据 CurrentViewModel 自动切换视图 -->
+    <!--  右侧内容区，根据 CurrentViewModel 自动切换视图  -->
     <ContentControl Content="{Binding CurrentViewModel}" />
   </DockPanel>
 </Window>
