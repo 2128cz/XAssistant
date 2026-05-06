@@ -23,6 +23,8 @@ public partial class UsageViewModel : ViewModelBase
     private ObservableCollection<DailyUsage> _history = new();
     private SessionEvent? _activeSessionStartEvent;
 
+    private volatile bool _isRefreshing;
+
     // 会话事件集合
     [ObservableProperty]
     private ObservableCollection<SessionEvent> _sessionEvents = new();
@@ -33,51 +35,35 @@ public partial class UsageViewModel : ViewModelBase
         _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _refreshTimer.Tick += async (_, _) =>
         {
-            // 1. 刷新今日使用时长（UI 上的大字）
-            await RefreshTodayAsync();
-
-            // 2. 如果有活跃的会话段，更新其累计时长
-            if (_activeSessionStartEvent != null)
+            // 防止上一次刷新还未结束就再次触发
+            if (_isRefreshing)
+                return;
+            _isRefreshing = true;
+            try
             {
-                // 当前总有效秒数 - 该事件发生时的总秒数 = 本段已使用秒数
-                long currentTotalSeconds = await TryGetCurrentTotalSecondsAsync();
-                long segmentSeconds = currentTotalSeconds - _activeSessionStartEvent.TotalSeconds;
-                _activeSessionStartEvent.FormattedCumulativeUsage = FormatSeconds(segmentSeconds);
+                await RefreshTodayAsync();
+                await LoadHistoryAsync();
+                await LoadSessionEventsAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "定时刷新数据失败");
+            }
+            finally
+            {
+                _isRefreshing = false;
             }
         };
         _refreshTimer.Start();
         _ = RefreshAllAsync();
     }
 
-    // 辅助方法：安全获取当前总有效秒数（优先管道，失败则本地数据库）
-    private async Task<long> TryGetCurrentTotalSecondsAsync()
-    {
-        try
-        {
-            var seconds = await GetTodaySecondsFromPipeAsync();
-            return seconds;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "管道获取失败，尝试本地数据库");
-            try
-            {
-                return LoadTodaySecondsFromDb();
-            }
-            catch (Exception dbEx)
-            {
-                _logger.LogError(dbEx, "数据库读取今日秒数失败");
-                return 0;
-            }
-        }
-    }
-
     private async Task RefreshAllAsync()
     {
         _logger.LogInformation("开始刷新全部数据");
         await RefreshTodayAsync();
-        LoadHistory();
-        LoadSessionEvents(); // 新增
+        await LoadHistoryAsync();
+        await LoadSessionEventsAsync();
     }
 
     private async Task<long> RefreshTodayAsync()
@@ -112,147 +98,146 @@ public partial class UsageViewModel : ViewModelBase
         }
     }
 
-    private void LoadHistory()
+    private async Task LoadHistoryAsync()
     {
         var list = new ObservableCollection<DailyUsage>();
-        try
+        await Task.Run(() =>
         {
-            using var conn = new SqliteConnection($"Data Source={DbPath}");
-            conn.Open();
-            var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT Date, Seconds FROM DailyUsage ORDER BY Date DESC LIMIT 30";
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            try
             {
-                list.Add(
-                    new DailyUsage { Date = reader.GetString(0), Seconds = reader.GetInt64(1) }
-                );
+                using var conn = new SqliteConnection($"Data Source={DbPath}");
+                conn.Open();
+                var cmd = conn.CreateCommand();
+                cmd.CommandText =
+                    "SELECT Date, Seconds FROM DailyUsage ORDER BY Date DESC LIMIT 30";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    list.Add(
+                        new DailyUsage { Date = reader.GetString(0), Seconds = reader.GetInt64(1) }
+                    );
+                }
+                // _logger.LogDebug("后台加载历史记录完成，共 {Count} 条", list.Count);
             }
-            _logger.LogDebug("加载历史记录完成，共 {Count} 条", list.Count);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "加载历史记录失败");
-        }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "后台加载历史记录失败");
+            }
+        });
         History = list;
     }
 
-    // 加载最近的事件记录（例如最近 50 条）
-    private void LoadSessionEvents()
+    // 加载最近的事件记录（例如最近 50 条）在后台线程读取数据库，回到 UI 线程更新集合
+    private async Task LoadSessionEventsAsync()
     {
         var events = new ObservableCollection<SessionEvent>();
-        try
+        SessionEvent? activeStart = null;
+
+        await Task.Run(() =>
         {
-            using var conn = new SqliteConnection($"Data Source={DbPath}");
-            conn.Open();
-            var cmd = conn.CreateCommand();
-            cmd.CommandText =
-                @"
-            SELECT Id, EventType, Timestamp, Date, TotalSeconds
-            FROM SessionEvents
-            ORDER BY Id ASC"; // 升序，保证时间顺序
+            // 从数据库读取原始数据
             var rawList = new List<SessionEvent>();
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            try
             {
-                rawList.Add(
-                    new SessionEvent
-                    {
-                        Id = reader.GetInt32(0),
-                        EventType = reader.GetString(1),
-                        Timestamp = reader.GetString(2),
-                        Date = reader.GetString(3),
-                        TotalSeconds = reader.GetInt64(4),
-                    }
-                );
-            }
-
-            // ---------- 按会话段计算每个事件的累计时长 ----------
-            SessionEvent? segmentStartEvent = null; // 当前段的开始事件
-            DateTime? segmentStartTime = null;
-            long segmentStartTotalSeconds = 0;
-
-            for (int i = 0; i < rawList.Count; i++)
-            {
-                var evt = rawList[i];
-                if (!DateTime.TryParse(evt.Timestamp, out DateTime currTime))
-                    continue;
-
-                // 新的一段开始
-                if (evt.EventType == "ServiceStarted" || evt.EventType == "Resume")
+                using var conn = new SqliteConnection($"Data Source={DbPath}");
+                conn.Open();
+                var cmd = conn.CreateCommand();
+                cmd.CommandText =
+                    @"
+                SELECT Id, EventType, Timestamp, Date, TotalSeconds
+                FROM SessionEvents
+                ORDER BY Id ASC";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
                 {
-                    // 新段开始
-                    // 如果之前有未结束的段，先忽略（正常数据不会出现）
-                    segmentStartEvent = evt;
-                    segmentStartTime = currTime;
-                    segmentStartTotalSeconds = evt.TotalSeconds;
-
-                    // 只有 Resume 才需要显示累计时长（ServiceStarted 永远不显示）
-                    evt.FormattedCumulativeUsage = evt.EventType == "Resume" ? "…" : "";
+                    rawList.Add(
+                        new SessionEvent
+                        {
+                            Id = reader.GetInt32(0),
+                            EventType = reader.GetString(1),
+                            Timestamp = reader.GetString(2),
+                            Date = reader.GetString(3),
+                            TotalSeconds = reader.GetInt64(4),
+                        }
+                    );
                 }
-                else if (evt.EventType == "Suspend" || evt.EventType == "ServiceStopped")
+
+                // 计算每个事件的累计时长、间隔等（原 LoadSessionEvents 中的逻辑）
+                SessionEvent? segmentStartEvent = null;
+                DateTime? segmentStartTime = null;
+                long segmentStartTotalSeconds = 0;
+
+                for (int i = 0; i < rawList.Count; i++)
                 {
-                    if (segmentStartEvent != null && segmentStartTime.HasValue)
+                    var evt = rawList[i];
+                    if (!DateTime.TryParse(evt.Timestamp, out DateTime currTime))
+                        continue;
+
+                    if (evt.EventType == "ServiceStarted" || evt.EventType == "Resume")
                     {
-                        long segmentSeconds = evt.TotalSeconds - segmentStartTotalSeconds;
-                        string formatted = FormatSeconds(segmentSeconds);
-
-                        // 结束事件始终显示该段时长
-                        evt.FormattedCumulativeUsage = formatted;
-
-                        // 开始事件：只有 Resume 才显示，ServiceStarted 留空
-                        segmentStartEvent.FormattedCumulativeUsage =
-                            segmentStartEvent.EventType == "Resume" ? formatted : "";
-
-                        segmentStartEvent = null;
-                        segmentStartTime = null;
+                        segmentStartEvent = evt;
+                        segmentStartTime = currTime;
+                        segmentStartTotalSeconds = evt.TotalSeconds;
+                        evt.FormattedCumulativeUsage = evt.EventType == "Resume" ? "…" : "";
                     }
-                    else
+                    else if (evt.EventType == "Suspend" || evt.EventType == "ServiceStopped")
                     {
-                        evt.FormattedCumulativeUsage = FormatSeconds(0);
+                        if (segmentStartEvent != null && segmentStartTime.HasValue)
+                        {
+                            long segmentSeconds = evt.TotalSeconds - segmentStartTotalSeconds;
+                            string formatted = FormatSeconds(segmentSeconds);
+                            evt.FormattedCumulativeUsage = formatted;
+                            segmentStartEvent.FormattedCumulativeUsage =
+                                segmentStartEvent.EventType == "Resume" ? formatted : "";
+                            segmentStartEvent = null;
+                            segmentStartTime = null;
+                        }
+                        else
+                        {
+                            evt.FormattedCumulativeUsage = FormatSeconds(0);
+                        }
                     }
                 }
-            }
 
-            // 如果遍历完后还有未结束的段（当前正在活跃的会话）
-            if (segmentStartEvent != null)
-            {
-                // 活跃段：用当前系统时间 - 段开始时间 计算即时时长
-                long activeSeconds = (long)(DateTime.Now - segmentStartTime!.Value).TotalSeconds;
-                segmentStartEvent.FormattedCumulativeUsage = FormatSeconds(activeSeconds);
-                // 标记为活跃段，留一个引用供定时器更新（见后文）
-                _activeSessionStartEvent = segmentStartEvent;
-            }
-            else
-            {
-                _activeSessionStartEvent = null; // 没有活跃段
-            }
-
-            // ---------- 计算相邻事件间隔 ----------
-            for (int i = 0; i < rawList.Count; i++)
-            {
-                if (i == 0)
-                    rawList[i].TimeSincePrevious = "-";
+                // 如果末尾还有未结束的段（当前活跃会话）
+                if (segmentStartEvent != null)
+                {
+                    long activeSeconds = (long)
+                        (DateTime.Now - segmentStartTime!.Value).TotalSeconds;
+                    segmentStartEvent.FormattedCumulativeUsage = FormatSeconds(activeSeconds);
+                    activeStart = segmentStartEvent;
+                }
                 else
                 {
-                    var prevTime = DateTime.Parse(rawList[i - 1].Timestamp);
-                    var currTime = DateTime.Parse(rawList[i].Timestamp);
-                    rawList[i].TimeSincePrevious = FormatTimeSpan(currTime - prevTime);
+                    activeStart = null;
                 }
+
+                // 计算相邻事件间隔
+                for (int i = 0; i < rawList.Count; i++)
+                {
+                    if (i == 0)
+                        rawList[i].TimeSincePrevious = "-";
+                    else
+                    {
+                        var prevTime = DateTime.Parse(rawList[i - 1].Timestamp);
+                        var currTime = DateTime.Parse(rawList[i].Timestamp);
+                        rawList[i].TimeSincePrevious = FormatTimeSpan(currTime - prevTime);
+                    }
+                }
+
+                // 倒序加入集合
+                for (int i = rawList.Count - 1; i >= 0; i--)
+                    events.Add(rawList[i]);
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "后台加载会话事件失败");
+            }
+        });
 
-            // 倒序，最新在最上面
-            for (int i = rawList.Count - 1; i >= 0; i--)
-                events.Add(rawList[i]);
-
-            SessionEvents = events;
-
-            _logger.LogDebug("加载会话事件完成，共 {Count} 条", events.Count);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "加载会话事件失败");
-        }
+        // 回到 UI 线程更新绑定源
+        SessionEvents = events;
+        _activeSessionStartEvent = activeStart;
     }
 
     // 工具方法：格式化秒数
