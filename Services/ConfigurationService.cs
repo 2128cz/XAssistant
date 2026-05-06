@@ -70,4 +70,28 @@ public class ConfigurationService : IConfigurationService
     }
 
     public bool GetKeyRecordingAutoStart() => _appSettings.Recording.AutoStartKeyRecording;
+
+    public double GetWindowWidth() => _appSettings.General.WindowWidth;
+
+    public double GetWindowHeight() => _appSettings.General.WindowHeight;
+
+    public bool GetIsLogExpanded() => _appSettings.General.IsLogExpanded;
+
+    public void SetWindowWidth(double width)
+    {
+        _appSettings.General.WindowWidth = width;
+        Save();
+    }
+
+    public void SetWindowHeight(double height)
+    {
+        _appSettings.General.WindowHeight = height;
+        Save();
+    }
+
+    public void SetIsLogExpanded(bool expanded)
+    {
+        _appSettings.General.IsLogExpanded = expanded;
+        Save();
+    }
 }

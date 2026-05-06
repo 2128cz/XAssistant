@@ -15,4 +15,7 @@ public class RecordingSettings
 public class GeneralSettings
 {
     public bool StartMinimized { get; set; }
+    public double WindowWidth { get; set; } = 1280;
+    public double WindowHeight { get; set; } = 720;
+    public bool IsLogExpanded { get; set; } = false;
 }

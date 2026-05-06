@@ -92,8 +92,9 @@ public partial class UsageViewModel : ViewModelBase
                     : $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
             return seconds;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "管道获取今日秒数失败，回退到数据库");
             try
             {
                 var seconds = LoadTodaySecondsFromDb();
@@ -102,8 +103,9 @@ public partial class UsageViewModel : ViewModelBase
                     $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2} (数据库)";
                 return seconds;
             }
-            catch
+            catch (Exception dbEx)
             {
+                _logger.LogError(dbEx, "数据库读取今日秒数也失败");
                 TodayUsageText = "无法获取";
                 return 0;
             }

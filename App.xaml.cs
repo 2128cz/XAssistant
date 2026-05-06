@@ -37,25 +37,18 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
-        // ---------- 1. 初始化 Serilog 文件日志 ----------
+        // ---------- 1. 准备日志目录 ----------
         string logDir = AppDataPathHelper.GetAppDataFolder();
         string logPath = System.IO.Path.Combine(logDir, "logs", "xassistant-.log");
-        Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Debug()
-            .WriteTo.File(
-                logPath,
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 31,
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"
-            )
-            .CreateLogger();
 
         var services = new ServiceCollection();
 
-        // ---------- 2. 添加日志服务 ----------
-        services.AddLogging(builder => builder.AddSerilog());
+        // ---------- 2. 创建 LogBufferService 实例并提前注册 ----------
+        // 这样 Serilog 配置和 DI 都使用同一个实例，且无需提前 Build 容器
+        var logBuffer = new LogBufferService();
+        services.AddSingleton<ILogBufferService>(logBuffer);
 
-        // ---------- 3. 应用服务 ----------
+        // ---------- 3. 注册其他应用服务 ----------
         services.AddSingleton<IMouseClickHookService, MouseClickHookService>();
         services.AddSingleton<IClickDatabaseService, ClickDatabaseService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -70,14 +63,32 @@ public partial class App : System.Windows.Application
         services.AddSingleton<KeyCounterViewModel>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<UsageViewModel>();
+        services.AddSingleton<LogViewerViewModel>();
 
+        // ---------- 4. 配置 Serilog Logger ----------
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.File(
+                logPath,
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 31,
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"
+            )
+            .WriteTo.Sink(new UiLogSink(logBuffer))
+            .CreateLogger();
+
+        // ---------- 5. 添加日志服务到 DI ----------
+        services.AddLogging(builder => builder.AddSerilog());
+
+        // ---------- 6. 构建容器 ----------
         var provider = services.BuildServiceProvider();
         Services = provider;
 
-        // ---------- 4. 获取系统日志记录器 ----------
+        // ---------- 7. 获取系统日志记录器 ----------
         _appLogger = provider.GetRequiredService<ILogger<App>>();
         _appLogger.LogInformation("═══════ XAssistant 启动成功 ═══════");
 
+        // 后续主窗口……
         var mainVM = provider.GetRequiredService<MainWindowViewModel>();
         mainVM.NavigateCommand.Execute("ClickCounter");
 
