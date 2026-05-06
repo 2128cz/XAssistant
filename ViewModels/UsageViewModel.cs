@@ -1,11 +1,10 @@
-using System;
 using System.Collections.ObjectModel;
 using System.IO.Pipes;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 using XAssistant.Models;
 
 namespace XAssistant.ViewModels;
@@ -15,6 +14,7 @@ public partial class UsageViewModel : ViewModelBase
     private const string DbPath = @"C:\ProgramData\XAssistant\UsageTracker\pc_usage.db";
     private const string PipeName = "UsageTrackerPipe";
     private readonly DispatcherTimer _refreshTimer;
+    private readonly ILogger<UsageViewModel> _logger;
 
     [ObservableProperty]
     private string _todayUsageText = "00:00:00";
@@ -27,8 +27,9 @@ public partial class UsageViewModel : ViewModelBase
     [ObservableProperty]
     private ObservableCollection<SessionEvent> _sessionEvents = new();
 
-    public UsageViewModel()
+    public UsageViewModel(ILogger<UsageViewModel> logger)
     {
+        _logger = logger;
         _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _refreshTimer.Tick += async (_, _) =>
         {
@@ -56,14 +57,16 @@ public partial class UsageViewModel : ViewModelBase
             var seconds = await GetTodaySecondsFromPipeAsync();
             return seconds;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "管道获取失败，尝试本地数据库");
             try
             {
                 return LoadTodaySecondsFromDb();
             }
-            catch
+            catch (Exception dbEx)
             {
+                _logger.LogError(dbEx, "数据库读取今日秒数失败");
                 return 0;
             }
         }
@@ -71,6 +74,7 @@ public partial class UsageViewModel : ViewModelBase
 
     private async Task RefreshAllAsync()
     {
+        _logger.LogInformation("开始刷新全部数据");
         await RefreshTodayAsync();
         LoadHistory();
         LoadSessionEvents(); // 新增
@@ -122,22 +126,13 @@ public partial class UsageViewModel : ViewModelBase
                     new DailyUsage { Date = reader.GetString(0), Seconds = reader.GetInt64(1) }
                 );
             }
+            _logger.LogDebug("加载历史记录完成，共 {Count} 条", list.Count);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "加载历史记录失败");
+        }
         History = list;
-    }
-
-    private void UpdateLatestEventCumulative(long seconds)
-    {
-        if (SessionEvents.Count == 0)
-            return;
-
-        var latestEvent = SessionEvents[0]; // 因为倒序排列，第一项即最新事件
-        var ts = TimeSpan.FromSeconds(seconds);
-        latestEvent.FormattedCumulativeUsage =
-            ts.TotalDays >= 1
-                ? $"{(int)ts.TotalDays}d {ts.Hours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}"
-                : $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
     }
 
     // 加载最近的事件记录（例如最近 50 条）
@@ -249,8 +244,13 @@ public partial class UsageViewModel : ViewModelBase
                 events.Add(rawList[i]);
 
             SessionEvents = events;
+
+            _logger.LogDebug("加载会话事件完成，共 {Count} 条", events.Count);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "加载会话事件失败");
+        }
     }
 
     // 工具方法：格式化秒数

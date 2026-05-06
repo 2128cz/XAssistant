@@ -1,9 +1,7 @@
-using System;
-using System.Drawing;
-using System.Runtime.Versioning;
 using System.Windows;
-using System.Windows.Forms;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Serilog;
 using XAssistant.Services;
 using XAssistant.Services.Interfaces;
 using XAssistant.ViewModels;
@@ -14,17 +12,50 @@ namespace XAssistant;
 public partial class App : System.Windows.Application
 {
     public static IServiceProvider Services { get; private set; } = null!;
-
     private NotifyIcon? _notifyIcon;
     internal static bool IsShuttingDown { get; private set; }
+
+    private ILogger<App>? _appLogger;
+
+    public App()
+    {
+        // 全局 UI 线程异常
+        DispatcherUnhandledException += (_, e) =>
+        {
+            _appLogger?.LogCritical(e.Exception, "未处理的 UI 线程异常");
+            e.Handled = true; // 防止进程崩溃，但记录日志
+        };
+
+        // 应用程序域未处理异常（通常导致进程退出）
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            _appLogger?.LogCritical(e.ExceptionObject as Exception, "未处理的应用程序域异常");
+        };
+    }
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
+        // ---------- 1. 初始化 Serilog 文件日志 ----------
+        string logDir = AppDataPathHelper.GetAppDataFolder();
+        string logPath = System.IO.Path.Combine(logDir, "logs", "xassistant-.log");
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.File(
+                logPath,
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 31,
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"
+            )
+            .CreateLogger();
+
         var services = new ServiceCollection();
 
-        // 服务（单例，共享状态）
+        // ---------- 2. 添加日志服务 ----------
+        services.AddLogging(builder => builder.AddSerilog());
+
+        // ---------- 3. 应用服务 ----------
         services.AddSingleton<IMouseClickHookService, MouseClickHookService>();
         services.AddSingleton<IClickDatabaseService, ClickDatabaseService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -43,6 +74,10 @@ public partial class App : System.Windows.Application
         var provider = services.BuildServiceProvider();
         Services = provider;
 
+        // ---------- 4. 获取系统日志记录器 ----------
+        _appLogger = provider.GetRequiredService<ILogger<App>>();
+        _appLogger.LogInformation("═══════ XAssistant 启动成功 ═══════");
+
         var mainVM = provider.GetRequiredService<MainWindowViewModel>();
         mainVM.NavigateCommand.Execute("ClickCounter");
 
@@ -50,7 +85,6 @@ public partial class App : System.Windows.Application
         MainWindow = mainWindow;
         mainWindow.Show();
 
-        // 初始化系统托盘
         InitializeNotifyIcon(mainWindow);
     }
 
@@ -92,6 +126,9 @@ public partial class App : System.Windows.Application
         IsShuttingDown = true;
         _notifyIcon!.Visible = false;
         _notifyIcon.Dispose();
+
+        _appLogger?.LogInformation("用户触发退出，应用即将关闭");
+        Log.CloseAndFlush();
         Shutdown();
     }
 
@@ -112,7 +149,9 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _appLogger?.LogInformation("应用 OnExit 执行");
         _notifyIcon?.Dispose();
+        Log.CloseAndFlush();
         base.OnExit(e);
     }
 }
