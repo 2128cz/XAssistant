@@ -37,18 +37,18 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
-        // ---------- 1. 准备日志目录 ----------
+        // 准备日志目录
         string logDir = AppDataPathHelper.GetAppDataFolder();
         string logPath = System.IO.Path.Combine(logDir, "logs", "xassistant-.log");
 
         var services = new ServiceCollection();
 
-        // ---------- 2. 创建 LogBufferService 实例并提前注册 ----------
+        // 创建 LogBufferService 实例并提前注册
         // 这样 Serilog 配置和 DI 都使用同一个实例，且无需提前 Build 容器
         var logBuffer = new LogBufferService();
         services.AddSingleton<ILogBufferService>(logBuffer);
 
-        // ---------- 3. 注册其他应用服务 ----------
+        // 注册其他应用服务
         services.AddSingleton<IMouseClickHookService, MouseClickHookService>();
         services.AddSingleton<IClickDatabaseService, ClickDatabaseService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -63,9 +63,12 @@ public partial class App : System.Windows.Application
         services.AddSingleton<KeyCounterViewModel>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<UsageViewModel>();
+        services.AddSingleton<AppUsageViewModel>();
         services.AddSingleton<LogViewerViewModel>();
 
-        // ---------- 4. 配置 Serilog Logger ----------
+        services.AddSingleton<ProcessUsageTracker>();
+
+        // 配置 Serilog Logger
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.File(
@@ -77,18 +80,22 @@ public partial class App : System.Windows.Application
             .WriteTo.Sink(new UiLogSink(logBuffer))
             .CreateLogger();
 
-        // ---------- 5. 添加日志服务到 DI ----------
+        // 添加日志服务到 DI
         services.AddLogging(builder => builder.AddSerilog());
 
-        // ---------- 6. 构建容器 ----------
+        // 构建容器
         var provider = services.BuildServiceProvider();
         Services = provider;
 
-        // ---------- 7. 获取系统日志记录器 ----------
+        // 启动进程追踪
+        var processTracker = provider.GetRequiredService<ProcessUsageTracker>();
+        processTracker.Start();
+
+        // 获取系统日志记录器
         _appLogger = provider.GetRequiredService<ILogger<App>>();
         _appLogger.LogInformation("═══════ XAssistant 启动成功 ═══════");
 
-        // 后续主窗口……
+        // 后续主窗口
         var mainVM = provider.GetRequiredService<MainWindowViewModel>();
         mainVM.NavigateCommand.Execute("ClickCounter");
 
@@ -161,6 +168,9 @@ public partial class App : System.Windows.Application
     protected override void OnExit(ExitEventArgs e)
     {
         _appLogger?.LogInformation("应用 OnExit 执行");
+        var tracker = Services.GetRequiredService<ProcessUsageTracker>();
+        tracker.Stop();
+        tracker.Dispose();
         _notifyIcon?.Dispose();
         Log.CloseAndFlush();
         base.OnExit(e);

@@ -1,9 +1,9 @@
-@echo off
-echo ===== ¿ªÊ¼·¢²¼ XAssistant =====
+ï»¿@echo off
+echo ===== å¼€å§‹å‘å¸ƒ XAssistant =====
 dotnet publish -r win-x64 -c Release
 if %errorlevel% equ 0 (
-    echo ===== ·¢²¼³É¹¦£¡Êä³öÔÚ .\publish ÎÄ¼ş¼Ğ =====
+    echo ===== å‘å¸ƒæˆåŠŸï¼è¾“å‡ºåœ¨ .\publish æ–‡ä»¶å¤¹ =====
 ) else (
-    echo ===== ·¢²¼Ê§°Ü£¬Çë¼ì²é´íÎó =====
+    echo ===== å‘å¸ƒå¤±è´¥ï¼Œè¯·æ£€æŸ¥é”™è¯¯ =====
 )
 pause

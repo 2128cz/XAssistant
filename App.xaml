@@ -14,5 +14,8 @@
     <DataTemplate DataType="{x:Type vm:UsageViewModel}">
       <views:UsageView />
     </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:AppUsageViewModel}">
+      <views:AppUsageView />
+    </DataTemplate>
   </Application.Resources>
 </Application>

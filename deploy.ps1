@@ -1,78 +1,78 @@
-<#
+ï»¿<#
 .SYNOPSIS
-    ¹¹½¨ XAssistant ²¢²¿Êğµ½ C:\XAssistant
+    æ„å»º XAssistant å¹¶éƒ¨ç½²åˆ° C:\XAssistant
 .DESCRIPTION
-    1. Ê¹ÓÃ Release ÅäÖÃ·¢²¼ÏîÄ¿
-    2. ÈôÄ¿±êÓ¦ÓÃÕıÔÚÔËĞĞ£¬Ç¿ÖÆ½áÊø½ø³Ì
-    3. ±¸·İ C:\XAssistant ÏÂµÄ¾ÉÎÄ¼ş£¨ÈçÓĞ£©
-    4. ½«·¢²¼Êä³ö¸´ÖÆµ½ C:\XAssistant
-    5. Æô¶¯Ó¦ÓÃ
+    1. ä½¿ç”¨ Release é…ç½®å‘å¸ƒé¡¹ç›®
+    2. è‹¥ç›®æ ‡åº”ç”¨æ­£åœ¨è¿è¡Œï¼Œå¼ºåˆ¶ç»“æŸè¿›ç¨‹
+    3. å¤‡ä»½ C:\XAssistant ä¸‹çš„æ—§æ–‡ä»¶ï¼ˆå¦‚æœ‰ï¼‰
+    4. å°†å‘å¸ƒè¾“å‡ºå¤åˆ¶åˆ° C:\XAssistant
+    5. å¯åŠ¨åº”ç”¨
 .NOTES
-    ½Å±¾ĞèÔÚÏîÄ¿¸ùÄ¿Â¼£¨XAssistant.csproj ËùÔÚÄ¿Â¼£©ÒÔ¹ÜÀíÔ±Éí·İÔËĞĞ£¬
-    ÒòÎª C:\XAssistant ¿ÉÄÜĞèÒª¹ÜÀíÔ±È¨ÏŞ¡£
+    è„šæœ¬éœ€åœ¨é¡¹ç›®æ ¹ç›®å½•ï¼ˆXAssistant.csproj æ‰€åœ¨ç›®å½•ï¼‰ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œï¼Œ
+    å› ä¸º C:\XAssistant å¯èƒ½éœ€è¦ç®¡ç†å‘˜æƒé™ã€‚
 #>
 
 $ErrorActionPreference = "Stop"
 
-# ---------- ÅäÖÃ ----------
+# ---------- é…ç½® ----------
 $scriptPath   = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectFile  = Join-Path $scriptPath "XAssistant.csproj"
 $targetDir    = "C:\XAssistant"
 $processName  = "XAssistant"
 $publishDir   = Join-Path $scriptPath "bin\Release\net10.0-windows\win-x64\publish"
 
-# ---------- 1. ¹¹½¨·¢²¼ ----------
-Write-Host "[1/5] ÕıÔÚ·¢²¼ÏîÄ¿ (Release)..." -ForegroundColor Cyan
+# ---------- 1. æ„å»ºå‘å¸ƒ ----------
+Write-Host "[1/5] æ­£åœ¨å‘å¸ƒé¡¹ç›® (Release)..." -ForegroundColor Cyan
 dotnet publish $projectFile -r win-x64 -c Release
 if ($LASTEXITCODE -ne 0) {
-    throw "·¢²¼Ê§°Ü£¬Çë¼ì²é´íÎóĞÅÏ¢¡£"
+    throw "å‘å¸ƒå¤±è´¥ï¼Œè¯·æ£€æŸ¥é”™è¯¯ä¿¡æ¯ã€‚"
 }
-Write-Host "    ·¢²¼Íê³É: $publishDir" -ForegroundColor Green
+Write-Host "    å‘å¸ƒå®Œæˆ: $publishDir" -ForegroundColor Green
 
-# ---------- 2. Í£Ö¹ÕıÔÚÔËĞĞµÄÊµÀı ----------
-Write-Host "[2/5] ¼ì²éÊÇ·ñÕıÔÚÔËĞĞ..." -ForegroundColor Cyan
+# ---------- 2. åœæ­¢æ­£åœ¨è¿è¡Œçš„å®ä¾‹ ----------
+Write-Host "[2/5] æ£€æŸ¥æ˜¯å¦æ­£åœ¨è¿è¡Œ..." -ForegroundColor Cyan
 $runningProcess = Get-Process -Name $processName -ErrorAction SilentlyContinue
 if ($runningProcess) {
-    Write-Host "    ·¢ÏÖÔËĞĞÖĞµÄ½ø³Ì£¬ÕıÔÚÍ£Ö¹..." -ForegroundColor Yellow
+    Write-Host "    å‘ç°è¿è¡Œä¸­çš„è¿›ç¨‹ï¼Œæ­£åœ¨åœæ­¢..." -ForegroundColor Yellow
     Stop-Process -Name $processName -Force
     Start-Sleep -Seconds 2
-    Write-Host "    ÒÑÍ£Ö¹¡£" -ForegroundColor Green
+    Write-Host "    å·²åœæ­¢ã€‚" -ForegroundColor Green
 } else {
-    Write-Host "    Î´¼ì²âµ½ÔËĞĞÊµÀı¡£" -ForegroundColor Green
+    Write-Host "    æœªæ£€æµ‹åˆ°è¿è¡Œå®ä¾‹ã€‚" -ForegroundColor Green
 }
 
-# ---------- 3. ±¸·İ¾É°æ±¾ ----------
-Write-Host "[3/5] ±¸·İ¾É°æ±¾..." -ForegroundColor Cyan
+# ---------- 3. å¤‡ä»½æ—§ç‰ˆæœ¬ ----------
+Write-Host "[3/5] å¤‡ä»½æ—§ç‰ˆæœ¬..." -ForegroundColor Cyan
 if (Test-Path $targetDir) {
     $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $backupDir = "C:\XAssistant_Backup_$timestamp"
-    Write-Host "    ÕıÔÚ±¸·İµ½ $backupDir ..." -ForegroundColor Yellow
+    Write-Host "    æ­£åœ¨å¤‡ä»½åˆ° $backupDir ..." -ForegroundColor Yellow
     Copy-Item -Path $targetDir -Destination $backupDir -Recurse -Force
-    Write-Host "    ±¸·İÍê³É¡£" -ForegroundColor Green
+    Write-Host "    å¤‡ä»½å®Œæˆã€‚" -ForegroundColor Green
 } else {
-    Write-Host "    Ä¿±êÄ¿Â¼²»´æÔÚ£¬ÎŞĞè±¸·İ¡£" -ForegroundColor Green
+    Write-Host "    ç›®æ ‡ç›®å½•ä¸å­˜åœ¨ï¼Œæ— éœ€å¤‡ä»½ã€‚" -ForegroundColor Green
 }
 
-# ---------- 4. ¸´ÖÆĞÂÎÄ¼ş ----------
-Write-Host "[4/5] ¸´ÖÆĞÂÎÄ¼şµ½ $targetDir ..." -ForegroundColor Cyan
-# È·±£Ä¿±êÄ¿Â¼´æÔÚ
+# ---------- 4. å¤åˆ¶æ–°æ–‡ä»¶ ----------
+Write-Host "[4/5] å¤åˆ¶æ–°æ–‡ä»¶åˆ° $targetDir ..." -ForegroundColor Cyan
+# ç¡®ä¿ç›®æ ‡ç›®å½•å­˜åœ¨
 New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
 
-# Çå¿ÕÄ¿±êÄ¿Â¼£¨±ÜÃâ²ĞÁô¾ÉÎÄ¼ş£©
+# æ¸…ç©ºç›®æ ‡ç›®å½•ï¼ˆé¿å…æ®‹ç•™æ—§æ–‡ä»¶ï¼‰
 Remove-Item "$targetDir\*" -Recurse -Force -ErrorAction SilentlyContinue
 
-# ¸´ÖÆËùÓĞ·¢²¼ÎÄ¼ş
+# å¤åˆ¶æ‰€æœ‰å‘å¸ƒæ–‡ä»¶
 Copy-Item -Path "$publishDir\*" -Destination $targetDir -Recurse -Force
-Write-Host "    ¸´ÖÆÍê³É¡£" -ForegroundColor Green
+Write-Host "    å¤åˆ¶å®Œæˆã€‚" -ForegroundColor Green
 
-# ---------- 5. Æô¶¯Ó¦ÓÃ ----------
-Write-Host "[5/5] Æô¶¯ XAssistant..." -ForegroundColor Cyan
+# ---------- 5. å¯åŠ¨åº”ç”¨ ----------
+Write-Host "[5/5] å¯åŠ¨ XAssistant..." -ForegroundColor Cyan
 $appExe = Join-Path $targetDir "XAssistant.exe"
 if (Test-Path $appExe) {
     Start-Process $appExe
-    Write-Host "    Ó¦ÓÃÒÑÆô¶¯¡£" -ForegroundColor Green
+    Write-Host "    åº”ç”¨å·²å¯åŠ¨ã€‚" -ForegroundColor Green
 } else {
-    throw "Î´ÕÒµ½ $appExe £¬²¿Êğ¿ÉÄÜ²»ÍêÕû¡£"
+    throw "æœªæ‰¾åˆ° $appExe ï¼Œéƒ¨ç½²å¯èƒ½ä¸å®Œæ•´ã€‚"
 }
 
-Write-Host "`n²¿Êğ³É¹¦£¡" -ForegroundColor Green
+Write-Host "`néƒ¨ç½²æˆåŠŸï¼" -ForegroundColor Green

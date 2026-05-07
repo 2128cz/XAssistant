@@ -29,7 +29,11 @@
         <Button
           Command="{Binding NavigateCommand}"
           CommandParameter="Usage"
-          Content="使用统计" />
+          Content="电脑使用统计" />
+        <Button
+          Command="{Binding NavigateCommand}"
+          CommandParameter="AppUsage"
+          Content="软件使用" />
         <Separator Margin="0,20,0,5" />
         <CheckBox
           Margin="10,5"
