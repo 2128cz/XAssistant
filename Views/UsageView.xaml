@@ -26,7 +26,7 @@
                 Text="{Binding TodayUsageText}" />
         </GroupBox>
 
-        <!--  历史记录  -->
+        <!--  历史使用时长  -->
         <GroupBox Grid.Row="1" Header="历史使用时长">
             <DataGrid
                 AutoGenerateColumns="False"
@@ -42,7 +42,24 @@
                     <DataGridTextColumn
                         Width="200"
                         Binding="{Binding FormattedTime}"
-                        Header="时长" />
+                        Header="时长（数据库）" />
+                    <!--  修正时长列 – 仅当存在差异时显示为红色强调  -->
+                    <DataGridTextColumn
+                        Width="200"
+                        Binding="{Binding FormattedCorrectedTime}"
+                        Header="修正时长">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="Black" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasDiscrepancy}" Value="True">
+                                        <Setter Property="Foreground" Value="Red" />
+                                        <Setter Property="FontWeight" Value="Bold" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
                 </DataGrid.Columns>
             </DataGrid>
         </GroupBox>
@@ -71,7 +88,7 @@
                     <DataGridTextColumn
                         Width="150"
                         Binding="{Binding FormattedCumulativeUsage}"
-                        Header="累计时长" />
+                        Header="本次会话时长" />
                 </DataGrid.Columns>
             </DataGrid>
         </GroupBox>

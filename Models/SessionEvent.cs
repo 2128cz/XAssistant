@@ -11,7 +11,7 @@ public partial class SessionEvent : ObservableObject
     public long TotalSeconds { get; set; }
 
     [ObservableProperty]
-    private string _timeSincePrevious = string.Empty;
+    private string _timeSincePrevious = "-"; // 初始值为 "-"
 
     [ObservableProperty]
     private string _formattedCumulativeUsage = string.Empty;

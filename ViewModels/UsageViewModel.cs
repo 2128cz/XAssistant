@@ -21,11 +21,13 @@ public partial class UsageViewModel : ViewModelBase
 
     [ObservableProperty]
     private ObservableCollection<DailyUsage> _history = new();
+
     private SessionEvent? _activeSessionStartEvent;
+    private DateTime? _activeSessionStartTime;
+    private long _todayCorrectedSeconds; // 根据事件时间戳计算的今日总秒数
 
     private volatile bool _isRefreshing;
 
-    // 会话事件集合
     [ObservableProperty]
     private ObservableCollection<SessionEvent> _sessionEvents = new();
 
@@ -35,7 +37,6 @@ public partial class UsageViewModel : ViewModelBase
         _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _refreshTimer.Tick += async (_, _) =>
         {
-            // 防止上一次刷新还未结束就再次触发
             if (_isRefreshing)
                 return;
             _isRefreshing = true;
@@ -70,24 +71,44 @@ public partial class UsageViewModel : ViewModelBase
     {
         try
         {
-            var seconds = await GetTodaySecondsFromPipeAsync();
-            var ts = TimeSpan.FromSeconds(seconds);
+            // 从管道获取服务端缓存值（可能不准）
+            var pipeSeconds = await GetTodaySecondsFromPipeAsync();
+
+            // 基于事件时间戳计算今日实际使用时长
+            var eventSeconds = _todayCorrectedSeconds;
+            if (_activeSessionStartTime.HasValue)
+            {
+                eventSeconds += (long)(DateTime.Now - _activeSessionStartTime.Value).TotalSeconds;
+            }
+
+            // 如果管道值和事件计算值差距大于5秒，记录警告并优先使用事件计算值
+            if (Math.Abs(pipeSeconds - eventSeconds) > 5)
+            {
+                _logger.LogWarning(
+                    "今日使用时长不一致：管道 {Pipe}s vs 事件计算 {Event}s，采用事件计算值",
+                    pipeSeconds,
+                    eventSeconds
+                );
+            }
+
+            var ts = TimeSpan.FromSeconds(eventSeconds);
             TodayUsageText =
                 ts.TotalDays >= 1
                     ? $"{(int)ts.TotalDays} 天 {ts.Hours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}"
                     : $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
-            return seconds;
+
+            return eventSeconds;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "管道获取今日秒数失败，回退到数据库");
             try
             {
-                var seconds = LoadTodaySecondsFromDb();
-                var ts = TimeSpan.FromSeconds(seconds);
+                var dbSeconds = LoadTodaySecondsFromDb();
+                var ts = TimeSpan.FromSeconds(dbSeconds);
                 TodayUsageText =
                     $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2} (数据库)";
-                return seconds;
+                return dbSeconds;
             }
             catch (Exception dbEx)
             {
@@ -105,19 +126,72 @@ public partial class UsageViewModel : ViewModelBase
         {
             try
             {
+                // 1. 读取数据库原始记录
                 using var conn = new SqliteConnection($"Data Source={DbPath}");
                 conn.Open();
                 var cmd = conn.CreateCommand();
                 cmd.CommandText =
                     "SELECT Date, Seconds FROM DailyUsage ORDER BY Date DESC LIMIT 30";
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
+                var dbRecords = new List<DailyUsage>();
+                using (var reader = cmd.ExecuteReader())
                 {
-                    list.Add(
-                        new DailyUsage { Date = reader.GetString(0), Seconds = reader.GetInt64(1) }
-                    );
+                    while (reader.Read())
+                    {
+                        dbRecords.Add(
+                            new DailyUsage
+                            {
+                                Date = reader.GetString(0),
+                                Seconds = reader.GetInt64(1),
+                            }
+                        );
+                    }
                 }
-                // _logger.LogDebug("后台加载历史记录完成，共 {Count} 条", list.Count);
+
+                // 2. 从事件时间戳计算每一天的实际总秒数（已完成段）
+                var eventDailySeconds = new Dictionary<string, long>();
+                cmd.CommandText =
+                    @"
+                    SELECT Id, EventType, Timestamp, Date
+                    FROM SessionEvents
+                    ORDER BY Id ASC";
+                using (var reader = cmd.ExecuteReader())
+                {
+                    DateTime? segmentStart = null;
+                    foreach (var row in reader.Cast<System.Data.Common.DbDataRecord>())
+                    {
+                        var eventType = reader.GetString(1);
+                        var timestampStr = reader.GetString(2);
+                        var date = reader.GetString(3);
+                        if (!DateTime.TryParse(timestampStr, out var currTime))
+                            continue;
+
+                        if (eventType == "ServiceStarted" || eventType == "Resume")
+                        {
+                            segmentStart = currTime;
+                        }
+                        else if (
+                            (eventType == "Suspend" || eventType == "ServiceStopped")
+                            && segmentStart.HasValue
+                        )
+                        {
+                            var segmentSeconds = (long)(currTime - segmentStart.Value).TotalSeconds;
+                            if (!eventDailySeconds.ContainsKey(date))
+                                eventDailySeconds[date] = 0;
+                            eventDailySeconds[date] += segmentSeconds;
+                            segmentStart = null;
+                        }
+                    }
+                }
+
+                // 3. 对比并填充修正值
+                foreach (var record in dbRecords)
+                {
+                    if (eventDailySeconds.TryGetValue(record.Date, out var corrected))
+                    {
+                        record.CorrectedSeconds = corrected;
+                    }
+                    list.Add(record);
+                }
             }
             catch (Exception ex)
             {
@@ -127,15 +201,15 @@ public partial class UsageViewModel : ViewModelBase
         History = list;
     }
 
-    // 加载最近的事件记录（例如最近 50 条）在后台线程读取数据库，回到 UI 线程更新集合
     private async Task LoadSessionEventsAsync()
     {
         var events = new ObservableCollection<SessionEvent>();
         SessionEvent? activeStart = null;
+        DateTime? activeStartTime = null;
+        var dailyCorrectedSeconds = new Dictionary<string, long>();
 
         await Task.Run(() =>
         {
-            // 从数据库读取原始数据
             var rawList = new List<SessionEvent>();
             try
             {
@@ -144,9 +218,9 @@ public partial class UsageViewModel : ViewModelBase
                 var cmd = conn.CreateCommand();
                 cmd.CommandText =
                     @"
-                SELECT Id, EventType, Timestamp, Date, TotalSeconds
-                FROM SessionEvents
-                ORDER BY Id ASC";
+                    SELECT Id, EventType, Timestamp, Date, TotalSeconds
+                    FROM SessionEvents
+                    ORDER BY Id ASC";
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
@@ -162,10 +236,9 @@ public partial class UsageViewModel : ViewModelBase
                     );
                 }
 
-                // 计算每个事件的累计时长、间隔等（原 LoadSessionEvents 中的逻辑）
+                // 遍历事件，用时间戳计算每个段的时长，并累加每日总秒数
                 SessionEvent? segmentStartEvent = null;
                 DateTime? segmentStartTime = null;
-                long segmentStartTotalSeconds = 0;
 
                 for (int i = 0; i < rawList.Count; i++)
                 {
@@ -177,18 +250,28 @@ public partial class UsageViewModel : ViewModelBase
                     {
                         segmentStartEvent = evt;
                         segmentStartTime = currTime;
-                        segmentStartTotalSeconds = evt.TotalSeconds;
                         evt.FormattedCumulativeUsage = evt.EventType == "Resume" ? "…" : "";
                     }
                     else if (evt.EventType == "Suspend" || evt.EventType == "ServiceStopped")
                     {
                         if (segmentStartEvent != null && segmentStartTime.HasValue)
                         {
-                            long segmentSeconds = evt.TotalSeconds - segmentStartTotalSeconds;
-                            string formatted = FormatSeconds(segmentSeconds);
-                            evt.FormattedCumulativeUsage = formatted;
-                            segmentStartEvent.FormattedCumulativeUsage =
-                                segmentStartEvent.EventType == "Resume" ? formatted : "";
+                            // 使用时间戳差计算段时长，不再依赖 TotalSeconds
+                            long segmentSeconds = (long)
+                                (currTime - segmentStartTime.Value).TotalSeconds;
+
+                            // 累加到当日校正总秒数
+                            string dateKey = evt.Date;
+                            if (!dailyCorrectedSeconds.ContainsKey(dateKey))
+                                dailyCorrectedSeconds[dateKey] = 0;
+                            dailyCorrectedSeconds[dateKey] += segmentSeconds;
+
+                            evt.FormattedCumulativeUsage = FormatSeconds(segmentSeconds);
+                            if (segmentStartEvent.EventType == "Resume")
+                                segmentStartEvent.FormattedCumulativeUsage = FormatSeconds(
+                                    segmentSeconds
+                                );
+
                             segmentStartEvent = null;
                             segmentStartTime = null;
                         }
@@ -199,17 +282,23 @@ public partial class UsageViewModel : ViewModelBase
                     }
                 }
 
-                // 如果末尾还有未结束的段（当前活跃会话）
-                if (segmentStartEvent != null)
+                // 处理末尾未结束的活跃段
+                if (segmentStartEvent != null && segmentStartTime.HasValue)
                 {
-                    long activeSeconds = (long)
-                        (DateTime.Now - segmentStartTime!.Value).TotalSeconds;
+                    long activeSeconds = (long)(DateTime.Now - segmentStartTime.Value).TotalSeconds;
+                    string activeDate = DateTime.Now.ToString("yyyy-MM-dd");
+                    if (!dailyCorrectedSeconds.ContainsKey(activeDate))
+                        dailyCorrectedSeconds[activeDate] = 0;
+                    dailyCorrectedSeconds[activeDate] += activeSeconds;
+
                     segmentStartEvent.FormattedCumulativeUsage = FormatSeconds(activeSeconds);
                     activeStart = segmentStartEvent;
+                    activeStartTime = segmentStartTime;
                 }
                 else
                 {
                     activeStart = null;
+                    activeStartTime = null;
                 }
 
                 // 计算相邻事件间隔
@@ -235,12 +324,17 @@ public partial class UsageViewModel : ViewModelBase
             }
         });
 
-        // 回到 UI 线程更新绑定源
         SessionEvents = events;
         _activeSessionStartEvent = activeStart;
+        _activeSessionStartTime = activeStartTime;
+        _todayCorrectedSeconds = dailyCorrectedSeconds.TryGetValue(
+            DateTime.Now.ToString("yyyy-MM-dd"),
+            out var todaySec
+        )
+            ? todaySec
+            : 0;
     }
 
-    // 工具方法：格式化秒数
     private static string FormatSeconds(long sec)
     {
         var ts = TimeSpan.FromSeconds(sec);
@@ -249,7 +343,6 @@ public partial class UsageViewModel : ViewModelBase
             : $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
     }
 
-    // 格式化时间差为可读字符串
     private static string FormatTimeSpan(TimeSpan ts)
     {
         if (ts.TotalSeconds < 60)
