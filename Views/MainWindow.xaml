@@ -20,6 +20,10 @@
         DockPanel.Dock="Left">
         <Button
           Command="{Binding NavigateCommand}"
+          CommandParameter="Home"
+          Content="首页" />
+        <Button
+          Command="{Binding NavigateCommand}"
           CommandParameter="ClickCounter"
           Content="鼠标点击记录" />
         <Button

@@ -1,10 +1,7 @@
-using System;
-using System.Collections.ObjectModel;
-using System.Runtime.Versioning;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using XAssistant.Models;
-using XAssistant.Services;
 using XAssistant.Services.Interfaces;
 
 namespace XAssistant.ViewModels;
@@ -37,25 +34,30 @@ public partial class ClickCounterViewModel : ViewModelBase
     [ObservableProperty]
     private int _rightClickToday;
 
-    // 昨天
+    // 日历选中日期及对应点击量
     [ObservableProperty]
-    private int _leftClickYesterday;
+    private DateTime _selectedDate = DateTime.Today;
 
     [ObservableProperty]
-    private int _middleClickYesterday;
+    private int _selectedDateLeftCount;
 
     [ObservableProperty]
-    private int _rightClickYesterday;
-
-    // 前天
-    [ObservableProperty]
-    private int _leftClickDayBeforeYesterday;
+    private int _selectedDateMiddleCount;
 
     [ObservableProperty]
-    private int _middleClickDayBeforeYesterday;
+    private int _selectedDateRightCount;
 
-    [ObservableProperty]
-    private int _rightClickDayBeforeYesterday;
+    // ===== 新增：首页用聚合属性 =====
+    public int MouseTodayClicks => LeftClickToday + MiddleClickToday + RightClickToday;
+    public int MouseTotalClicks => LeftClickCount + MiddleClickCount + RightClickCount;
+
+    public string MouseRecordingStatus => IsRecording ? "记录中" : "已停止";
+    public System.Windows.Media.Brush MouseRecordingColor =>
+        IsRecording
+            ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x4C, 0xAF, 0x50)) // 绿色
+            : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x9E, 0x9E, 0x9E)); // 灰色
+
+    // =============================
 
     public ClickCounterViewModel(
         IMouseClickHookService hookService,
@@ -67,21 +69,42 @@ public partial class ClickCounterViewModel : ViewModelBase
         _dbService = dbService;
         _configService = configService;
 
-        // 加载历史计数
+        // 加载历史总计
         var counts = _dbService.GetClickCounts();
         LeftClickCount = counts["Left"];
         MiddleClickCount = counts["Middle"];
         RightClickCount = counts["Right"];
 
         RefreshDailyCounts();
+        LoadCountsForDate(SelectedDate);
 
         _hookService.MouseClicked += OnMouseClicked;
 
-        // 根据配置自动开始录制
         if (_configService.GetRecordingAutoStart())
         {
-            StartRecording(); // 这会设置 IsRecording = true 并启动钩子
+            StartRecording();
         }
+    }
+
+    // 当 IsRecording 变化时，自动通知状态属性
+    partial void OnIsRecordingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(MouseRecordingStatus));
+        OnPropertyChanged(nameof(MouseRecordingColor));
+    }
+
+    // SelectedDate 变更时自动加载对应日期的点击量
+    partial void OnSelectedDateChanged(DateTime value)
+    {
+        LoadCountsForDate(value);
+    }
+
+    private void LoadCountsForDate(DateTime date)
+    {
+        var dayCounts = _dbService.GetClickCountsByDate(date);
+        SelectedDateLeftCount = dayCounts["Left"];
+        SelectedDateMiddleCount = dayCounts["Middle"];
+        SelectedDateRightCount = dayCounts["Right"];
     }
 
     public void RefreshDailyCounts()
@@ -90,16 +113,6 @@ public partial class ClickCounterViewModel : ViewModelBase
         LeftClickToday = today["Left"];
         MiddleClickToday = today["Middle"];
         RightClickToday = today["Right"];
-
-        var yesterday = _dbService.GetClickCountsByDate(DateTime.Today.AddDays(-1));
-        LeftClickYesterday = yesterday["Left"];
-        MiddleClickYesterday = yesterday["Middle"];
-        RightClickYesterday = yesterday["Right"];
-
-        var dayBefore = _dbService.GetClickCountsByDate(DateTime.Today.AddDays(-2));
-        LeftClickDayBeforeYesterday = dayBefore["Left"];
-        MiddleClickDayBeforeYesterday = dayBefore["Middle"];
-        RightClickDayBeforeYesterday = dayBefore["Right"];
     }
 
     private DateTime _lastRefreshDate = DateTime.Today;
@@ -109,7 +122,6 @@ public partial class ClickCounterViewModel : ViewModelBase
         if (!IsRecording)
             return;
 
-        // 总量始终实时递增
         switch (button)
         {
             case "Left":
@@ -125,15 +137,13 @@ public partial class ClickCounterViewModel : ViewModelBase
 
         _dbService.SaveClick(new MouseClickRecord { Button = button, ClickTime = DateTime.Now });
 
-        // 检查是否跨天，如跨天则刷新所有每日计数，然后归零今天
         if (DateTime.Today != _lastRefreshDate)
         {
-            RefreshDailyCounts(); // 此时获取到的已经是新一天的数据，今天自动为0
+            RefreshDailyCounts();
             _lastRefreshDate = DateTime.Today;
         }
         else
         {
-            // 同一天内，仅内存递增今天计数（不再查库）
             switch (button)
             {
                 case "Left":
@@ -147,6 +157,10 @@ public partial class ClickCounterViewModel : ViewModelBase
                     break;
             }
         }
+
+        // 通知聚合属性更新
+        OnPropertyChanged(nameof(MouseTodayClicks));
+        OnPropertyChanged(nameof(MouseTotalClicks));
     }
 
     [RelayCommand]

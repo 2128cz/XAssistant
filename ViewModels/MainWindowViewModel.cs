@@ -14,6 +14,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IStartupService _startupService;
     private readonly ILogBufferService _logBuffer;
     private readonly IConfigurationService _configService;
+    private readonly HomeViewModel _homeViewModel;
 
     [ObservableProperty]
     private double _windowWidth;
@@ -56,7 +57,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel(
         IStartupService startupService,
         ILogBufferService logBuffer,
-        IConfigurationService configService
+        IConfigurationService configService,
+        HomeViewModel homeViewModel
     )
     {
         _startupService = startupService;
@@ -65,7 +67,8 @@ public partial class MainWindowViewModel : ViewModelBase
         WindowWidth = _configService.GetWindowWidth();
         WindowHeight = _configService.GetWindowHeight();
         IsLogExpanded = _configService.GetIsLogExpanded();
-
+        CurrentViewModel = homeViewModel;
+        _homeViewModel = homeViewModel;
         IsStartWithWindowsEnabled = _startupService.IsStartWithWindowsEnabled();
 
         // 当日志集合变化时，通知 FilteredLogs 属性变化（简化方式）
@@ -98,6 +101,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         CurrentViewModel = pageName switch
         {
+            "Home" => _homeViewModel,
             "ClickCounter" => App.Services.GetRequiredService<ClickCounterViewModel>(),
             "KeyCounter" => App.Services.GetRequiredService<KeyCounterViewModel>(),
             "Usage" => App.Services.GetRequiredService<UsageViewModel>(),

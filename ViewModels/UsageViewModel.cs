@@ -82,14 +82,14 @@ public partial class UsageViewModel : ViewModelBase
             }
 
             // 如果管道值和事件计算值差距大于5秒，记录警告并优先使用事件计算值
-            if (Math.Abs(pipeSeconds - eventSeconds) > 5)
-            {
-                _logger.LogWarning(
-                    "今日使用时长不一致：管道 {Pipe}s vs 事件计算 {Event}s，采用事件计算值",
-                    pipeSeconds,
-                    eventSeconds
-                );
-            }
+            // if (Math.Abs(pipeSeconds - eventSeconds) > 5)
+            // {
+            //     _logger.LogWarning(
+            //         "今日使用时长不一致：管道 {Pipe}s vs 事件计算 {Event}s，采用事件计算值",
+            //         pipeSeconds,
+            //         eventSeconds
+            //     );
+            // }
 
             var ts = TimeSpan.FromSeconds(eventSeconds);
             TodayUsageText =

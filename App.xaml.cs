@@ -49,6 +49,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ILogBufferService>(logBuffer);
 
         // 注册其他应用服务
+        services.AddSingleton<HomeViewModel>();
         services.AddSingleton<IMouseClickHookService, MouseClickHookService>();
         services.AddSingleton<IClickDatabaseService, ClickDatabaseService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -97,7 +98,6 @@ public partial class App : System.Windows.Application
 
         // 后续主窗口
         var mainVM = provider.GetRequiredService<MainWindowViewModel>();
-        mainVM.NavigateCommand.Execute("ClickCounter");
 
         var mainWindow = new MainWindow { DataContext = mainVM };
         MainWindow = mainWindow;

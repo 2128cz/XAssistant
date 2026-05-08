@@ -1,7 +1,5 @@
-using System;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Windows;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using XAssistant.Services.Interfaces;
@@ -34,6 +32,18 @@ public partial class KeyCounterViewModel : ViewModelBase
     [ObservableProperty]
     private int _selectedTabIndex;
 
+    // ===== 新增：首页用聚合属性 =====
+    public int KeyTodayPresses => TodayKeyCounts.Sum(item => item.Count);
+    public int KeyTotalPresses => KeyCounts.Sum(item => item.Count);
+
+    public string KeyRecordingStatus => IsRecording ? "记录中" : "已停止";
+    public System.Windows.Media.Brush KeyRecordingColor =>
+        IsRecording
+            ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x4C, 0xAF, 0x50)) // 绿色
+            : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x9E, 0x9E, 0x9E)); // 灰色
+
+    // =============================
+
     public KeyCounterViewModel(
         IKeyboardHookService hookService,
         IKeyDatabaseService dbService,
@@ -52,6 +62,13 @@ public partial class KeyCounterViewModel : ViewModelBase
         {
             StartRecording();
         }
+    }
+
+    // IsRecording 变化时通知状态属性
+    partial void OnIsRecordingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(KeyRecordingStatus));
+        OnPropertyChanged(nameof(KeyRecordingColor));
     }
 
     private void OnKeyPressed(string key)
@@ -78,6 +95,10 @@ public partial class KeyCounterViewModel : ViewModelBase
                 UpdateCollection(KeyCounts, key);
                 // 更新今天
                 UpdateCollection(TodayKeyCounts, key);
+
+                // 集合变化后通知聚合属性
+                OnPropertyChanged(nameof(KeyTodayPresses));
+                OnPropertyChanged(nameof(KeyTotalPresses));
             });
         }
     }
@@ -123,6 +144,10 @@ public partial class KeyCounterViewModel : ViewModelBase
                 DayBeforeYesterdayKeyCounts.Add(
                     new KeyCountItem { Key = kv.Key, Count = kv.Value }
                 );
+
+            // 通知聚合属性更新
+            OnPropertyChanged(nameof(KeyTodayPresses));
+            OnPropertyChanged(nameof(KeyTotalPresses));
         });
     }
 
@@ -140,6 +165,13 @@ public partial class KeyCounterViewModel : ViewModelBase
         _hookService.Stop();
         IsRecording = false;
         _configService.SetKeyRecordingAutoStart(false);
+    }
+
+    [RelayCommand]
+    private void RefreshData()
+    {
+        _currentDate = DateTime.Today;
+        LoadAllCounts();
     }
 }
 
