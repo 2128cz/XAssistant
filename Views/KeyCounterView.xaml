@@ -9,25 +9,25 @@
     <converters:InvertableBooleanToVisibilityConverter x:Key="BoolToVis" />
 
     <!--  四个排序视图  -->
-    <CollectionViewSource x:Key="SortedTotal" Source="{Binding KeyCounts}">
+    <CollectionViewSource x:Key="SortedTotal" Source="{Binding KeyCounts, StringFormat=N0}">
       <CollectionViewSource.SortDescriptions>
         <scm:SortDescription Direction="Ascending" PropertyName="Length" />
         <scm:SortDescription Direction="Ascending" PropertyName="Key" />
       </CollectionViewSource.SortDescriptions>
     </CollectionViewSource>
-    <CollectionViewSource x:Key="SortedToday" Source="{Binding TodayKeyCounts}">
+    <CollectionViewSource x:Key="SortedToday" Source="{Binding TodayKeyCounts, StringFormat=N0}">
       <CollectionViewSource.SortDescriptions>
         <scm:SortDescription Direction="Ascending" PropertyName="Length" />
         <scm:SortDescription Direction="Ascending" PropertyName="Key" />
       </CollectionViewSource.SortDescriptions>
     </CollectionViewSource>
-    <CollectionViewSource x:Key="SortedYesterday" Source="{Binding YesterdayKeyCounts}">
+    <CollectionViewSource x:Key="SortedYesterday" Source="{Binding YesterdayKeyCounts, StringFormat=N0}">
       <CollectionViewSource.SortDescriptions>
         <scm:SortDescription Direction="Ascending" PropertyName="Length" />
         <scm:SortDescription Direction="Ascending" PropertyName="Key" />
       </CollectionViewSource.SortDescriptions>
     </CollectionViewSource>
-    <CollectionViewSource x:Key="SortedDayBefore" Source="{Binding DayBeforeYesterdayKeyCounts}">
+    <CollectionViewSource x:Key="SortedDayBefore" Source="{Binding DayBeforeYesterdayKeyCounts, StringFormat=N0}">
       <CollectionViewSource.SortDescriptions>
         <scm:SortDescription Direction="Ascending" PropertyName="Length" />
         <scm:SortDescription Direction="Ascending" PropertyName="Key" />
@@ -68,7 +68,7 @@
           ItemsSource="{Binding Source={StaticResource SortedTotal}}">
           <DataGrid.Columns>
             <DataGridTextColumn Binding="{Binding Key}" Header="按键" />
-            <DataGridTextColumn Binding="{Binding Count}" Header="次数" />
+            <DataGridTextColumn Binding="{Binding Count, StringFormat=N0}" Header="次数" />
           </DataGrid.Columns>
         </DataGrid>
       </TabItem>
@@ -79,7 +79,7 @@
           ItemsSource="{Binding Source={StaticResource SortedToday}}">
           <DataGrid.Columns>
             <DataGridTextColumn Binding="{Binding Key}" Header="按键" />
-            <DataGridTextColumn Binding="{Binding Count}" Header="次数" />
+            <DataGridTextColumn Binding="{Binding Count, StringFormat=N0}" Header="次数" />
           </DataGrid.Columns>
         </DataGrid>
       </TabItem>
@@ -90,7 +90,7 @@
           ItemsSource="{Binding Source={StaticResource SortedYesterday}}">
           <DataGrid.Columns>
             <DataGridTextColumn Binding="{Binding Key}" Header="按键" />
-            <DataGridTextColumn Binding="{Binding Count}" Header="次数" />
+            <DataGridTextColumn Binding="{Binding Count, StringFormat=N0}" Header="次数" />
           </DataGrid.Columns>
         </DataGrid>
       </TabItem>
@@ -101,7 +101,7 @@
           ItemsSource="{Binding Source={StaticResource SortedDayBefore}}">
           <DataGrid.Columns>
             <DataGridTextColumn Binding="{Binding Key}" Header="按键" />
-            <DataGridTextColumn Binding="{Binding Count}" Header="次数" />
+            <DataGridTextColumn Binding="{Binding Count, StringFormat=N0}" Header="次数" />
           </DataGrid.Columns>
         </DataGrid>
       </TabItem>

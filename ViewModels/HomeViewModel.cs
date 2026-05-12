@@ -1,4 +1,7 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using XAssistant.Models;
 
@@ -6,90 +9,99 @@ namespace XAssistant.ViewModels;
 
 public partial class HomeViewModel : ViewModelBase
 {
-    private readonly ClickCounterViewModel _clickVM;
-    private readonly KeyCounterViewModel _keyVM;
-    private readonly UsageViewModel _usageVM;
-    private readonly AppUsageViewModel _appUsageVM;
-
-    // 鼠标摘要
-    [ObservableProperty]
-    private int _mouseTotalClicks;
-
-    [ObservableProperty]
-    private int _mouseTodayClicks;
-
-    [ObservableProperty]
-    private bool _isMouseRecording;
-
-    // 键盘摘要
-    [ObservableProperty]
-    private int _keyTotalPresses;
-
-    [ObservableProperty]
-    private int _keyTodayPresses;
-
-    [ObservableProperty]
-    private bool _isKeyRecording;
-
-    // 电脑使用今日时长
-    [ObservableProperty]
-    private string _todayUsageText = "00:00:00";
-
-    // 软件使用 Top 列表（直接引用 AppUsageViewModel 的列表）
-    public ObservableCollection<AppUsageItem> TopApps => _appUsageVM.AppUsageList;
+    private readonly ClickCounterViewModel _clickCounter;
+    private readonly KeyCounterViewModel _keyCounter;
+    private readonly UsageViewModel _usage;
+    private readonly AppUsageViewModel _appUsage;
 
     public HomeViewModel(
-        ClickCounterViewModel clickVM,
-        KeyCounterViewModel keyVM,
-        UsageViewModel usageVM,
-        AppUsageViewModel appUsageVM
+        ClickCounterViewModel clickCounter,
+        KeyCounterViewModel keyCounter,
+        UsageViewModel usage,
+        AppUsageViewModel appUsage
     )
     {
-        _clickVM = clickVM;
-        _keyVM = keyVM;
-        _usageVM = usageVM;
-        _appUsageVM = appUsageVM;
+        _clickCounter = clickCounter;
+        _keyCounter = keyCounter;
+        _usage = usage;
+        _appUsage = appUsage;
 
-        // 初始化数据
-        RefreshMouseSummary();
-        RefreshKeySummary();
-        TodayUsageText = _usageVM.TodayUsageText;
-        _appUsageVM.SelectedDate = DateTime.Today; // 确保软件使用显示今日
-
-        // 订阅源数据变化，实时更新摘要
-        _clickVM.PropertyChanged += (_, _) => RefreshMouseSummary();
-        _keyVM.PropertyChanged += (_, _) => RefreshKeySummary();
-        _keyVM.KeyCounts.CollectionChanged += (_, _) => RefreshKeyTotal();
-        _keyVM.TodayKeyCounts.CollectionChanged += (_, _) => RefreshKeyToday();
-        _usageVM.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(UsageViewModel.TodayUsageText))
-                TodayUsageText = _usageVM.TodayUsageText;
-        };
-        _appUsageVM.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(AppUsageViewModel.AppUsageList))
-                OnPropertyChanged(nameof(TopApps)); // 集合对象被替换时通知绑定
-        };
+        // 监听子 ViewModel 的属性变化，及时转发到自身同名的属性
+        _clickCounter.PropertyChanged += OnClickCounterPropertyChanged;
+        _keyCounter.PropertyChanged += OnKeyCounterPropertyChanged;
+        _usage.PropertyChanged += OnUsagePropertyChanged;
+        _appUsage.PropertyChanged += OnAppUsagePropertyChanged;
     }
 
-    private void RefreshMouseSummary()
+    // ========== 鼠标点击模块 ==========
+    public string MouseRecordingStatus => _clickCounter.MouseRecordingStatus;
+    public System.Windows.Media.Brush MouseRecordingColor => _clickCounter.MouseRecordingColor;
+    public int MouseTodayClicks => _clickCounter.MouseTodayClicks;
+    public int MouseTotalClicks => _clickCounter.MouseTotalClicks;
+
+    // ========== 键盘记录模块 ==========
+    public string KeyRecordingStatus => _keyCounter.KeyRecordingStatus;
+    public System.Windows.Media.Brush KeyRecordingColor => _keyCounter.KeyRecordingColor;
+    public int KeyTodayPresses => _keyCounter.KeyTodayPresses;
+    public int KeyTotalPresses => _keyCounter.KeyTotalPresses;
+
+    // ========== 电脑使用模块 ==========
+    // 假设 UsageViewModel 里有 TodayUsageText 属性（带格式化时长）
+    public string TodayUsageText => _usage.TodayUsageText;
+
+    // ========== 软件使用模块（修正点）==========
+    // 注意：AppUsageViewModel 中的列表属性叫 AppUsageList，不是 TopApps
+    public ObservableCollection<AppUsageItem> TopApps => _appUsage.AppUsageList;
+
+    // ========== 属性变化转发 ==========
+    private void OnClickCounterPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        MouseTotalClicks =
-            _clickVM.LeftClickCount + _clickVM.MiddleClickCount + _clickVM.RightClickCount;
-        MouseTodayClicks =
-            _clickVM.LeftClickToday + _clickVM.MiddleClickToday + _clickVM.RightClickToday;
-        IsMouseRecording = _clickVM.IsRecording;
+        switch (e.PropertyName)
+        {
+            case nameof(ClickCounterViewModel.MouseRecordingStatus):
+                OnPropertyChanged(nameof(MouseRecordingStatus));
+                break;
+            case nameof(ClickCounterViewModel.MouseRecordingColor):
+                OnPropertyChanged(nameof(MouseRecordingColor));
+                break;
+            case nameof(ClickCounterViewModel.MouseTodayClicks):
+                OnPropertyChanged(nameof(MouseTodayClicks));
+                break;
+            case nameof(ClickCounterViewModel.MouseTotalClicks):
+                OnPropertyChanged(nameof(MouseTotalClicks));
+                break;
+        }
     }
 
-    private void RefreshKeySummary()
+    private void OnKeyCounterPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        RefreshKeyTotal();
-        RefreshKeyToday();
-        IsKeyRecording = _keyVM.IsRecording;
+        switch (e.PropertyName)
+        {
+            case nameof(KeyCounterViewModel.KeyRecordingStatus):
+                OnPropertyChanged(nameof(KeyRecordingStatus));
+                break;
+            case nameof(KeyCounterViewModel.KeyRecordingColor):
+                OnPropertyChanged(nameof(KeyRecordingColor));
+                break;
+            case nameof(KeyCounterViewModel.KeyTodayPresses):
+                OnPropertyChanged(nameof(KeyTodayPresses));
+                break;
+            case nameof(KeyCounterViewModel.KeyTotalPresses):
+                OnPropertyChanged(nameof(KeyTotalPresses));
+                break;
+        }
     }
 
-    private void RefreshKeyTotal() => KeyTotalPresses = _keyVM.KeyCounts.Sum(x => x.Count);
+    private void OnUsagePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(UsageViewModel.TodayUsageText))
+            OnPropertyChanged(nameof(TodayUsageText));
+    }
 
-    private void RefreshKeyToday() => KeyTodayPresses = _keyVM.TodayKeyCounts.Sum(x => x.Count);
+    private void OnAppUsagePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // 当 AppUsageViewModel 的 AppUsageList 重新赋值时，通知 TopApps 已变化
+        if (e.PropertyName == nameof(AppUsageViewModel.AppUsageList))
+            OnPropertyChanged(nameof(TopApps));
+    }
 }

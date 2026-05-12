@@ -178,12 +178,20 @@ public sealed class ProcessUsageTracker : IDisposable
             using var conn = new SqliteConnection($"Data Source={_dbPath}");
             conn.Open();
             using var cmd = conn.CreateCommand();
+            // 1. 查询时多取一列 Date，用于判断跨天
             cmd.CommandText =
-                "SELECT Id, ProcessName, StartTime, AccumulatedSeconds, LastUpdateTime FROM ProcessSession WHERE EndTime IS NULL";
+                "SELECT Id, ProcessName, StartTime, Date, AccumulatedSeconds, LastUpdateTime FROM ProcessSession WHERE EndTime IS NULL";
             using var reader = cmd.ExecuteReader();
 
             var recovered =
-                new List<(long id, string name, string startStr, double acc, string? lastUpdStr)>();
+                new List<(
+                    long id,
+                    string name,
+                    string startStr,
+                    string dateStr,
+                    double acc,
+                    string? lastUpdStr
+                )>();
             while (reader.Read())
             {
                 recovered.Add(
@@ -191,8 +199,9 @@ public sealed class ProcessUsageTracker : IDisposable
                         reader.GetInt64(0),
                         reader.GetString(1),
                         reader.GetString(2),
-                        reader.GetDouble(3),
-                        reader.IsDBNull(4) ? null : reader.GetString(4)
+                        reader.GetString(3), // Date
+                        reader.GetDouble(4),
+                        reader.IsDBNull(5) ? null : reader.GetString(5)
                     )
                 );
             }
@@ -200,16 +209,20 @@ public sealed class ProcessUsageTracker : IDisposable
             if (recovered.Count == 0)
                 return;
 
+            var todayStr = DateTime.Today.ToString("yyyy-MM-dd");
             var allProcs = Process.GetProcesses();
+
             foreach (var item in recovered)
             {
                 if (!DateTime.TryParse(item.startStr, out var startTime))
                     startTime = DateTime.Now;
+
                 DateTime lastUpdate =
                     item.lastUpdStr != null && DateTime.TryParse(item.lastUpdStr, out var lu)
                         ? lu
                         : startTime;
 
+                // 找出仍在运行的对应进程（排除自身和 Session 0）
                 var matchingProcs = allProcs
                     .Where(p =>
                     {
@@ -228,9 +241,54 @@ public sealed class ProcessUsageTracker : IDisposable
                     })
                     .ToList();
 
+                // 2. 如果会话日期不是今天 → 需要关闭旧记录，并可能为今天创建新记录
+                if (item.dateStr != todayStr)
+                {
+                    // 2.1 先将旧会话结束到当天的最后一刻（23:59:59.999）
+                    DateTime endOfOldDay;
+                    if (DateTime.TryParse(item.dateStr, out var oldDate))
+                        endOfOldDay = oldDate.Date.AddDays(1).AddMilliseconds(-1);
+                    else
+                        endOfOldDay = DateTime.Today.AddMilliseconds(-1); // 兜底
+
+                    // 最终累计秒数：已有累计 + 从上次更新到当天结束的增量
+                    double finalAcc = item.acc;
+                    if (lastUpdate < endOfOldDay)
+                        finalAcc += (endOfOldDay - lastUpdate).TotalSeconds;
+
+                    // 关闭旧会话
+                    CloseSession(item.id, endOfOldDay, finalAcc, null);
+
+                    // 2.2 如果进程仍在运行 → 为今天创建全新会话
+                    if (matchingProcs.Count > 0)
+                    {
+                        var now = DateTime.Now;
+                        // 今天0点作为统计开始时间（精确启动时间已无法获得）
+                        var todayStart = DateTime.Today;
+                        long newSessionId = InsertAppSession(item.name, todayStart);
+
+                        var newState = new AppSessionState
+                        {
+                            ProcessCount = matchingProcs.Count,
+                            SessionId = newSessionId,
+                            StartTime = todayStart,
+                            AccumulatedSeconds = (now - todayStart).TotalSeconds, // 补上0点到现在的时长
+                            LastUpdateTime = now,
+                            LastWindowTitle = GetBestWindowTitle(matchingProcs),
+                        };
+
+                        _appSessions[item.name] = newState;
+                        foreach (var proc in matchingProcs)
+                            _pidToAppName[(uint)proc.Id] = item.name;
+                    }
+
+                    // 跨天处理完毕，跳过后续原生逻辑
+                    continue;
+                }
+
+                // 3. 日期相同（今天）→ 沿用原来的恢复逻辑
                 if (matchingProcs.Count > 0)
                 {
-                    // 进程仍在运行，接管会话
                     var state = new AppSessionState
                     {
                         ProcessCount = matchingProcs.Count,
@@ -246,8 +304,8 @@ public sealed class ProcessUsageTracker : IDisposable
                 }
                 else
                 {
-                    // 进程已退出，关闭会话
-                    CloseSession(item.id, lastUpdate, item.acc, null);
+                    // 进程已退出，正常关闭（使用当前时间作为结束）
+                    CloseSession(item.id, DateTime.Now, item.acc, null);
                 }
             }
         }

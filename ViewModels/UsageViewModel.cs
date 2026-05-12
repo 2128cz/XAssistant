@@ -218,9 +218,9 @@ public partial class UsageViewModel : ViewModelBase
                 var cmd = conn.CreateCommand();
                 cmd.CommandText =
                     @"
-                    SELECT Id, EventType, Timestamp, Date, TotalSeconds
-                    FROM SessionEvents
-                    ORDER BY Id ASC";
+                SELECT Id, EventType, Timestamp, Date, TotalSeconds
+                FROM SessionEvents
+                ORDER BY Id ASC";
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
@@ -236,6 +236,8 @@ public partial class UsageViewModel : ViewModelBase
                     );
                 }
 
+                // _logger.LogInformation("从数据库读取到 {Count} 条事件记录", rawList.Count);
+
                 // 遍历事件，用时间戳计算每个段的时长，并累加每日总秒数
                 SessionEvent? segmentStartEvent = null;
                 DateTime? segmentStartTime = null;
@@ -244,27 +246,53 @@ public partial class UsageViewModel : ViewModelBase
                 {
                     var evt = rawList[i];
                     if (!DateTime.TryParse(evt.Timestamp, out DateTime currTime))
+                    {
+                        // _logger.LogWarning(
+                        //     "事件 {Id} 的时间戳无法解析: {Timestamp}",
+                        //     evt.Id,
+                        //     evt.Timestamp
+                        // );
                         continue;
+                    }
 
                     if (evt.EventType == "ServiceStarted" || evt.EventType == "Resume")
                     {
                         segmentStartEvent = evt;
                         segmentStartTime = currTime;
                         evt.FormattedCumulativeUsage = evt.EventType == "Resume" ? "…" : "";
+                        // _logger.LogDebug(
+                        //     "会话段开始: 类型={Type}, 时间={Time}, ID={Id}",
+                        //     evt.EventType,
+                        //     evt.Timestamp,
+                        //     evt.Id
+                        // );
                     }
                     else if (evt.EventType == "Suspend" || evt.EventType == "ServiceStopped")
                     {
                         if (segmentStartEvent != null && segmentStartTime.HasValue)
                         {
-                            // 使用时间戳差计算段时长，不再依赖 TotalSeconds
                             long segmentSeconds = (long)
                                 (currTime - segmentStartTime.Value).TotalSeconds;
+
+                            // _logger.LogInformation(
+                            //     "会话段结束: 开始={StartTime}, 结束={EndTime}, 日期={Date}, 段秒数={SegmentSeconds}s",
+                            //     segmentStartTime.Value.ToString("yyyy-MM-dd HH:mm:ss"),
+                            //     currTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                            //     evt.Date,
+                            //     segmentSeconds
+                            // );
 
                             // 累加到当日校正总秒数
                             string dateKey = evt.Date;
                             if (!dailyCorrectedSeconds.ContainsKey(dateKey))
                                 dailyCorrectedSeconds[dateKey] = 0;
                             dailyCorrectedSeconds[dateKey] += segmentSeconds;
+
+                            // _logger.LogDebug(
+                            //     "日期 {Date} 累计秒数更新为 {Total}s",
+                            //     dateKey,
+                            //     dailyCorrectedSeconds[dateKey]
+                            // );
 
                             evt.FormattedCumulativeUsage = FormatSeconds(segmentSeconds);
                             if (segmentStartEvent.EventType == "Resume")
@@ -277,6 +305,11 @@ public partial class UsageViewModel : ViewModelBase
                         }
                         else
                         {
+                            // _logger.LogWarning(
+                            //     "结束事件 {Id}（类型={Type}）没有匹配的开始事件",
+                            //     evt.Id,
+                            //     evt.EventType
+                            // );
                             evt.FormattedCumulativeUsage = FormatSeconds(0);
                         }
                     }
@@ -286,17 +319,21 @@ public partial class UsageViewModel : ViewModelBase
                 if (segmentStartEvent != null && segmentStartTime.HasValue)
                 {
                     long activeSeconds = (long)(DateTime.Now - segmentStartTime.Value).TotalSeconds;
-                    string activeDate = DateTime.Now.ToString("yyyy-MM-dd");
-                    if (!dailyCorrectedSeconds.ContainsKey(activeDate))
-                        dailyCorrectedSeconds[activeDate] = 0;
-                    dailyCorrectedSeconds[activeDate] += activeSeconds;
 
+                    // _logger.LogInformation(
+                    //     "存在未结束的活跃段: 开始时间={StartTime}, 当前实时秒数={ActiveSeconds}s",
+                    //     segmentStartTime.Value.ToString("yyyy-MM-dd HH:mm:ss"),
+                    //     activeSeconds
+                    // );
+
+                    // 注意：不再累加到 dailyCorrectedSeconds，活跃部分在 RefreshTodayAsync 中实时计算
                     segmentStartEvent.FormattedCumulativeUsage = FormatSeconds(activeSeconds);
                     activeStart = segmentStartEvent;
                     activeStartTime = segmentStartTime;
                 }
                 else
                 {
+                    // _logger.LogInformation("没有未结束的活跃段");
                     activeStart = null;
                     activeStartTime = null;
                 }
@@ -308,9 +345,17 @@ public partial class UsageViewModel : ViewModelBase
                         rawList[i].TimeSincePrevious = "-";
                     else
                     {
-                        var prevTime = DateTime.Parse(rawList[i - 1].Timestamp);
-                        var currTime = DateTime.Parse(rawList[i].Timestamp);
-                        rawList[i].TimeSincePrevious = FormatTimeSpan(currTime - prevTime);
+                        if (
+                            DateTime.TryParse(rawList[i - 1].Timestamp, out var prevTime)
+                            && DateTime.TryParse(rawList[i].Timestamp, out var currTime)
+                        )
+                        {
+                            rawList[i].TimeSincePrevious = FormatTimeSpan(currTime - prevTime);
+                        }
+                        else
+                        {
+                            rawList[i].TimeSincePrevious = "?";
+                        }
                     }
                 }
 
@@ -333,6 +378,13 @@ public partial class UsageViewModel : ViewModelBase
         )
             ? todaySec
             : 0;
+
+        // _logger.LogInformation(
+        //     "加载会话事件完成：今日已完成会话秒数={CompletedSeconds}s, 活跃会话开始时间={ActiveStart}, 活跃实时秒数={ActiveSeconds}s",
+        //     _todayCorrectedSeconds,
+        //     activeStartTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "无",
+        //     activeStartTime.HasValue ? (long)(DateTime.Now - activeStartTime.Value).TotalSeconds : 0
+        // );
     }
 
     private static string FormatSeconds(long sec)
