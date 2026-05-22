@@ -1,6 +1,7 @@
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
 using Serilog;
 using XAssistant.Services;
 using XAssistant.Services.Interfaces;
@@ -16,6 +17,7 @@ public partial class App : System.Windows.Application
     internal static bool IsShuttingDown { get; private set; }
 
     private ILogger<App>? _appLogger;
+    private bool _isDataSaved;
 
     public App()
     {
@@ -141,12 +143,13 @@ public partial class App : System.Windows.Application
 
     private void ShutdownApplication()
     {
+        if (_isDataSaved)
+            return;
         IsShuttingDown = true;
         _notifyIcon!.Visible = false;
         _notifyIcon.Dispose();
 
-        _appLogger?.LogInformation("用户触发退出，应用即将关闭");
-        Log.CloseAndFlush();
+        SaveDataAndStopTracker(); // 复用统一逻辑
         Shutdown();
     }
 
@@ -165,14 +168,40 @@ public partial class App : System.Windows.Application
         return SystemIcons.Application;
     }
 
+    private void OnSessionEnding(object sender, SessionEndingEventArgs e)
+    {
+        SaveDataAndStopTracker();
+    }
+
+    private void SaveDataAndStopTracker()
+    {
+        if (_isDataSaved)
+            return;
+        _isDataSaved = true;
+
+        _appLogger?.LogInformation("系统正在关闭/注销，保存进程使用数据...");
+        try
+        {
+            var tracker = Services.GetRequiredService<ProcessUsageTracker>();
+            tracker.Stop();
+            tracker.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _appLogger?.LogError(ex, "停止进程追踪器失败");
+        }
+
+        Log.CloseAndFlush();
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
-        _appLogger?.LogInformation("应用 OnExit 执行");
-        var tracker = Services.GetRequiredService<ProcessUsageTracker>();
-        tracker.Stop();
-        tracker.Dispose();
+        // 防止重复保存（如果已经通过 SessionEnding 或 ShutdownApplication 保存过）
+        SaveDataAndStopTracker();
+
         _notifyIcon?.Dispose();
-        Log.CloseAndFlush();
+        // 移除事件订阅，避免内存泄漏
+        SystemEvents.SessionEnding -= OnSessionEnding;
         base.OnExit(e);
     }
 }
