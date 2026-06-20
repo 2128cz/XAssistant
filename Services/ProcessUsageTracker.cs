@@ -808,22 +808,6 @@ public sealed class ProcessUsageTracker : IDisposable
                 _pendingProcesses.TryRemove(pid, out _); // 进程已死，移除
             }
         }
-
-        // 超时清理可以保留，但建议延长并记录日志
-        var now = DateTime.UtcNow;
-        foreach (var kvp in _pendingProcesses)
-        {
-            if ((now - kvp.Value.AddedAt).TotalSeconds >= PendingProcessTimeoutSeconds)
-            {
-                // _logger.LogWarning(
-                //     "待确认进程 {App} (PID {Pid}) 超过 {Timeout}s 仍未出现窗口，移除",
-                //     kvp.Value.AppName,
-                //     kvp.Key,
-                //     PendingProcessTimeoutSeconds
-                // );
-                _pendingProcesses.TryRemove(kvp.Key, out _);
-            }
-        }
     }
 
     private static string? GetWindowTitle(uint processId)
