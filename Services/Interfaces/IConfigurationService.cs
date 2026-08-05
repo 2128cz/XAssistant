@@ -1,4 +1,6 @@
 // Services/Interfaces/IConfigurationService.cs
+using XAssistant.Models;
+
 namespace XAssistant.Services.Interfaces;
 
 /// <summary>
@@ -6,6 +8,10 @@ namespace XAssistant.Services.Interfaces;
 /// </summary>
 public interface IConfigurationService
 {
+    /// <summary>
+    /// 当前应用配置（含速记唤起等各段设置）。
+    /// </summary>
+    AppSettings Settings { get; }
     /// <summary>
     /// 获取上次程序退出时是否处于鼠标点击录制状态的配置。
     /// </summary>

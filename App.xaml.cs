@@ -5,6 +5,7 @@ using Microsoft.Win32;
 using Serilog;
 using XAssistant.Services;
 using XAssistant.Services.Interfaces;
+using XAssistant.Services.QuickNote;
 using XAssistant.ViewModels;
 using XAssistant.Views;
 
@@ -14,6 +15,8 @@ public partial class App : System.Windows.Application
 {
     public static IServiceProvider Services { get; private set; } = null!;
     private NotifyIcon? _notifyIcon;
+    private QuickNoteCaptureService? _quickNoteCapture;
+    private GlobalHotkeyService? _globalHotkey;
     internal static bool IsShuttingDown { get; private set; }
 
     private ILogger<App>? _appLogger;
@@ -71,6 +74,10 @@ public partial class App : System.Windows.Application
 
         services.AddSingleton<ProcessUsageTracker>();
 
+        // 速记唤起（全局热键 + 捕获窗）
+        services.AddSingleton<GlobalHotkeyService>();
+        services.AddSingleton<QuickNoteCaptureService>();
+
         // 配置 Serilog Logger
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
@@ -105,6 +112,12 @@ public partial class App : System.Windows.Application
         MainWindow = mainWindow;
         mainWindow.Show();
 
+        // 速记唤起：注册全局热键，热键按下 → 唤起捕获窗
+        _quickNoteCapture = provider.GetRequiredService<QuickNoteCaptureService>();
+        _globalHotkey = provider.GetRequiredService<GlobalHotkeyService>();
+        _globalHotkey.HotKeyPressed += () => _quickNoteCapture.InvokeCapture();
+        _globalHotkey.Start();
+
         InitializeNotifyIcon(mainWindow);
     }
 
@@ -129,6 +142,9 @@ public partial class App : System.Windows.Application
         // 右键菜单
         var contextMenu = new ContextMenuStrip();
         contextMenu.Items.Add("显示", null, (_, _) => ShowMainWindow(mainWindow));
+        contextMenu.Items.Add("打开速记窗", null, (_, _) => _quickNoteCapture?.InvokeCapture());
+        contextMenu.Items.Add("速记列表", null, (_, _) => _quickNoteCapture?.OpenList());
+        contextMenu.Items.Add(new ToolStripSeparator());
         contextMenu.Items.Add("退出", null, (_, _) => ShutdownApplication());
         _notifyIcon.ContextMenuStrip = contextMenu;
     }
@@ -199,6 +215,7 @@ public partial class App : System.Windows.Application
         // 防止重复保存（如果已经通过 SessionEnding 或 ShutdownApplication 保存过）
         SaveDataAndStopTracker();
 
+        _globalHotkey?.Dispose();
         _notifyIcon?.Dispose();
         // 移除事件订阅，避免内存泄漏
         SystemEvents.SessionEnding -= OnSessionEnding;
