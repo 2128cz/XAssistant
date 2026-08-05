@@ -1,45 +1,41 @@
 using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using XAssistant.Models;
 using XAssistant.Services.Interfaces;
+using XAssistant.ViewModels;
+using XAssistant.Views;
 
 namespace XAssistant.Services.QuickNote;
 
-// 速记唤起服务：抓取前台窗口标题作为来源，检测已打开的捕获窗并聚焦，否则新开
+// 速记唤起服务：全局热键/托盘触发时，速记窗已开则置顶聚焦，否则弹原生无边框速记窗并抓取前台窗口标题作来源
 public sealed class QuickNoteCaptureService
 {
-    private const int MaxTitleLength = 200; // 来源标题 URL 编码前截断
-    private const int SwRestore = 9;
+    private const int MaxTitleLength = 200; // 来源标题截断上限
     private const int MonitorDefaultToNearest = 0x00000002;
-    private static readonly IntPtr HwndTopmost = new(-1);
-    private const uint SwpNoMove = 0x0002;
-    private const uint SwpNoSize = 0x0001;
-    private const uint SwpShowWindow = 0x0040;
-
-    private static readonly string[] ChromePaths =
-    {
-        @"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-    };
-
-    private static readonly string[] EdgePaths =
-    {
-        @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-        @"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-    };
+    private const int MdTEffectiveDpi = 0; // GetDpiForMonitor 的 MDT_EFFECTIVE_DPI
+    private const int DefaultDpi = 96;
 
     private readonly ILogger<QuickNoteCaptureService> _logger;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly IQuickNoteDatabaseService _dbService;
+    private readonly ToastService _toastService;
     private readonly QuickNoteSettings _settings;
+
+    private QuickNoteWindow? _window; // 自持窗体引用：单实例复用，无需窗口标题标记
 
     public QuickNoteCaptureService(
         IConfigurationService configurationService,
-        ILogger<QuickNoteCaptureService> logger
+        IQuickNoteDatabaseService dbService,
+        ToastService toastService,
+        ILoggerFactory loggerFactory
     )
     {
-        _logger = logger;
+        _logger = loggerFactory.CreateLogger<QuickNoteCaptureService>();
+        _loggerFactory = loggerFactory;
+        _dbService = dbService;
+        _toastService = toastService;
         _settings = configurationService.Settings.QuickNote;
     }
 
@@ -53,17 +49,35 @@ public sealed class QuickNoteCaptureService
 #endif
         ;
 
-    // 唤起捕获窗：已打开则置顶聚焦（不覆盖已输入内容与来源），否则新开并带上当前前台标题
+    // 唤起速记窗：已打开则置顶聚焦（不覆盖已输入内容与来源），否则新开并带上当前前台标题
     public void InvokeCapture()
     {
-        IntPtr? existing = FindCaptureWindow();
-        if (existing.HasValue)
+        if (_window is { IsVisible: true } existing)
         {
-            _logger.LogDebug("捕获窗已打开，仅置顶聚焦");
-            BringToFront(existing.Value);
+            _logger.LogDebug("速记窗已打开，仅置顶聚焦");
+            existing.BringToFront();
             return;
         }
-        LaunchCaptureWindow();
+
+        // 新开：唤起瞬间抓取前台窗口标题作来源（前台是本应用自己时不算，避免来源变成 "XAssistant"），并定位在它所在屏居中
+        IntPtr foreground = GetForegroundWindow();
+        string source = IsOwnProcess(foreground)
+            ? ""
+            : Truncate(GetWindowTitle(foreground) ?? "");
+        (double left, double top) = ComputeWindowPosition(foreground);
+
+        var viewModel = new QuickNoteViewModel(
+            _dbService,
+            _loggerFactory.CreateLogger<QuickNoteViewModel>()
+        )
+        {
+            Source = source,
+        };
+        // 保存成功 → 关窗（窗口自行订阅）+ 弹 toast 确认已落库
+        viewModel.SaveSucceeded += () => _toastService.Show("速记已保存");
+        _window = new QuickNoteWindow(viewModel, _settings) { Left = left, Top = top };
+        _window.BringToFront(); // 显示并抢前台焦点、聚焦输入框
+        _logger.LogInformation("唤起速记窗，来源：{Source}", source);
     }
 
     // 打开速记列表页（普通浏览器标签）
@@ -79,121 +93,43 @@ public sealed class QuickNoteCaptureService
         }
     }
 
-    private void LaunchCaptureWindow()
+    // 新窗位置：前台窗口所在屏工作区居中（WPF 坐标为 DIP，物理像素按该屏 DPI 换算）
+    // 注：多屏缩放不一致时会有少量偏移，v1 不追求高 DPI 精细适配（见 spec 出域项）
+    private (double left, double top) ComputeWindowPosition(IntPtr foreground)
     {
-        try
-        {
-            string? browser = FindBrowserPath();
-            if (browser is null)
-            {
-                _logger.LogError("未找到可用的 Chrome/Edge 浏览器，无法唤起捕获窗");
-                return;
-            }
-
-            string? title = GetWindowTitle(GetForegroundWindow());
-            string src = title is null ? "" : $"?src={Uri.EscapeDataString(Truncate(title))}";
-            string url = $"{BaseUrl}/quick-note/capture{src}";
-
-            (int x, int y) = ComputeWindowPosition();
-            string args =
-                $"--app=\"{url}\" --window-size={_settings.WindowWidth},{_settings.WindowHeight} --window-position={x},{y}";
-
-            Process.Start(new ProcessStartInfo(browser, args) { UseShellExecute = false });
-            _logger.LogInformation("唤起捕获窗：{Url}", url);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "启动浏览器唤起捕获窗失败");
-        }
-    }
-
-    // 按标题标记找已打开的捕获窗（chrome/edge 进程 + 可见未最小化 + 标题前缀）
-    private IntPtr? FindCaptureWindow()
-    {
-        IntPtr found = IntPtr.Zero;
-        EnumWindows(
-            (hwnd, _) =>
-            {
-                if (!IsWindowVisible(hwnd) || IsIconic(hwnd))
-                    return true; // 只看可见且未最小化的窗口
-                if (!IsBrowserWindow(hwnd))
-                    return true; // 只看 chrome/edge，避免标题撞名
-                if (
-                    GetWindowTitle(hwnd)?.StartsWith(
-                        _settings.TitleMarker,
-                        StringComparison.Ordinal
-                    ) == true
-                )
-                {
-                    found = hwnd;
-                    return false; // 找到即停止枚举
-                }
-                return true;
-            },
-            IntPtr.Zero
-        );
-        return found == IntPtr.Zero ? null : found;
-    }
-
-    // 置顶并聚焦（最小化时先还原）
-    private static void BringToFront(IntPtr hwnd)
-    {
-        ShowWindow(hwnd, SwRestore);
-        SetForegroundWindow(hwnd);
-        SetWindowPos(hwnd, HwndTopmost, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpShowWindow);
-    }
-
-    private static bool IsBrowserWindow(IntPtr hwnd)
-    {
-        GetWindowThreadProcessId(hwnd, out uint pid);
-        if (pid == 0)
-            return false;
-        try
-        {
-            using var process = Process.GetProcessById((int)pid);
-            string name = process.ProcessName;
-            return name.Equals("chrome", StringComparison.OrdinalIgnoreCase)
-                || name.Equals("msedge", StringComparison.OrdinalIgnoreCase);
-        }
-        catch (ArgumentException)
-        {
-            return false; // 进程已退出
-        }
-    }
-
-    private string? FindBrowserPath()
-    {
-        string browser = _settings.Browser?.Trim().ToLowerInvariant() ?? "";
-        IEnumerable<string> candidates = browser switch
-        {
-            "chrome" => ChromePaths,
-            "edge" => EdgePaths,
-            _ => ChromePaths.Concat(EdgePaths), // 默认：优先 Chrome，Edge 兜底
-        };
-        return candidates.FirstOrDefault(File.Exists);
-    }
-
-    // 新窗位置：当前前台窗口所在屏幕的工作区居中；无前台窗口时用主屏
-    // 注意：GetWindowRect 返回物理像素，高 DPI 下 --window-position 存在缩放差异（v1 简化居中，精细适配见 spec 出域）
-    private (int x, int y) ComputeWindowPosition()
-    {
-        // hwnd 为 NULL 时 MonitorFromWindow 返回主显示器
-        IntPtr fg = GetForegroundWindow();
-        IntPtr monitor = MonitorFromWindow(fg, MonitorDefaultToNearest);
-
+        IntPtr monitor = MonitorFromWindow(foreground, MonitorDefaultToNearest);
         var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-        RECT work = default;
-        if (monitor != IntPtr.Zero && GetMonitorInfo(monitor, ref info))
-            work = info.rcWork;
+        if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info))
+            return (0, 0); // 拿不到工作区时放主屏原点，由系统默认放置
 
-        // 拿到工作区后在其中居中；拿不到时让浏览器默认放置
-        int x = work.Right == 0 ? 0 : work.Left + (work.Width - _settings.WindowWidth) / 2;
-        int y = work.Bottom == 0 ? 0 : work.Top + (work.Height - _settings.WindowHeight) / 2;
-        return (Math.Max(x, 0), Math.Max(y, 0));
+        int dpiX = DefaultDpi;
+        int dpiY = DefaultDpi;
+        if (GetDpiForMonitor(monitor, MdTEffectiveDpi, out uint dx, out uint dy) == 0)
+        {
+            dpiX = (int)dx;
+            dpiY = (int)dy;
+        }
+
+        // 窗口物理尺寸按目标屏 DPI 放大后在工作区居中，再换算回 DIP 作为 Left/Top
+        RECT work = info.rcWork;
+        int winWidthPx = (int)(_settings.WindowWidth * dpiX / (double)DefaultDpi);
+        int winHeightPx = (int)(_settings.WindowHeight * dpiY / (double)DefaultDpi);
+        int xPx = Math.Max(work.Left, work.Left + (work.Width - winWidthPx) / 2);
+        int yPx = Math.Max(work.Top, work.Top + (work.Height - winHeightPx) / 2);
+        double left = xPx * DefaultDpi / (double)dpiX;
+        double top = yPx * DefaultDpi / (double)dpiY;
+        return (left, top);
     }
 
     private static string Truncate(string s) =>
         s.Length <= MaxTitleLength ? s : s[..MaxTitleLength];
+
+    // 前台窗口是否属于本应用（XAssistant 自己的窗口作来源没有意义）
+    private static bool IsOwnProcess(IntPtr hwnd)
+    {
+        GetWindowThreadProcessId(hwnd, out uint pid);
+        return pid == Environment.ProcessId;
+    }
 
     // 读取窗口标题（best-effort；UIPI 下提升权限的窗口读不到，返回 null）
     private static string? GetWindowTitle(IntPtr hwnd)
@@ -210,8 +146,6 @@ public sealed class QuickNoteCaptureService
     }
 
     // ---------- P/Invoke ----------
-    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
 
@@ -222,45 +156,22 @@ public sealed class QuickNoteCaptureService
     private static extern int GetWindowTextLength(IntPtr hWnd);
 
     [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool IsWindowVisible(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool IsIconic(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr SetWindowPos(
-        IntPtr hWnd,
-        IntPtr hWndInsertAfter,
-        int X,
-        int Y,
-        int cx,
-        int cy,
-        uint uFlags
-    );
-
-    [DllImport("user32.dll")]
     private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(
+        IntPtr hmonitor,
+        int dpiType,
+        out uint dpiX,
+        out uint dpiY
+    );
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT

@@ -74,7 +74,9 @@ public partial class App : System.Windows.Application
 
         services.AddSingleton<ProcessUsageTracker>();
 
-        // 速记唤起（全局热键 + 捕获窗）
+        // 速记唤起（全局热键 + 原生捕获窗 + 直插速记库 + 保存确认 toast）
+        services.AddSingleton<IQuickNoteDatabaseService, QuickNoteDatabaseService>();
+        services.AddSingleton<ToastService>();
         services.AddSingleton<GlobalHotkeyService>();
         services.AddSingleton<QuickNoteCaptureService>();
 
