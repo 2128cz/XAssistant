@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using XAssistant.Services.Interfaces;
 
 namespace XAssistant.Services;
@@ -15,6 +16,7 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
     private const int WM_KEYUP = 0x0101;
     private const int WM_SYSKEYUP = 0x0105;
 
+    private readonly ILogger<KeyboardHookService> _logger;
     private LowLevelKeyboardProc _proc;
     private IntPtr _hookId = IntPtr.Zero;
 
@@ -24,8 +26,9 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern int GetKeyNameText(int lParam, StringBuilder lpString, int cchSize);
 
-    public KeyboardHookService()
+    public KeyboardHookService(ILogger<KeyboardHookService> logger)
     {
+        _logger = logger;
         _proc = HookCallback;
     }
 
@@ -56,7 +59,7 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
             if (isKeyDown || isKeyUp)
             {
                 var kb = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
-                string keyName = GetKeyNameFromScanCode(kb.scanCode, kb.flags);
+                string keyName = GetKeyNameFromScanCode(kb.vkCode, kb.scanCode, kb.flags);
 
                 if (isKeyDown)
                 {
@@ -77,9 +80,28 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
         return CallNextHookEx(_hookId, nCode, wParam, lParam);
     }
 
-    // 把扫描码 + 扩展标志合成 GetKeyNameText 所需的参数
-    private static string GetKeyNameFromScanCode(int scanCode, int flags)
+    // 左右修饰键固定映射：GetKeyNameText 对左/右 Shift、Ctrl、Alt、Win 的命名依赖键盘布局
+    // （部分布局自带 “Left/Right” 方位词，多数不区分），统一走这里保证左右稳定可区分。
+    // Win 用 “Left Windows/Right Windows” 与正式版历史数据保持一致
+    private static readonly Dictionary<int, string> ModifierKeyNames = new()
     {
+        [0x5B] = "Left Windows", // VK_LWIN
+        [0x5C] = "Right Windows", // VK_RWIN
+        [0xA0] = "Shift", // VK_LSHIFT
+        [0xA1] = "Right Shift", // VK_RSHIFT
+        [0xA2] = "Ctrl", // VK_LCONTROL
+        [0xA3] = "Right Ctrl", // VK_RCONTROL
+        [0xA4] = "Alt", // VK_LMENU
+        [0xA5] = "Right Alt", // VK_RMENU
+    };
+
+    // 把扫描码 + 扩展标志合成 GetKeyNameText 所需的参数
+    private string GetKeyNameFromScanCode(int vkCode, int scanCode, int flags)
+    {
+        // 左右修饰键优先走固定映射，避免布局差异
+        if (ModifierKeyNames.TryGetValue(vkCode, out var modifierName))
+            return modifierName;
+
         // 如果设置了扩展位（flags & 1），需要给扫描码加上 0x100
         bool isExtended = (flags & 1) != 0;
         int lParamValue = (scanCode << 16) | (isExtended ? 0x1000000 : 0);
@@ -88,8 +110,13 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
         int result = GetKeyNameText(lParamValue, sb, sb.Capacity);
         if (result > 0)
             return sb.ToString();
-        else
-            return "Unknown"; // fallback
+
+        // GetKeyNameText 无法命名（常见于笔记本 Fn 键等非标准键）。
+        // 扫描码 0x63 是多数笔记本 Fn 的扫描码；其余保留原始码值以便后续识别
+        if (scanCode == 0x63)
+            return "Fn";
+        _logger.LogWarning("按键无法识别，扫描码 0x{Scan:X2}，虚拟键码 0x{Vk:X2}，标志 0x{Flags:X2}", scanCode, vkCode, flags);
+        return $"Unknown (scan 0x{scanCode:X2}, vk 0x{vkCode:X2})";
     }
 
     // 结构体定义
