@@ -147,8 +147,14 @@ public partial class UsageViewModel : ViewModelBase
                     }
                 }
 
-                // 2. 从事件时间戳计算每一天的实际总秒数（已完成段）
+                // 2. 从事件时间戳计算每一天的实际总秒数（已完成段），并收集修正原因
                 var eventDailySeconds = new Dictionary<string, long>();
+                // 跨午夜会话造成的归属差异：键为日期，值为「修正值相对数据库记录的增减秒数」
+                var straddleDeltas = new Dictionary<string, long>();
+                // 跨午夜会话的原因文本，按日期收集
+                var straddleNotes = new Dictionary<string, List<string>>();
+                // 存在未配对结束事件（缺少开始事件）的日期
+                var unmatchedDates = new List<string>();
                 cmd.CommandText =
                     @"
                     SELECT Id, EventType, Timestamp, Date
@@ -161,7 +167,6 @@ public partial class UsageViewModel : ViewModelBase
                     {
                         var eventType = reader.GetString(1);
                         var timestampStr = reader.GetString(2);
-                        var date = reader.GetString(3);
                         if (!DateTime.TryParse(timestampStr, out var currTime))
                             continue;
 
@@ -174,21 +179,93 @@ public partial class UsageViewModel : ViewModelBase
                             && segmentStart.HasValue
                         )
                         {
-                            var segmentSeconds = (long)(currTime - segmentStart.Value).TotalSeconds;
-                            if (!eventDailySeconds.ContainsKey(date))
-                                eventDailySeconds[date] = 0;
-                            eventDailySeconds[date] += segmentSeconds;
+                            var start = segmentStart.Value;
+                            // 跨午夜的会话段按自然日拆分，避免整段被记到结束当天
+                            var byDay = SplitSegmentByDay(start, currTime);
+                            foreach (var (dayKey, seconds) in byDay)
+                            {
+                                eventDailySeconds[dayKey] =
+                                    eventDailySeconds.GetValueOrDefault(dayKey) + seconds;
+                            }
+
+                            // 服务按「会话整段记在开始日」记账；跨午夜时记录归属差异供原因展示
+                            if (start.Date != currTime.Date)
+                            {
+                                var startKey = start.ToString("yyyy-MM-dd");
+                                var startDaySec = byDay[startKey];
+                                var crossOut = byDay.Values.Sum() - startDaySec;
+                                if (crossOut > 0)
+                                {
+                                    straddleDeltas[startKey] =
+                                        straddleDeltas.GetValueOrDefault(startKey) - crossOut;
+                                    if (!straddleNotes.ContainsKey(startKey))
+                                        straddleNotes[startKey] = new List<string>();
+                                    straddleNotes[startKey]
+                                        .Add(
+                                            $"会话 {start:MM-dd HH:mm}→{currTime:HH:mm} 跨午夜，其中 {FormatSecondsShort(crossOut)} 实属次日"
+                                        );
+                                }
+                                foreach (var (dayKey, seconds) in byDay)
+                                {
+                                    if (dayKey == startKey)
+                                        continue;
+                                    straddleDeltas[dayKey] =
+                                        straddleDeltas.GetValueOrDefault(dayKey) + seconds;
+                                    if (!straddleNotes.ContainsKey(dayKey))
+                                        straddleNotes[dayKey] = new List<string>();
+                                    straddleNotes[dayKey]
+                                        .Add(
+                                            $"会话 {start:MM-dd HH:mm}→{currTime:HH:mm} 跨午夜，{FormatSecondsShort(seconds)} 实属本日"
+                                        );
+                                }
+                            }
                             segmentStart = null;
                         }
+                        else if (eventType == "Suspend" || eventType == "ServiceStopped")
+                        {
+                            // 结束事件没有匹配的开始事件（服务记录缺失）
+                            var dayKey = currTime.ToString("yyyy-MM-dd");
+                            if (!unmatchedDates.Contains(dayKey))
+                                unmatchedDates.Add(dayKey);
+                        }
+                    }
+
+                    // 仍有未关闭的开始事件且不在今日，说明缺少结束事件
+                    if (
+                        segmentStart.HasValue
+                        && segmentStart.Value.Date != DateTime.Today
+                        && !unmatchedDates.Contains(segmentStart.Value.ToString("yyyy-MM-dd"))
+                    )
+                    {
+                        unmatchedDates.Add(segmentStart.Value.ToString("yyyy-MM-dd"));
                     }
                 }
 
-                // 3. 对比并填充修正值
+                // 3. 对比并填充修正值与原因
                 foreach (var record in dbRecords)
                 {
                     if (eventDailySeconds.TryGetValue(record.Date, out var corrected))
                     {
                         record.CorrectedSeconds = corrected;
+
+                        var notes = straddleNotes.GetValueOrDefault(
+                            record.Date,
+                            new List<string>()
+                        );
+                        // 未被跨午夜拆分解释的差值：秒级计时误差或事件缺失
+                        var explainedDelta = straddleDeltas.GetValueOrDefault(record.Date);
+                        var residual = (corrected - record.Seconds) - explainedDelta;
+                        if (Math.Abs(residual) > 5)
+                        {
+                            if (unmatchedDates.Contains(record.Date))
+                                notes.Add("存在未配对的会话事件（开始/结束事件缺失）");
+                            else
+                                notes.Add(
+                                    $"另有 {FormatSecondsShort(Math.Abs(residual))} 的计时差异"
+                                );
+                        }
+                        if (notes.Count > 0)
+                            record.CorrectionReason = string.Join("；", notes);
                     }
                     list.Add(record);
                 }
@@ -282,17 +359,18 @@ public partial class UsageViewModel : ViewModelBase
                             //     segmentSeconds
                             // );
 
-                            // 累加到当日校正总秒数
-                            string dateKey = evt.Date;
-                            if (!dailyCorrectedSeconds.ContainsKey(dateKey))
-                                dailyCorrectedSeconds[dateKey] = 0;
-                            dailyCorrectedSeconds[dateKey] += segmentSeconds;
-
-                            // _logger.LogDebug(
-                            //     "日期 {Date} 累计秒数更新为 {Total}s",
-                            //     dateKey,
-                            //     dailyCorrectedSeconds[dateKey]
-                            // );
+                            // 跨午夜的会话段按自然日拆分，避免整段被记到结束当天
+                            foreach (
+                                var (dayKey, seconds) in SplitSegmentByDay(
+                                    segmentStartTime.Value,
+                                    currTime
+                                )
+                            )
+                            {
+                                if (!dailyCorrectedSeconds.ContainsKey(dayKey))
+                                    dailyCorrectedSeconds[dayKey] = 0;
+                                dailyCorrectedSeconds[dayKey] += seconds;
+                            }
 
                             evt.FormattedCumulativeUsage = FormatSeconds(segmentSeconds);
                             if (segmentStartEvent.EventType == "Resume")
@@ -393,6 +471,44 @@ public partial class UsageViewModel : ViewModelBase
         return ts.TotalDays >= 1
             ? $"{(int)ts.TotalDays}d {ts.Hours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}"
             : $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
+    }
+
+    /// <summary>
+    /// 中文短格式时长，如「48分22秒」「15分钟14秒」「5秒」。
+    /// </summary>
+    private static string FormatSecondsShort(long sec)
+    {
+        var ts = TimeSpan.FromSeconds(sec);
+        if (ts.TotalDays >= 1)
+            return $"{(int)ts.TotalDays}天 {ts.Hours}小时 {ts.Minutes}分";
+        if (ts.TotalHours >= 1)
+            return $"{ts.Hours}小时 {ts.Minutes}分";
+        if (ts.Minutes > 0)
+            return $"{ts.Minutes}分{ts.Seconds:D2}秒";
+        return $"{ts.Seconds}秒";
+    }
+
+    /// <summary>
+    /// 将会话段按自然日拆分，返回每天各自占用的秒数。
+    /// 跨午夜的段（如 23:00 → 次日 01:00）会被拆到两天，避免整段记在开始或结束当天。
+    /// </summary>
+    private static Dictionary<string, long> SplitSegmentByDay(DateTime start, DateTime end)
+    {
+        var byDay = new Dictionary<string, long>();
+        var cursor = start;
+        while (cursor < end)
+        {
+            var nextMidnight = cursor.Date.AddDays(1);
+            var segmentEnd = end < nextMidnight ? end : nextMidnight;
+            var seconds = (long)(segmentEnd - cursor).TotalSeconds;
+            if (seconds > 0)
+            {
+                var dayKey = cursor.ToString("yyyy-MM-dd");
+                byDay[dayKey] = byDay.GetValueOrDefault(dayKey) + seconds;
+            }
+            cursor = segmentEnd;
+        }
+        return byDay;
     }
 
     private static string FormatTimeSpan(TimeSpan ts)

@@ -10,6 +10,7 @@
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -17,7 +18,7 @@
         <!--  今日使用时长  -->
         <GroupBox
             Grid.Row="0"
-            Margin="0,0,0,20"
+            Margin="0,0,0,10"
             Header="今日使用时长">
             <TextBlock
                 Margin="10"
@@ -26,8 +27,16 @@
                 Text="{Binding TodayUsageText}" />
         </GroupBox>
 
+        <!--  说明  -->
+        <TextBlock
+            Grid.Row="1"
+            Margin="0,0,0,10"
+            FontSize="12"
+            Foreground="Gray"
+            Text="说明：本页使用时长来自后台 UsageTracker 服务。服务按「会话整段记在会话开始的那一天」写入数据库；跨午夜的会话会被修正拆分到实际所属日期，因此个别日期的「修正时长」与数据库存在分钟级差异（原因见「修正原因」列），其余日期通常只有秒级计时误差。" />
+
         <!--  历史使用时长  -->
-        <GroupBox Grid.Row="1" Header="历史使用时长">
+        <GroupBox Grid.Row="2" Header="历史使用时长">
             <DataGrid
                 AutoGenerateColumns="False"
                 ClipboardCopyMode="IncludeHeader"
@@ -60,12 +69,22 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
+                    <DataGridTextColumn
+                        Width="300"
+                        Binding="{Binding CorrectionReason}"
+                        Header="修正原因">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="TextWrapping" Value="Wrap" />
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
                 </DataGrid.Columns>
             </DataGrid>
         </GroupBox>
 
         <!--  会话事件记录  -->
-        <GroupBox Grid.Row="2" Header="会话事件">
+        <GroupBox Grid.Row="3" Header="会话事件">
             <DataGrid
                 AutoGenerateColumns="False"
                 ClipboardCopyMode="IncludeHeader"

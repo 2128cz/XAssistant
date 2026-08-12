@@ -8,6 +8,9 @@ public class DailyUsage
     // 根据事件时间戳校正后的秒数（仅当有事件数据时存在）
     public long? CorrectedSeconds { get; set; }
 
+    // 修正原因（如跨午夜会话拆分、未配对事件、计时差异）
+    public string? CorrectionReason { get; set; }
+
     // 是否存在明显差异（比如超过5秒）
     public bool HasDiscrepancy =>
         CorrectedSeconds.HasValue && Math.Abs(Seconds - CorrectedSeconds.Value) > 5;
