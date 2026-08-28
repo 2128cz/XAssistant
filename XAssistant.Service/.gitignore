@@ -27,7 +27,3 @@ Logs/
 TestResults/
 
 temp/
-*.stackdump
-
-## 发布打包产物
-release/

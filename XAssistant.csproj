@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -11,6 +11,13 @@
 
   <ItemGroup>
     <Folder Include="Models\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="XAssistant.Service\**" />
+    <EmbeddedResource Remove="XAssistant.Service\**" />
+    <None Remove="XAssistant.Service\**" />
+    <Page Remove="XAssistant.Service\**" />
   </ItemGroup>
 
   <ItemGroup>
