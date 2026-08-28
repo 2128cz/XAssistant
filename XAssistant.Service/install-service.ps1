@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     从已构建产物安装 XAssistant.UsageTracker Windows 服务（无需 .NET SDK）
 .DESCRIPTION
