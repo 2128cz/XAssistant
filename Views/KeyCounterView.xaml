@@ -59,6 +59,56 @@
         Content="刷新数据" />
     </StackPanel>
 
+    <!--  实时节奏区：速率 / 时间差 / 按键顺序  -->
+    <GroupBox
+      Margin="10,0,10,10"
+      DockPanel.Dock="Top"
+      Header="实时节奏">
+      <StackPanel>
+        <StackPanel
+          Margin="8,6"
+          Orientation="Horizontal">
+          <TextBlock
+            Margin="0,0,24,0"
+            FontWeight="Bold"
+            Text="{Binding KeysPerMinute, StringFormat='实时速率: {0} 键/分钟'}" />
+          <TextBlock
+            Margin="0,0,24,0"
+            Text="{Binding LastKeyIntervalMs, StringFormat='上次间隔: {0} ms'}" />
+          <TextBlock
+            Margin="0,0,24,0"
+            Text="{Binding AverageKeyIntervalMs, StringFormat='平均间隔: {0:0.0} ms'}" />
+          <TextBlock Text="{Binding TodayAverageKeysPerMinute, StringFormat='今日平均: {0:0.0} 键/分钟'}" />
+        </StackPanel>
+
+        <ScrollViewer
+          MaxHeight="72"
+          HorizontalScrollBarVisibility="Disabled"
+          VerticalScrollBarVisibility="Auto">
+          <ItemsControl
+            Margin="8,0,8,8"
+            ItemsSource="{Binding RecentKeySequence}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border
+                  Margin="0,0,4,4"
+                  Padding="6,2"
+                  Background="#E8F0FE"
+                  CornerRadius="3">
+                  <TextBlock FontFamily="Consolas" Text="{Binding}" />
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </StackPanel>
+    </GroupBox>
+
     <!--  Tab 切换区  -->
     <TabControl SelectedIndex="{Binding SelectedTabIndex}">
       <TabItem Header="总计">
