@@ -47,7 +47,6 @@ public partial class MainWindowViewModel : ViewModelBase
             new NavItem("🏠", "首页", "Home"),
             new NavItem("🖱️", "鼠标", "ClickCounter"),
             new NavItem("⌨️", "键盘", "KeyCounter"),
-            new NavItem("🎹", "键盘动画", "KeyAnimation"),
             new NavItem("💻", "电脑使用", "Usage"),
             new NavItem("📊", "软件使用", "AppUsage"),
             new NavItem("⚙️", "设置", "Settings"),

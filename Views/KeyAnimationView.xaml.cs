@@ -31,9 +31,14 @@ public partial class KeyAnimationView
             if (_vm != null)
             {
                 _vm.KeyPressed += OnVmKeyPressed;
+                _vm.MouseClicked += OnVmMouseClicked;
+                _vm.MouseMoved += OnVmMouseMoved;
                 _subscribed = true;
             }
         }
+
+        // WebView2 默认背景透明：透明开关由页面内按钮控制（透视模式）
+        KeyboardWebView.DefaultBackgroundColor = System.Drawing.Color.Transparent;
 
         // 首次加载时导航到本地动画页
         if (KeyboardWebView.CoreWebView2 == null && KeyboardWebView.Source == null)
@@ -71,6 +76,23 @@ public partial class KeyAnimationView
         KeyboardWebView.CoreWebView2.PostWebMessageAsJson(message);
     }
 
+    private void OnVmMouseClicked(string button, double x, double y)
+    {
+        if (!_webReady || KeyboardWebView.CoreWebView2 == null)
+            return;
+
+        var message = JsonSerializer.Serialize(new { type = "mouseClick", button, x, y });
+        KeyboardWebView.CoreWebView2.PostWebMessageAsJson(message);
+    }
+
+    private void OnVmMouseMoved(double nx, double ny)
+    {
+        if (!_webReady || KeyboardWebView.CoreWebView2 == null)
+            return;
+
+        var message = JsonSerializer.Serialize(new { type = "mouseMove", x = nx, y = ny });
+        KeyboardWebView.CoreWebView2.PostWebMessageAsJson(message);
+    }
     private void PushInitialCounts()
     {
         if (_vm == null || KeyboardWebView.CoreWebView2 == null)

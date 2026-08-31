@@ -20,7 +20,25 @@
         FontWeight="Bold"
         Text="设置" />
 
-      <!--  ========== 界面主题 ==========  -->
+      <!--  ========== 键盘动画 ==========  -->
+      <GroupBox
+        Margin="0,16,0,0"
+        Padding="14"
+        Header="键盘动画">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock
+            Margin="0,0,16,0"
+            VerticalAlignment="Center"
+            FontSize="12"
+            Foreground="{DynamicResource TextSecondary}"
+            Text="在独立透明窗口中显示 3D/2D 键盘（可开启透明背景实现屏幕透视效果）" />
+          <Button
+            Padding="14,6"
+            Command="{Binding OpenKeyAnimationWindowCommand}"
+            Content="打开键盘动画窗口" />
+        </StackPanel>
+      </GroupBox>
+
       <GroupBox
         Margin="0,16,0,0"
         Padding="14"

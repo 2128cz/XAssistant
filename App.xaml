@@ -20,9 +20,7 @@
       <DataTemplate DataType="{x:Type vm:KeyCounterViewModel}">
         <views:KeyCounterView />
       </DataTemplate>
-      <DataTemplate DataType="{x:Type vm:KeyAnimationViewModel}">
-        <views:KeyAnimationView />
-      </DataTemplate>
+
       <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
         <views:SettingsView />
       </DataTemplate>
