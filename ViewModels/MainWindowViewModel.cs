@@ -107,6 +107,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "KeyAnimation" => App.Services.GetRequiredService<KeyAnimationViewModel>(),
             "Usage" => App.Services.GetRequiredService<UsageViewModel>(),
             "AppUsage" => App.Services.GetRequiredService<AppUsageViewModel>(),
+            "Settings" => App.Services.GetRequiredService<SettingsViewModel>(),
             _ => CurrentViewModel,
         };
     }

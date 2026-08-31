@@ -72,6 +72,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<AppUsageViewModel>();
         services.AddSingleton<LogViewerViewModel>();
         services.AddSingleton<KeyAnimationViewModel>();
+        services.AddSingleton<SettingsViewModel>();
 
         services.AddSingleton<ProcessUsageTracker>();
 
@@ -107,6 +108,11 @@ public partial class App : System.Windows.Application
         // 获取系统日志记录器
         _appLogger = provider.GetRequiredService<ILogger<App>>();
         _appLogger.LogInformation("═══════ XAssistant 启动成功 ═══════");
+
+        // 应用持久化的界面主题（默认浅色）
+        var configService = provider.GetRequiredService<IConfigurationService>();
+        ThemeManager.Apply(configService.GetTheme());
+        _appLogger.LogInformation("已应用界面主题：{Theme}", ThemeManager.Current);
 
         // 后续主窗口
         var mainVM = provider.GetRequiredService<MainWindowViewModel>();

@@ -9,7 +9,7 @@
 
     <!--  小卡片样式（总计/历史）  -->
     <Style x:Key="SmallCardStyle" TargetType="Border">
-      <Setter Property="Background" Value="#F0F0F0" />
+      <Setter Property="Background" Value="{DynamicResource PanelBackground}" />
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Padding" Value="12,8" />
       <Setter Property="Margin" Value="6" />
@@ -28,7 +28,7 @@
 
     <!--  今日卡片样式（高亮）  -->
     <Style x:Key="TodayCardStyle" TargetType="Border">
-      <Setter Property="Background" Value="#0078D4" />
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
       <Setter Property="CornerRadius" Value="12" />
       <Setter Property="Padding" Value="16,12" />
       <Setter Property="Margin" Value="6" />
@@ -47,13 +47,13 @@
 
     <!--  历史日期卡片样式  -->
     <Style x:Key="HistoryCardStyle" TargetType="Border">
-      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="Background" Value="{DynamicResource CardBackground}" />
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Padding" Value="12,8" />
       <Setter Property="Margin" Value="6" />
       <Setter Property="Width" Value="120" />
       <Setter Property="Height" Value="80" />
-      <Setter Property="BorderBrush" Value="#E0E0E0" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
 
@@ -68,7 +68,7 @@
     <Style x:Key="CardTitle" TargetType="TextBlock">
       <Setter Property="FontSize" Value="12" />
       <Setter Property="HorizontalAlignment" Value="Center" />
-      <Setter Property="Foreground" Value="#666666" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
     </Style>
   </UserControl.Resources>
 
@@ -220,21 +220,21 @@
           Width="120"
           Height="35"
           Margin="5"
-          BorderBrush="#0078D4"
+          BorderBrush="{DynamicResource AccentBrush}"
           Command="{Binding StartRecordingCommand}"
           Content="▶ 开始记录"
           FontWeight="SemiBold"
-          Foreground="#0078D4"
+          Foreground="{DynamicResource AccentBrush}"
           IsEnabled="{Binding IsRecording, Converter={StaticResource InverseBool}}" />
         <Button
           Width="120"
           Height="35"
           Margin="5"
-          Background="#0078D4"
+          Background="{DynamicResource AccentBrush}"
           Command="{Binding StopRecordingCommand}"
           Content="⏹ 停止记录"
           FontWeight="SemiBold"
-          Foreground="White"
+          Foreground="{DynamicResource AccentText}"
           IsEnabled="{Binding IsRecording}" />
       </StackPanel>
 

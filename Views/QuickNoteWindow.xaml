@@ -8,11 +8,11 @@
   Topmost="True"
   ShowInTaskbar="False"
   WindowStartupLocation="Manual"
-  Background="#FFFFFF">
+  Background="{DynamicResource WindowBackground}">
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
   </Window.Resources>
-  <Border BorderBrush="#CCCCCC" BorderThickness="1">
+  <Border BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1">
     <Grid Margin="14,10,14,10">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
@@ -29,7 +29,7 @@
           FontSize="13"
           FontWeight="Bold"
           VerticalAlignment="Center"
-          Foreground="#333333" />
+          Foreground="{DynamicResource TextPrimary}" />
         <Button
           x:Name="CloseButton"
           HorizontalAlignment="Right"
@@ -39,7 +39,7 @@
           Padding="0"
           Content="✕"
           FontSize="12"
-          Foreground="#666666"
+          Foreground="{DynamicResource TextSecondary}"
           BorderThickness="0"
           Background="Transparent"
           ToolTip="关闭（不保存）"
@@ -53,7 +53,7 @@
         Margin="0,0,0,8"
         Text="{Binding Source}"
         TextTrimming="CharacterEllipsis"
-        Foreground="#888888"
+        Foreground="{DynamicResource TextSecondary}"
         FontSize="12"
         ToolTip="{Binding Source}"
         Visibility="{Binding HasSource, Converter={StaticResource BoolToVisibility}}" />
@@ -69,14 +69,14 @@
         VerticalScrollBarVisibility="Auto"
         FontSize="14"
         Padding="4"
-        BorderBrush="#D0D0D0" />
+        BorderBrush="{DynamicResource ControlBorder}" />
 
       <!--  保存失败提示：内容保留，可重试  -->
       <TextBlock
         Grid.Row="3"
         Margin="0,8,0,0"
         Text="{Binding ErrorMessage}"
-        Foreground="#C62828"
+        Foreground="{DynamicResource DangerBrush}"
         FontSize="12"
         TextWrapping="Wrap"
         Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
@@ -86,7 +86,7 @@
         Grid.Row="4"
         Margin="0,8,0,0"
         Text="Ctrl+Enter 保存　·　Esc / ✕ 取消"
-        Foreground="#999999"
+        Foreground="{DynamicResource TextHint}"
         FontSize="11"
         HorizontalAlignment="Right" />
     </Grid>
