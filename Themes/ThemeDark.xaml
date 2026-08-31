@@ -35,6 +35,11 @@
   <SolidColorBrush x:Key="KeyChipBackground" Color="#343C4E" />
   <SolidColorBrush x:Key="KeyChipText" Color="#FFD54F" />
 
+  <!-- 侧边栏导航 -->
+  <SolidColorBrush x:Key="NavHoverBackground" Color="#2F3542" />
+  <SolidColorBrush x:Key="NavSelectedBackground" Color="#3A4560" />
+  <SolidColorBrush x:Key="NavSelectedForeground" Color="#FFFFFF" />
+
   <!-- ===================================================== -->
   <!-- 常用控件隐式样式（与浅色主题相同结构，引用深色画刷）     -->
   <!-- ===================================================== -->

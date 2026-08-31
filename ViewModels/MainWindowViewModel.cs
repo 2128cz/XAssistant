@@ -40,6 +40,28 @@ public partial class MainWindowViewModel : ViewModelBase
     // 日志集合（直接暴露底层集合，也可以做筛选）
     public ObservableCollection<LogEntry> AllLogs => _logBuffer.LogEntries;
 
+    // 侧边栏导航项
+    public ObservableCollection<NavItem> NavItems { get; } =
+        new()
+        {
+            new NavItem("🏠", "首页", "Home"),
+            new NavItem("🖱️", "鼠标", "ClickCounter"),
+            new NavItem("⌨️", "键盘", "KeyCounter"),
+            new NavItem("🎹", "键盘动画", "KeyAnimation"),
+            new NavItem("💻", "电脑使用", "Usage"),
+            new NavItem("📊", "软件使用", "AppUsage"),
+            new NavItem("⚙️", "设置", "Settings"),
+        };
+
+    [ObservableProperty]
+    private NavItem? _selectedNavItem;
+
+    partial void OnSelectedNavItemChanged(NavItem? value)
+    {
+        if (value != null)
+            Navigate(value.PageName);
+    }
+
     [ObservableProperty]
     private string _logLevelFilter = "All";
 
@@ -70,6 +92,9 @@ public partial class MainWindowViewModel : ViewModelBase
         CurrentViewModel = homeViewModel;
         _homeViewModel = homeViewModel;
         IsStartWithWindowsEnabled = _startupService.IsStartWithWindowsEnabled();
+
+        // 默认选中"首页"（触发导航）
+        SelectedNavItem = NavItems.First();
 
         // 当日志集合变化时，通知 FilteredLogs 属性变化（简化方式）
         _logBuffer.LogEntries.CollectionChanged += (_, _) =>
@@ -110,5 +135,20 @@ public partial class MainWindowViewModel : ViewModelBase
             "Settings" => App.Services.GetRequiredService<SettingsViewModel>(),
             _ => CurrentViewModel,
         };
+    }
+}
+
+/// <summary>侧边栏导航项（图标 + 文本 + 目标页面）</summary>
+public class NavItem
+{
+    public string Icon { get; }
+    public string Label { get; }
+    public string PageName { get; }
+
+    public NavItem(string icon, string label, string pageName)
+    {
+        Icon = icon;
+        Label = label;
+        PageName = pageName;
     }
 }

@@ -15,45 +15,75 @@
 
     <!--  第一行：原有的主界面  -->
     <DockPanel Grid.Row="0">
-      <!--  左侧菜单  -->
-      <StackPanel
-        Width="200"
+      <!--  左侧导航  -->
+      <DockPanel
+        Width="165"
         Background="{DynamicResource MenuBackground}"
         DockPanel.Dock="Left">
-        <Button
-          Command="{Binding NavigateCommand}"
-          CommandParameter="Home"
-          Content="首页" />
-        <Button
-          Command="{Binding NavigateCommand}"
-          CommandParameter="ClickCounter"
-          Content="鼠标点击记录" />
-        <Button
-          Command="{Binding NavigateCommand}"
-          CommandParameter="KeyCounter"
-          Content="键盘记录" />
-        <Button
-          Command="{Binding NavigateCommand}"
-          CommandParameter="KeyAnimation"
-          Content="键盘动画" />
-        <Button
-          Command="{Binding NavigateCommand}"
-          CommandParameter="Usage"
-          Content="电脑使用统计" />
-        <Button
-          Command="{Binding NavigateCommand}"
-          CommandParameter="AppUsage"
-          Content="软件使用" />
-        <Button
-          Command="{Binding NavigateCommand}"
-          CommandParameter="Settings"
-          Content="设置" />
-        <Separator Margin="0,20,0,5" />
         <CheckBox
-          Margin="10,5"
+          Margin="12,5"
+          DockPanel.Dock="Bottom"
           Content="开机自动启动"
           IsChecked="{Binding IsStartWithWindowsEnabled}" />
-      </StackPanel>
+        <ListBox
+          Margin="6,8"
+          Background="Transparent"
+          BorderThickness="0"
+          ItemsSource="{Binding NavItems}"
+          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+          SelectedItem="{Binding SelectedNavItem}">
+          <ListBox.ItemContainerStyle>
+            <Style TargetType="ListBoxItem">
+              <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+              <Setter Property="Padding" Value="10,8" />
+              <Setter Property="Margin" Value="2,2" />
+              <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="ListBoxItem">
+                    <Border
+                      x:Name="bd"
+                      Padding="{TemplateBinding Padding}"
+                      Background="Transparent"
+                      CornerRadius="6">
+                      <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                      <Trigger Property="IsMouseOver" Value="True">
+                        <Setter
+                          TargetName="bd"
+                          Property="Background"
+                          Value="{DynamicResource NavHoverBackground}" />
+                      </Trigger>
+                      <Trigger Property="IsSelected" Value="True">
+                        <Setter
+                          TargetName="bd"
+                          Property="Background"
+                          Value="{DynamicResource NavSelectedBackground}" />
+                        <Setter Property="Foreground" Value="{DynamicResource NavSelectedForeground}" />
+                      </Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+          </ListBox.ItemContainerStyle>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock
+                  FontSize="15"
+                  Text="{Binding Icon}" />
+                <TextBlock
+                  Margin="9,0,0,0"
+                  VerticalAlignment="Center"
+                  FontSize="13"
+                  Text="{Binding Label}" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
 
       <!--  右侧内容区  -->
       <ContentControl Content="{Binding CurrentViewModel}" />
