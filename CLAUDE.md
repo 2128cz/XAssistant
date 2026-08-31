@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-XAssistant 是一款 Windows 桌面活动监控应用（WPF、C#、.NET 10），负责记录：
+XAssistant 是一款 Windows 桌面活动监控应用（WPF、C#、.NET 9），负责记录：
 
 - **鼠标点击**（左/中/右键），通过低级 Win32 钩子实现
 - **键盘按键**，通过低级 Win32 钩子实现
@@ -16,9 +16,9 @@ UI 采用基于 CommunityToolkit.Mvvm 的 WPF MVVM 架构。项目没有自动�
 
 ## 常用命令
 
-- 构建：`dotnet build`（需要 .NET 10 SDK）
+- 构建：`dotnet build`（需要 .NET 9 SDK）
 - 运行（调试）：`dotnet run`
-- 发布（Release，win-x64）：`dotnet publish -r win-x64 -c Release` —— 输出位于 `bin\Release\net10.0-windows\win-x64\publish`（`build.bat` 封装了这条命令）
+- 发布（Release，win-x64）：`dotnet publish -r win-x64 -c Release` —— 输出位于 `bin\Release\net9.0-windows\win-x64\publish`（`build.bat` 封装了这条命令）
 - 部署到 `C:\XAssistant` 并重新启动：`powershell -ExecutionPolicy Bypass -File deploy.ps1` —— 必须以管理员身份运行；该脚本会停止正在运行的实例、备份旧版本、复制新构建并启动应用
 - 格式化代码：`dotnet tool restore && dotnet csharpier .`（CSharpier 1.2.6 是 `dotnet-tools.json` 中固定的格式化工具）
 

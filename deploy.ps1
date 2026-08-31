@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     构建 XAssistant 并部署到 C:\XAssistant
 .DESCRIPTION
@@ -19,7 +19,7 @@ $scriptPath   = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectFile  = Join-Path $scriptPath "XAssistant.csproj"
 $targetDir    = "C:\XAssistant"
 $processName  = "XAssistant"
-$publishDir   = Join-Path $scriptPath "bin\Release\net10.0-windows\win-x64\publish"
+$publishDir   = Join-Path $scriptPath "bin\Release\net9.0-windows\win-x64\publish"
 
 # ---------- 1. 构建发布 ----------
 Write-Host "[1/5] 正在发布项目 (Release)..." -ForegroundColor Cyan

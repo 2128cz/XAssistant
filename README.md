@@ -1,6 +1,6 @@
 # XAssistant
 
-**XAssistant** 是一款 Windows 桌面活动统计工具（WPF / C# / .NET 10），常驻系统托盘，记录键盘、鼠标点击数及使用时长。**所有数据仅保存在本机，不联网上传。**
+**XAssistant** 是一款 Windows 桌面活动统计工具（WPF / C# / .NET 9），常驻系统托盘，记录键盘、鼠标点击数及使用时长。**所有数据仅保存在本机，不联网上传。**
 
 ## 说明
 
@@ -83,7 +83,7 @@ dotnet publish XAssistant.csproj -r win-x64 -c Release --self-contained true
 dotnet publish XAssistant.Service\XAssistant.Service.csproj -c Release --self-contained true -r win-x64
 ```
 
-需安装 [.NET 10 SDK](https://dotnet.microsoft.com/download)。
+需安装 [.NET 9 SDK](https://dotnet.microsoft.com/download)。
 
 
 ## 许可证
