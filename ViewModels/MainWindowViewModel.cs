@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Runtime.Versioning;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -104,6 +104,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "Home" => _homeViewModel,
             "ClickCounter" => App.Services.GetRequiredService<ClickCounterViewModel>(),
             "KeyCounter" => App.Services.GetRequiredService<KeyCounterViewModel>(),
+            "KeyAnimation" => App.Services.GetRequiredService<KeyAnimationViewModel>(),
             "Usage" => App.Services.GetRequiredService<UsageViewModel>(),
             "AppUsage" => App.Services.GetRequiredService<AppUsageViewModel>(),
             _ => CurrentViewModel,

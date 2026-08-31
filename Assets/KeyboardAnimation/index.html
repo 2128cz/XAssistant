@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>XAssistant 键盘热力图</title>
+<style>
+  :root {
+    --bg: #1c1f26;
+    --panel: #232833;
+    --key-bg: #2d3342;
+    --key-border: #3a4154;
+    --text: #d7dce8;
+    --text-dim: #8b93a7;
+    --amber: #ffd54f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+    padding: 18px;
+    overflow: hidden;
+    user-select: none;
+  }
+  .title { font-size: 14px; color: var(--text-dim); letter-spacing: 2px; }
+  .title b { color: var(--text); }
+
+  /* ---------- 键盘主体 ---------- */
+  .keyboard {
+    background: var(--panel);
+    border: 1px solid #2e3444;
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.45);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    max-width: 920px;
+  }
+  .row { display: flex; gap: 6px; }
+  .key {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: var(--key-bg);
+    border: 1px solid var(--key-border);
+    border-bottom: 3px solid #1f2430;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #eef1f8;
+    transition: background .25s ease, transform .12s ease, box-shadow .25s ease;
+    will-change: transform;
+    overflow: hidden;
+  }
+  .key .cap-label { pointer-events: none; z-index: 2; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+  .key .badge {
+    position: absolute;
+    right: 4px;
+    bottom: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255,255,255,.85);
+    text-shadow: 0 1px 2px rgba(0,0,0,.6);
+    z-index: 2;
+    pointer-events: none;
+  }
+  .key .max-flag {
+    position: absolute;
+    left: 4px;
+    top: 3px;
+    font-size: 9px;
+    font-weight: 800;
+    color: #fff;
+    background: #ff5722;
+    border-radius: 3px;
+    padding: 0 4px;
+    line-height: 13px;
+    z-index: 2;
+    display: none;
+    pointer-events: none;
+  }
+  .key.is-max .max-flag { display: block; }
+
+  /* 按下动画：琥珀色亮起 + 放大 + 光晕 */
+  .key.pressed {
+    background: var(--amber) !important;
+    color: #1a1d24 !important;
+    transform: scale(1.07);
+    box-shadow: 0 0 22px 6px rgba(255,213,79,.55);
+    border-color: #ffe082;
+    z-index: 5;
+  }
+
+  /* 窄键位扩展宽度 */
+  .w-wide  { flex: 2.2 1 0; }
+  .w-half  { flex: 1.4 1 0; }
+  .w-space { flex: 6.2 1 0; }
+
+  /* ---------- 底部信息条 ---------- */
+  .footer {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: 920px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid #2e3444;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .stat b { color: var(--text); font-size: 14px; }
+  .recent {
+    flex: 1 1 auto;
+    min-width: 260px;
+    background: var(--panel);
+    border: 1px solid #2e3444;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+  }
+  .recent .chip {
+    background: #343c4e;
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    color: #ffd54f;
+    animation: chip-in .18s ease;
+  }
+  @keyframes chip-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+  <div class="title">XAssistant <b>·</b> 键盘热力图（点击次数越多 → 越接近橙红）</div>
+
+  <div class="keyboard" id="kb">
+    <!-- 功能键行 -->
+    <div class="row" data-row>
+      <div class="key" data-k="esc">Esc</div>
+      <div class="key" data-k="f1">F1</div>
+      <div class="key" data-k="f2">F2</div>
+      <div class="key" data-k="f3">F3</div>
+      <div class="key" data-k="f4">F4</div>
+      <div class="key" data-k="f5">F5</div>
+      <div class="key" data-k="f6">F6</div>
+      <div class="key" data-k="f7">F7</div>
+      <div class="key" data-k="f8">F8</div>
+      <div class="key" data-k="f9">F9</div>
+      <div class="key" data-k="f10">F10</div>
+      <div class="key" data-k="f11">F11</div>
+      <div class="key" data-k="f12">F12</div>
+    </div>
+    <!-- 数字行 -->
+    <div class="row" data-row>
+      <div class="key" data-k="`">`</div>
+      <div class="key" data-k="1">1</div>
+      <div class="key" data-k="2">2</div>
+      <div class="key" data-k="3">3</div>
+      <div class="key" data-k="4">4</div>
+      <div class="key" data-k="5">5</div>
+      <div class="key" data-k="6">6</div>
+      <div class="key" data-k="7">7</div>
+      <div class="key" data-k="8">8</div>
+      <div class="key" data-k="9">9</div>
+      <div class="key" data-k="0">0</div>
+      <div class="key" data-k="-">-</div>
+      <div class="key" data-k="=">=</div>
+      <div class="key w-wide" data-k="backspace">⌫ Backspace</div>
+    </div>
+    <!-- QWERTY 行 -->
+    <div class="row" data-row>
+      <div class="key w-half" data-k="tab">Tab ⇥</div>
+      <div class="key" data-k="q">Q</div>
+      <div class="key" data-k="w">W</div>
+      <div class="key" data-k="e">E</div>
+      <div class="key" data-k="r">R</div>
+      <div class="key" data-k="t">T</div>
+      <div class="key" data-k="y">Y</div>
+      <div class="key" data-k="u">U</div>
+      <div class="key" data-k="i">I</div>
+      <div class="key" data-k="o">O</div>
+      <div class="key" data-k="p">P</div>
+      <div class="key" data-k="[">[</div>
+      <div class="key" data-k="]">]</div>
+      <div class="key w-half" data-k="\">\</div>
+    </div>
+    <!-- ASDF 行 -->
+    <div class="row" data-row>
+      <div class="key w-wide" data-k="caps lock">⇧ Caps<br/>Lock</div>
+      <div class="key" data-k="a">A</div>
+      <div class="key" data-k="s">S</div>
+      <div class="key" data-k="d">D</div>
+      <div class="key" data-k="f">F</div>
+      <div class="key" data-k="g">G</div>
+      <div class="key" data-k="h">H</div>
+      <div class="key" data-k="j">J</div>
+      <div class="key" data-k="k">K</div>
+      <div class="key" data-k="l">L</div>
+      <div class="key" data-k=";">;</div>
+      <div class="key" data-k="'">'</div>
+      <div class="key w-wide" data-k="enter">Enter ↵</div>
+    </div>
+    <!-- ZXCV 行 -->
+    <div class="row" data-row>
+      <div class="key w-wide" data-k="shift">Shift ⇧</div>
+      <div class="key" data-k="z">Z</div>
+      <div class="key" data-k="x">X</div>
+      <div class="key" data-k="c">C</div>
+      <div class="key" data-k="v">V</div>
+      <div class="key" data-k="b">B</div>
+      <div class="key" data-k="n">N</div>
+      <div class="key" data-k="m">M</div>
+      <div class="key" data-k=",">,</div>
+      <div class="key" data-k=".">.</div>
+      <div class="key" data-k="/">/</div>
+      <div class="key w-wide" data-k="right shift">Shift ⇧</div>
+    </div>
+    <!-- 控制行 -->
+    <div class="row" data-row>
+      <div class="key" data-k="ctrl">Ctrl</div>
+      <div class="key" data-k="windows">Win</div>
+      <div class="key" data-k="alt">Alt</div>
+      <div class="key w-space" data-k="space">Space</div>
+      <div class="key" data-k="right alt">Alt</div>
+      <div class="key" data-k="right windows">Win</div>
+      <div class="key" data-k="menu">Menu</div>
+      <div class="key" data-k="right ctrl">Ctrl</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="stat">总按键：<b id="total">0</b></div>
+    <div class="stat">当前上限：<b id="maxInfo">-</b></div>
+    <div class="recent"><span>最近按键：</span><div id="recentKeys" style="display:flex;gap:6px;flex-wrap:wrap;"></div></div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var counts = {};          // key -> count
+  var keyEls = {};          // normalizedKey -> DOM element
+  var recentKeys = [];      // 最近 15 个按键名
+  var MAX_RECENT = 15;
+  var maxKey = null;
+
+  // ---------- 键名规范化（兼容 GetKeyNameText 的布局相关命名） ----------
+  function normalizeKey(name) {
+    var n = String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+    var aliases = {
+      "escape": "esc",
+      "back space": "backspace",
+      "backspace": "backspace",
+      "capslock": "caps lock",
+      "caps lock": "caps lock",
+      "left shift": "shift",
+      "left ctrl": "ctrl",
+      "left alt": "alt",
+      "left windows": "windows",
+      "right windows": "windows",
+      "win": "windows",
+      "apps": "menu",
+      "spacebar": "space",
+      "return": "enter",
+      "scroll": "scrolllock",
+      "print screen": "prtsc"
+    };
+    return aliases[n] || n;
+  }
+
+  // ---------- 热力色：次数占比越高 → 越接近橙红色 ----------
+  function heatColor(t) {
+    // 蓝(220°) → 橙红(14°)，饱和度/亮度随占比提升
+    var hue = 220 - 206 * t;
+    var sat = 62 + 33 * t;
+    var light = 32 + 26 * t;
+    return "hsl(" + hue + ", " + sat + "%, " + light + "%)";
+  }
+
+  function applyHeat() {
+    var values = [];
+    for (var k in counts) values.push(counts[k]);
+    var max = values.length ? Math.max.apply(null, values) : 0;
+    var total = values.reduce(function (a, b) { return a + b; }, 0);
+
+    maxKey = null;
+    document.getElementById("total").textContent = total.toLocaleString();
+
+    for (var k in keyEls) {
+      var el = keyEls[k];
+      var c = counts[k] || 0;
+      var t = max > 0 ? c / max : 0;
+      el.style.background = heatColor(t);
+      el.classList.toggle("is-max", max > 0 && c === max);
+      // 徽标：次数 > 0 时显示
+      var badge = el.querySelector(".badge");
+      if (c > 0) {
+        if (!badge) {
+          badge = document.createElement("span");
+          badge.className = "badge";
+          el.appendChild(badge);
+        }
+        badge.textContent = c.toLocaleString();
+      } else if (badge) {
+        badge.remove();
+      }
+      if (max > 0 && c === max && !maxKey) maxKey = k;
+    }
+
+    document.getElementById("maxInfo").textContent = maxKey
+      ? maxKey + "（" + counts[maxKey].toLocaleString() + " 次）"
+      : "-";
+  }
+
+  // ---------- 按下动画 ----------
+  function playPress(key) {
+    var el = keyEls[key];
+    if (!el) return;
+    el.classList.remove("pressed");
+    void el.offsetWidth; // 强制重排以重启动画
+    el.classList.add("pressed");
+    setTimeout(function () { el.classList.remove("pressed"); }, 240);
+  }
+
+  function pushRecent(key) {
+    recentKeys.push(key);
+    if (recentKeys.length > MAX_RECENT) recentKeys.shift();
+    var box = document.getElementById("recentKeys");
+    box.innerHTML = "";
+    for (var i = recentKeys.length - 1; i >= 0; i--) {
+      var chip = document.createElement("div");
+      chip.className = "chip";
+      chip.textContent = recentKeys[i];
+      box.appendChild(chip);
+    }
+  }
+
+  function onPress(key, count) {
+    var nk = normalizeKey(key);
+    counts[nk] = count;
+    playPress(nk);
+    pushRecent(key);
+    applyHeat();
+  }
+
+  function onInit(payload) {
+    counts = {};
+    if (payload && payload.counts) {
+      for (var k in payload.counts) {
+        if (Object.prototype.hasOwnProperty.call(payload.counts, k)) {
+          counts[normalizeKey(k)] = payload.counts[k];
+        }
+      }
+    }
+    applyHeat();
+  }
+
+  // ---------- 收集键盘 DOM ----------
+  document.querySelectorAll("#kb .key").forEach(function (el) {
+    var k = normalizeKey(el.getAttribute("data-k"));
+    keyEls[k] = el;
+    if (!el.querySelector(".cap-label")) {
+      var span = document.createElement("span");
+      span.className = "cap-label";
+      span.innerHTML = el.innerHTML;
+      el.innerHTML = "";
+      el.appendChild(span);
+    }
+    var flag = document.createElement("span");
+    flag.className = "max-flag";
+    flag.textContent = "MAX";
+    el.appendChild(flag);
+  });
+
+  // ---------- 接收来自 C# 的消息 ----------
+  function handleMessage(data) {
+    var msg = null;
+    try { msg = typeof data === "string" ? JSON.parse(data) : data; } catch (e) { return; }
+    if (!msg || !msg.type) return;
+    if (msg.type === "press") onPress(msg.key, msg.count);
+    else if (msg.type === "init") onInit(msg);
+  }
+
+  if (window.chrome && window.chrome.webview && window.chrome.webview.addEventListener) {
+    window.chrome.webview.addEventListener("message", function (e) {
+      handleMessage(e.data);
+    });
+  } else if (window.parent && window.parent.chrome && window.parent.chrome.webview) {
+    window.parent.chrome.webview.addEventListener("message", function (e) {
+      handleMessage(e.data);
+    });
+  }
+
+  // 初次渲染（无数据时的底色）
+  applyHeat();
+})();
+</script>
+</body>
+</html>

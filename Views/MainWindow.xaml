@@ -32,6 +32,10 @@
           Content="键盘记录" />
         <Button
           Command="{Binding NavigateCommand}"
+          CommandParameter="KeyAnimation"
+          Content="键盘动画" />
+        <Button
+          Command="{Binding NavigateCommand}"
           CommandParameter="Usage"
           Content="电脑使用统计" />
         <Button

@@ -71,6 +71,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<UsageViewModel>();
         services.AddSingleton<AppUsageViewModel>();
         services.AddSingleton<LogViewerViewModel>();
+        services.AddSingleton<KeyAnimationViewModel>();
 
         services.AddSingleton<ProcessUsageTracker>();
 
