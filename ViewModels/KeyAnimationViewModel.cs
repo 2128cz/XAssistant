@@ -16,7 +16,6 @@ public partial class KeyAnimationViewModel : ViewModelBase
     private readonly IMouseClickHookService _mouseHook;
     private readonly IKeyDatabaseService _dbService;
     private readonly Dictionary<string, int> _counts = new(StringComparer.OrdinalIgnoreCase);
-    private System.Windows.Threading.DispatcherTimer? _mouseTimer;
 
     /// <summary>每次按键触发：参数为（按键名, 累计次数），始终在 UI 线程触发</summary>
     public event Action<string, int>? KeyPressed;
@@ -24,8 +23,7 @@ public partial class KeyAnimationViewModel : ViewModelBase
     /// <summary>鼠标点击触发：参数为（按键, 归一化 X, 归一化 Y 0-1），始终在 UI 线程触发</summary>
     public event Action<string, double, double>? MouseClicked;
 
-    /// <summary>鼠标指针位置（归一化 0-1，相对虚拟屏幕），约 60ms 一次</summary>
-    public event Action<double, double>? MouseMoved;
+
 
     public KeyAnimationViewModel(
         IKeyboardHookService hookService,
@@ -45,13 +43,7 @@ public partial class KeyAnimationViewModel : ViewModelBase
         _hookService.KeyPressed += OnKeyPressed;
         _mouseHook.MouseClickedAt += OnMouseClicked;
 
-        // 指针位置轮询
-        _mouseTimer = new System.Windows.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(60),
-        };
-        _mouseTimer.Tick += (_, _) => PublishMousePosition();
-        _mouseTimer.Start();
+
     }
 
     private void OnKeyPressed(string key)
@@ -82,27 +74,6 @@ public partial class KeyAnimationViewModel : ViewModelBase
         ny = vs.Height > 0 ? (y - vs.Top) / (double)vs.Height : 0;
         nx = Math.Clamp(nx, 0, 1);
         ny = Math.Clamp(ny, 0, 1);
-    }
-
-    /// <summary>读取全局鼠标位置，归一化到虚拟屏幕 0-1 后推送</summary>
-    private void PublishMousePosition()
-    {
-        try
-        {
-            var vs = System.Windows.Forms.SystemInformation.VirtualScreen;
-            var pos = System.Windows.Forms.Cursor.Position;
-
-            double nx = vs.Width > 0 ? (pos.X - vs.Left) / (double)vs.Width : 0;
-            double ny = vs.Height > 0 ? (pos.Y - vs.Top) / (double)vs.Height : 0;
-            nx = Math.Clamp(nx, 0, 1);
-            ny = Math.Clamp(ny, 0, 1);
-
-            MouseMoved?.Invoke(nx, ny);
-        }
-        catch
-        {
-            // 读取失败时忽略本轮推送
-        }
     }
 
     /// <summary>供前端页面加载时获取初始计数快照</summary>

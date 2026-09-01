@@ -31,7 +31,7 @@
             VerticalAlignment="Center"
             FontSize="12"
             Foreground="{DynamicResource TextSecondary}"
-            Text="在独立透明窗口中显示 3D/2D 键盘（可开启透明背景实现屏幕透视效果）" />
+            Text="在独立透明窗口中显示 2D 键盘（可开启透明背景实现屏幕透视效果）" />
           <Button
             Padding="14,6"
             Command="{Binding OpenKeyAnimationWindowCommand}"
