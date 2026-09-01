@@ -18,10 +18,10 @@
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <!--  顶栏：拖拽移动 + 关闭  -->
+    <!--  顶栏：拖拽手柄 + 关闭  -->
     <Border
       Grid.Row="0"
-      Background="Transparent"
+      Background="#66000000"
       MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
       <Grid>
         <TextBlock
@@ -29,7 +29,7 @@
           VerticalAlignment="Center"
           FontSize="12"
           Foreground="White"
-          Text="键盘动画（拖拽移动 · 页面内可切透明背景）" />
+          Text="键盘动画 · 按住空白处拖拽移动窗口 · 页面内可切背景透明" />
         <Button
           x:Name="CloseButton"
           HorizontalAlignment="Right"
@@ -42,13 +42,13 @@
           FontSize="13"
           Foreground="White"
           BorderThickness="0"
-          Background="#33000000"
+          Background="#66000000"
           Cursor="Hand"
           Click="CloseButton_Click" />
       </Grid>
     </Border>
 
-    <!--  内容：复用的键盘动画视图  -->
-    <views:KeyAnimationView Grid.Row="1" />
+    <!--  内容：Composition 模式键盘动画（透明窗口可正常交互）  -->
+    <views:KeyAnimationOverlayView x:Name="Overlay" Grid.Row="1" />
   </Grid>
 </Window>
