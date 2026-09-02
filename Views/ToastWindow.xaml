@@ -13,8 +13,8 @@
   SizeToContent="WidthAndHeight">
   <Border
     x:Name="Root"
-    Background="#F7F7F7"
-    BorderBrush="#CCCCCC"
+    Background="{DynamicResource PanelBackground}"
+    BorderBrush="{DynamicResource ControlBorder}"
     BorderThickness="1"
     CornerRadius="6"
     Padding="14,10"
@@ -22,7 +22,7 @@
     <StackPanel Orientation="Horizontal">
       <TextBlock
         Text="✓"
-        Foreground="#4CAF50"
+        Foreground="{DynamicResource SuccessBrush}"
         FontSize="14"
         FontWeight="Bold"
         VerticalAlignment="Center"
@@ -32,7 +32,7 @@
         TextWrapping="Wrap"
         MaxWidth="300"
         FontSize="13"
-        Foreground="#333333"
+        Foreground="{DynamicResource TextPrimary}"
         VerticalAlignment="Center" />
     </StackPanel>
   </Border>

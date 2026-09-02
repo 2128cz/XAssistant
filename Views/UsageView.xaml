@@ -32,7 +32,7 @@
             Grid.Row="1"
             Margin="0,0,0,10"
             FontSize="12"
-            Foreground="Gray"
+            Foreground="{DynamicResource TextSecondary}"
             Text="说明：本页使用时长来自后台 UsageTracker 服务。服务按「会话整段记在会话开始的那一天」写入数据库；跨午夜的会话会被修正拆分到实际所属日期，因此个别日期的「修正时长」与数据库存在分钟级差异（原因见「修正原因」列），其余日期通常只有秒级计时误差。" />
 
         <!--  历史使用时长  -->
@@ -59,10 +59,10 @@
                         Header="修正时长">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="Black" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HasDiscrepancy}" Value="True">
-                                        <Setter Property="Foreground" Value="Red" />
+                                        <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
                                         <Setter Property="FontWeight" Value="Bold" />
                                     </DataTrigger>
                                 </Style.Triggers>

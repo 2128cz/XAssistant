@@ -3,346 +3,384 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>XAssistant 键盘热力图</title>
+<title>XAssistant Keyboard Heatmap</title>
 <style>
-  :root {
-    --bg: #1c1f26;
-    --panel: #232833;
-    --key-bg: #2d3342;
-    --key-border: #3a4154;
-    --text: #d7dce8;
-    --text-dim: #8b93a7;
-    --amber: #ffd54f;
-  }
+  :root { --bg:#1c1f26; --panel:#232833; --key-bg:#2d3342; --key-border:#3a4154; --text:#d7dce8; --text-dim:#8b93a7; --amber:#ffd54f; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 14px;
-    padding: 18px;
-    overflow: hidden;
-    user-select: none;
-  }
-  .title { font-size: 14px; color: var(--text-dim); letter-spacing: 2px; }
-  .title b { color: var(--text); }
-
-  /* ---------- 键盘主体 ---------- */
-  .keyboard {
-    background: var(--panel);
-    border: 1px solid #2e3444;
-    border-radius: 14px;
-    padding: 14px;
-    box-shadow: 0 12px 32px rgba(0,0,0,.45);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    width: 100%;
-    max-width: 920px;
-  }
-  .row { display: flex; gap: 6px; }
-  .key {
-    flex: 1 1 0;
-    min-width: 0;
-    height: 46px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    background: var(--key-bg);
-    border: 1px solid var(--key-border);
-    border-bottom: 3px solid #1f2430;
-    border-radius: 7px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #eef1f8;
-    transition: background .25s ease, transform .12s ease, box-shadow .25s ease;
-    will-change: transform;
-    overflow: hidden;
-  }
-  .key .cap-label { pointer-events: none; z-index: 2; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
-  .key .badge {
-    position: absolute;
-    right: 4px;
-    bottom: 3px;
-    font-size: 10px;
-    font-weight: 700;
-    color: rgba(255,255,255,.85);
-    text-shadow: 0 1px 2px rgba(0,0,0,.6);
-    z-index: 2;
-    pointer-events: none;
-  }
-  .key .max-flag {
-    position: absolute;
-    left: 4px;
-    top: 3px;
-    font-size: 9px;
-    font-weight: 800;
-    color: #fff;
-    background: #ff5722;
-    border-radius: 3px;
-    padding: 0 4px;
-    line-height: 13px;
-    z-index: 2;
-    display: none;
-    pointer-events: none;
-  }
+  body { background: var(--bg); color: var(--text); font-family: "Segoe UI","Microsoft YaHei",system-ui,sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; padding: 12px; overflow: hidden; user-select: none; }
+  body.transparent { background: transparent; }
+  body.transparent .keyboard, body.transparent .stat, body.transparent .recent, body.transparent .toolbar { background: rgba(35,40,51,0.55); }
+  body.transparent .keyboard { box-shadow: none; border-color: rgba(62,70,92,0.6); }
+  body.transparent .title { opacity: 0.75; }
+  .title { font-size: 13px; color: var(--text-dim); letter-spacing: 1px; }
+  .toolbar { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); flex-wrap: wrap; justify-content: center; }
+  .toolbar .sep { width: 1px; height: 18px; background: var(--key-border); margin: 0 8px; }
+  .layout-btn, .mode-btn { background: var(--key-bg); border: 1px solid var(--key-border); border-radius: 6px; color: var(--text); padding: 3px 12px; font-size: 12px; cursor: pointer; transition: background .15s ease; }
+  .layout-btn:hover, .mode-btn:hover { background: #39415a; }
+  .layout-btn.active, .mode-btn.active { background: #4c9fe8; border-color: #4c9fe8; color: #0d1117; font-weight: 700; }
+  #view2d { width: 100%; max-width: 1080px; }
+  .keyboard { background: var(--panel); border: 1px solid #2e3444; border-radius: 12px; padding: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.45); display: flex; gap: 10px; width: 100%; }
+  .kb-left { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .kb-right { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; }
+  .side { display: flex; flex-direction: row; gap: 6px; align-items: flex-start; }
+  .kb-column { display: flex; flex-direction: column; gap: 6px; }
+  .row { display: flex; gap: 5px; }
+  .key { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; position: relative; background: var(--key-bg); border: 1px solid var(--key-border); border-bottom: 3px solid #1f2430; border-radius: 6px; font-weight: 600; color: #eef1f8; transition: background .25s ease, transform .12s ease, box-shadow .25s ease; will-change: transform; overflow: hidden; }
+  .key .cap-label { pointer-events: none; z-index: 2; text-shadow: 0 1px 2px rgba(0,0,0,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1; }
+  .key .badge { position: absolute; right: 3px; bottom: 2px; font-size: 9px; font-weight: 700; color: rgba(255,255,255,.85); text-shadow: 0 1px 2px rgba(0,0,0,.6); z-index: 2; pointer-events: none; }
+  .key .max-flag { position: absolute; left: 3px; top: 2px; font-size: 8px; font-weight: 800; color: #fff; background: #ff5722; border-radius: 3px; padding: 0 3px; line-height: 12px; z-index: 2; display: none; pointer-events: none; }
   .key.is-max .max-flag { display: block; }
-
-  /* 按下动画：琥珀色亮起 + 放大 + 光晕 */
-  .key.pressed {
-    background: var(--amber) !important;
-    color: #1a1d24 !important;
-    transform: scale(1.07);
-    box-shadow: 0 0 22px 6px rgba(255,213,79,.55);
-    border-color: #ffe082;
-    z-index: 5;
-  }
-
-  /* 窄键位扩展宽度 */
-  .w-wide  { flex: 2.2 1 0; }
-  .w-half  { flex: 1.4 1 0; }
-  .w-space { flex: 6.2 1 0; }
-
-  /* ---------- 底部信息条 ---------- */
-  .footer {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    flex-wrap: wrap;
-    width: 100%;
-    max-width: 920px;
-  }
-  .stat {
-    background: var(--panel);
-    border: 1px solid #2e3444;
-    border-radius: 10px;
-    padding: 8px 14px;
-    font-size: 12px;
-    color: var(--text-dim);
-    white-space: nowrap;
-  }
-  .stat b { color: var(--text); font-size: 14px; }
-  .recent {
-    flex: 1 1 auto;
-    min-width: 260px;
-    background: var(--panel);
-    border: 1px solid #2e3444;
-    border-radius: 10px;
-    padding: 8px 12px;
-    font-size: 12px;
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    overflow: hidden;
-  }
-  .recent .chip {
-    background: #343c4e;
-    border-radius: 5px;
-    padding: 2px 7px;
-    font-family: Consolas, monospace;
-    font-size: 12px;
-    color: #ffd54f;
-    animation: chip-in .18s ease;
-  }
+  .key.pressed { background: var(--amber) !important; color: #1a1d24 !important; transform: scale(1.06); box-shadow: 0 0 20px 5px rgba(255,213,79,.5); border-color: #ffe082; z-index: 5; }
+  .kb-grid { display: grid; gap: 5px; }
+  .kb-grid .key { height: 38px; }
+  .footer { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; width: 100%; max-width: 1080px; justify-content: center; }
+  .stat { background: var(--panel); border: 1px solid #2e3444; border-radius: 8px; padding: 6px 12px; font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+  .stat b { color: var(--text); font-size: 13px; }
+  .recent { flex: 1 1 auto; min-width: 180px; max-width: 360px; background: var(--panel); border: 1px solid #2e3444; border-radius: 8px; padding: 6px 10px; font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; overflow: hidden; }
+  .recent .chip { background: #343c4e; border-radius: 4px; padding: 1px 6px; font-family: Consolas,monospace; font-size: 11px; color: var(--amber); animation: chip-in .18s ease; }
   @keyframes chip-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 </style>
 </head>
 <body>
 
-  <div class="title">XAssistant <b>·</b> 键盘热力图（点击次数越多 → 越接近橙红）</div>
+  <div id="errbar" style="display:none; position:fixed; bottom:0; left:0; right:0; background:#c62828; color:#fff; font-size:11px; padding:4px 8px; z-index:99999;"></div>
+  <div class="title">XAssistant <b>.</b> Keyboard Heatmap (more clicks = more orange-red)</div>
 
-  <div class="keyboard" id="kb">
-    <!-- 功能键行 -->
-    <div class="row" data-row>
-      <div class="key" data-k="esc">Esc</div>
-      <div class="key" data-k="f1">F1</div>
-      <div class="key" data-k="f2">F2</div>
-      <div class="key" data-k="f3">F3</div>
-      <div class="key" data-k="f4">F4</div>
-      <div class="key" data-k="f5">F5</div>
-      <div class="key" data-k="f6">F6</div>
-      <div class="key" data-k="f7">F7</div>
-      <div class="key" data-k="f8">F8</div>
-      <div class="key" data-k="f9">F9</div>
-      <div class="key" data-k="f10">F10</div>
-      <div class="key" data-k="f11">F11</div>
-      <div class="key" data-k="f12">F12</div>
-    </div>
-    <!-- 数字行 -->
-    <div class="row" data-row>
-      <div class="key" data-k="`">`</div>
-      <div class="key" data-k="1">1</div>
-      <div class="key" data-k="2">2</div>
-      <div class="key" data-k="3">3</div>
-      <div class="key" data-k="4">4</div>
-      <div class="key" data-k="5">5</div>
-      <div class="key" data-k="6">6</div>
-      <div class="key" data-k="7">7</div>
-      <div class="key" data-k="8">8</div>
-      <div class="key" data-k="9">9</div>
-      <div class="key" data-k="0">0</div>
-      <div class="key" data-k="-">-</div>
-      <div class="key" data-k="=">=</div>
-      <div class="key w-wide" data-k="backspace">⌫ Backspace</div>
-    </div>
-    <!-- QWERTY 行 -->
-    <div class="row" data-row>
-      <div class="key w-half" data-k="tab">Tab ⇥</div>
-      <div class="key" data-k="q">Q</div>
-      <div class="key" data-k="w">W</div>
-      <div class="key" data-k="e">E</div>
-      <div class="key" data-k="r">R</div>
-      <div class="key" data-k="t">T</div>
-      <div class="key" data-k="y">Y</div>
-      <div class="key" data-k="u">U</div>
-      <div class="key" data-k="i">I</div>
-      <div class="key" data-k="o">O</div>
-      <div class="key" data-k="p">P</div>
-      <div class="key" data-k="[">[</div>
-      <div class="key" data-k="]">]</div>
-      <div class="key w-half" data-k="\">\</div>
-    </div>
-    <!-- ASDF 行 -->
-    <div class="row" data-row>
-      <div class="key w-wide" data-k="caps lock">⇧ Caps<br/>Lock</div>
-      <div class="key" data-k="a">A</div>
-      <div class="key" data-k="s">S</div>
-      <div class="key" data-k="d">D</div>
-      <div class="key" data-k="f">F</div>
-      <div class="key" data-k="g">G</div>
-      <div class="key" data-k="h">H</div>
-      <div class="key" data-k="j">J</div>
-      <div class="key" data-k="k">K</div>
-      <div class="key" data-k="l">L</div>
-      <div class="key" data-k=";">;</div>
-      <div class="key" data-k="'">'</div>
-      <div class="key w-wide" data-k="enter">Enter ↵</div>
-    </div>
-    <!-- ZXCV 行 -->
-    <div class="row" data-row>
-      <div class="key w-wide" data-k="shift">Shift ⇧</div>
-      <div class="key" data-k="z">Z</div>
-      <div class="key" data-k="x">X</div>
-      <div class="key" data-k="c">C</div>
-      <div class="key" data-k="v">V</div>
-      <div class="key" data-k="b">B</div>
-      <div class="key" data-k="n">N</div>
-      <div class="key" data-k="m">M</div>
-      <div class="key" data-k=",">,</div>
-      <div class="key" data-k=".">.</div>
-      <div class="key" data-k="/">/</div>
-      <div class="key w-wide" data-k="right shift">Shift ⇧</div>
-    </div>
-    <!-- 控制行 -->
-    <div class="row" data-row>
-      <div class="key" data-k="ctrl">Ctrl</div>
-      <div class="key" data-k="windows">Win</div>
-      <div class="key" data-k="alt">Alt</div>
-      <div class="key w-space" data-k="space">Space</div>
-      <div class="key" data-k="right alt">Alt</div>
-      <div class="key" data-k="right windows">Win</div>
-      <div class="key" data-k="menu">Menu</div>
-      <div class="key" data-k="right ctrl">Ctrl</div>
-    </div>
+  <div class="toolbar">
+    <span>Layout:</span>
+    <button class="layout-btn" data-layout="87">87</button>
+    <button class="layout-btn active" data-layout="104">104</button>
+    <button class="layout-btn" data-layout="144">144</button>
+    <span id="layoutName"></span>
+    <div class="sep"></div>
+    <button class="mode-btn" id="transBtn" title="Toggle transparent background">Transparent</button>
+    <button class="mode-btn" id="detachBtn" title="Open in separate window">Detach</button>
+  </div>
+
+  <div id="view2d">
+    <div class="keyboard" id="kb"></div>
   </div>
 
   <div class="footer">
-    <div class="stat">总按键：<b id="total">0</b></div>
-    <div class="stat">当前上限：<b id="maxInfo">-</b></div>
-    <div class="recent"><span>最近按键：</span><div id="recentKeys" style="display:flex;gap:6px;flex-wrap:wrap;"></div></div>
+    <div class="stat">Total: <b id="total">0</b></div>
+    <div class="stat">Max: <b id="maxInfo">-</b></div>
+    <div class="recent"><span>Recent:</span><div id="recentKeys" style="display:flex;gap:5px;flex-wrap:wrap;"></div></div>
   </div>
 
 <script>
 (function () {
   "use strict";
 
-  var counts = {};          // key -> count
-  var keyEls = {};          // normalizedKey -> DOM element
-  var recentKeys = [];      // 最近 15 个按键名
+  function showErr(text) {
+    var bar = document.getElementById("errbar");
+    if (bar) { bar.style.display = "block"; bar.textContent = text; }
+  }
+  window.addEventListener("error", function (e) {
+    showErr("JS error: " + (e.message || e.type || "unknown"));
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    var r = e.reason;
+    showErr("Promise error: " + (r && r.message ? r.message : String(r)));
+  });
+
+  var counts = {};
+  var keyEls = {};
+  var recentKeys = [];
   var MAX_RECENT = 15;
   var maxKey = null;
+  var currentLayout = "104";
+  var lastUnit = 0;
+  var lastWidth = 0;
+  var renderQueued = false;
 
-  // ---------- 键名规范化（兼容 GetKeyNameText 的布局相关命名） ----------
+  function K(k, label, w) { return { k: k, label: label, w: w || 1 }; }
+
+  var MAIN_87 = [
+    [K("esc","Esc"),K("f1","F1"),K("f2","F2"),K("f3","F3"),K("f4","F4"),K("f5","F5"),K("f6","F6"),K("f7","F7"),K("f8","F8"),K("f9","F9"),K("f10","F10"),K("f11","F11"),K("f12","F12")],
+    [K("`","`"),K("1","1"),K("2","2"),K("3","3"),K("4","4"),K("5","5"),K("6","6"),K("7","7"),K("8","8"),K("9","9"),K("0","0"),K("-","-"),K("=","="),K("backspace","Backspace",2)],
+    [K("tab","Tab",1.4),K("q","Q"),K("w","W"),K("e","E"),K("r","R"),K("t","T"),K("y","Y"),K("u","U"),K("i","I"),K("o","O"),K("p","P"),K("[","["),K("]","]"),K("\\","\\",1.4)],
+    [K("caps lock","Caps",1.7),K("a","A"),K("s","S"),K("d","D"),K("f","F"),K("g","G"),K("h","H"),K("j","J"),K("k","K"),K("l","L"),K(";",";"),K("'","'"),K("enter","Enter",2.2)],
+    [K("shift","Shift",2.2),K("z","Z"),K("x","X"),K("c","C"),K("v","V"),K("b","B"),K("n","N"),K("m","M"),K(",",","),K(".","."),K("/","/"),K("right shift","Shift",2.6)],
+    [K("ctrl","Ctrl",1.25),K("windows","Win",1.25),K("alt","Alt",1.25),K("space","Space",6.2),K("right alt","Alt",1.25),K("right windows","Win",1.25),K("menu","Menu",1.25),K("right ctrl","Ctrl",1.25)]
+  ];
+
+  var PAD_EDIT = {
+    cols: 3,
+    cells: [
+      K("insert","Ins"), K("home","Home"), K("pageup","PgUp"),
+      K("delete","Del"), K("end","End"), K("pagedown","PgDn"),
+      null,             K("up","Up"),      null,
+      K("left","Left"), K("down","Down"), K("right","Right")
+    ]
+  };
+
+  var NUMPAD = {
+    cols: 4,
+    cells: [
+      K("numlock","Num"),K("divide","/"),K("multiply","*"),K("subtract","-"),
+      K("num7","7"),K("num8","8"),K("num9","9"),K("add","+",1),
+      K("num4","4"),K("num5","5"),K("num6","6"),
+      K("num1","1"),K("num2","2"),K("num3","3"),K("numenter","Enter",1),
+      K("num0","0",2),K("decimal",".")
+    ]
+  };
+
+  var MEDIA = [
+    [K("media_prev","Prev"),K("media_play","Play"),K("media_next","Next"),K("media_mute","Mute"),K("media_voldn","Vol-"),K("media_volup","Vol+"),
+     K("media_mail","Mail"),K("media_calc","Calc"),K("media_search","Search"),K("media_pc","PC"),K("media_browser","Web"),K("media_sleep","Sleep")]
+  ];
+
+  var LAYOUTS = {
+    "87": { name: "87 keys (main only)", blocks: [
+      { side:"left", type:"main", rows: MAIN_87 }
+    ] },
+    "104": { name: "104 keys (edit + arrows)", blocks: [
+      { side:"left", type:"main", rows: MAIN_87 },
+      { side:"right", type:"grid", data: PAD_EDIT }
+    ] },
+    "144": { name: "144 keys (media + numpad right)", blocks: [
+      { side:"left", type:"media", rows: MEDIA },
+      { side:"left", type:"main", rows: MAIN_87 },
+      { side:"right", type:"side", children: [
+        { type:"grid", data: PAD_EDIT },
+        { type:"grid", data: NUMPAD }
+      ] }
+    ] }
+  };
+
   function normalizeKey(name) {
     var n = String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
     var aliases = {
-      "escape": "esc",
-      "back space": "backspace",
-      "backspace": "backspace",
-      "capslock": "caps lock",
-      "caps lock": "caps lock",
-      "left shift": "shift",
-      "left ctrl": "ctrl",
-      "left alt": "alt",
-      "left windows": "windows",
-      "right windows": "windows",
-      "win": "windows",
-      "apps": "menu",
-      "spacebar": "space",
-      "return": "enter",
-      "scroll": "scrolllock",
-      "print screen": "prtsc"
+      "escape":"esc", "back space":"backspace", "backspace":"backspace",
+      "capslock":"caps lock", "caps lock":"caps lock",
+      "left shift":"shift", "left ctrl":"ctrl", "left alt":"alt",
+      "right shift":"right shift", "right ctrl":"right ctrl", "right alt":"right alt",
+      "left windows":"windows", "right windows":"windows", "win":"windows", "apps":"menu",
+      "spacebar":"space", "return":"enter", "scroll":"scrolllock", "print screen":"prtsc",
+      "page up":"pageup", "page down":"pagedown",
+      "num lock":"numlock", "numlock":"numlock", "num lk":"numlock",
+      "numpad 1":"num1", "num 1":"num1", "numpad1":"num1",
+      "numpad 2":"num2", "num 2":"num2", "numpad2":"num2",
+      "numpad 3":"num3", "num 3":"num3", "numpad3":"num3",
+      "numpad 4":"num4", "num 4":"num4", "numpad4":"num4",
+      "numpad 5":"num5", "num 5":"num5", "numpad5":"num5",
+      "numpad 6":"num6", "num 6":"num6", "numpad6":"num6",
+      "numpad 7":"num7", "num 7":"num7", "numpad7":"num7",
+      "numpad 8":"num8", "num 8":"num8", "numpad8":"num8",
+      "numpad 9":"num9", "num 9":"num9", "numpad9":"num9",
+      "numpad 0":"num0", "num 0":"num0", "numpad0":"num0",
+      "num enter":"numenter", "numpad enter":"numenter", "numpadenter":"numenter",
+      "num .":"decimal", "numpad .":"decimal", "decimal":"decimal", "numpad decimal":"decimal",
+      "num /":"divide", "divide":"divide", "numpad divide":"divide",
+      "num *":"multiply", "multiply":"multiply", "numpad multiply":"multiply",
+      "num -":"subtract", "subtract":"subtract", "numpad subtract":"subtract",
+      "num +":"add", "add":"add", "numpad add":"add",
+      "arrow up":"up", "arrow down":"down", "arrow left":"left", "arrow right":"right"
     };
     return aliases[n] || n;
   }
 
-  // ---------- 热力色：次数占比越高 → 越接近橙红色 ----------
   function heatColor(t) {
-    // 蓝(220°) → 橙红(14°)，饱和度/亮度随占比提升
     var hue = 220 - 206 * t;
     var sat = 62 + 33 * t;
     var light = 32 + 26 * t;
     return "hsl(" + hue + ", " + sat + "%, " + light + "%)";
   }
 
-  function applyHeat() {
+  function computeStats() {
     var values = [];
     for (var k in counts) values.push(counts[k]);
     var max = values.length ? Math.max.apply(null, values) : 0;
     var total = values.reduce(function (a, b) { return a + b; }, 0);
-
     maxKey = null;
+    for (var k in counts) { if (max > 0 && counts[k] === max && !maxKey) maxKey = k; }
     document.getElementById("total").textContent = total.toLocaleString();
+    document.getElementById("maxInfo").textContent = maxKey ? maxKey + " (" + counts[maxKey].toLocaleString() + ")" : "-";
+    return max;
+  }
 
+  function makeKey2D(kd, unit) {
+    var el = document.createElement("div");
+    el.className = "key";
+    el.setAttribute("data-k", kd.k);
+    el.style.width = Math.round((kd.w || 1) * unit) + "px";
+    el.style.height = Math.round(unit * 0.9) + "px";
+    var span = document.createElement("span");
+    span.className = "cap-label";
+    span.style.fontSize = Math.max(8, Math.round(unit * 0.24)) + "px";
+    span.textContent = kd.label;
+    el.appendChild(span);
+    var flag = document.createElement("span");
+    flag.className = "max-flag";
+    flag.textContent = "MAX";
+    el.appendChild(flag);
+    return el;
+  }
+
+  function collectKeys2D() {
+    keyEls = {};
+    document.querySelectorAll("#kb .key").forEach(function (el) {
+      keyEls[normalizeKey(el.getAttribute("data-k"))] = el;
+    });
+  }
+
+  function containerWidth() {
+    var view = document.getElementById("view2d");
+    var w = view ? view.clientWidth : 0;
+    if (w > 100) return w;
+    var kb = document.getElementById("kb");
+    if (kb && kb.clientWidth > 100) return kb.clientWidth;
+    var de = document.documentElement;
+    if (de && de.clientWidth > 100) return de.clientWidth;
+    if (window.innerWidth > 100) return window.innerWidth;
+    return 1060;
+  }
+
+  function blockModel(b) {
+    if (b.type === "main" || b.type === "media") {
+      var bestW = 0, bestF = 0;
+      b.rows.forEach(function (row) {
+        var w = 0;
+        row.forEach(function (kd) { w += (kd.w || 1); });
+        var f = Math.max(0, (row.length - 1) * 5);
+        if (w > bestW || (w === bestW && f > bestF)) { bestW = w; bestF = f; }
+      });
+      return { weight: bestW, fixed: bestF };
+    } else if (b.type === "grid") {
+      return { weight: b.data.cols, fixed: Math.max(0, (b.data.cols - 1) * 5) };
+    } else if (b.type === "side") {
+      var tw = 0, tf = 0, n = 0;
+      b.children.forEach(function (ch) {
+        var m = blockModel(ch);
+        tw += m.weight;
+        tf += m.fixed;
+        n++;
+      });
+      tf += Math.max(0, (n - 1) * 5);
+      return { weight: tw, fixed: tf };
+    }
+    return { weight: 0, fixed: 0 };
+  }
+
+  function computeUnit() {
+    var L = LAYOUTS[currentLayout];
+    if (!L) return 40;
+    var avail = Math.max(300, containerWidth() - 24);
+    var leftW = 0, leftF = 0, rightW = 0, rightF = 0, hasRight = false;
+    L.blocks.forEach(function (b) {
+      var m = blockModel(b);
+      if (b.side === "right") {
+        hasRight = true;
+        if (m.weight > rightW) { rightW = m.weight; rightF = m.fixed; }
+      } else {
+        if (m.weight > leftW) { leftW = m.weight; leftF = m.fixed; }
+      }
+    });
+    var gap = hasRight ? 10 : 0;
+    var unit = 52;
+    if (leftW + rightW > 0) {
+      unit = (avail - gap - leftF - rightF) / (leftW + rightW);
+    }
+    unit = Math.max(20, Math.min(52, unit));
+    return unit;
+  }
+
+  function buildGridEl(data, unit) {
+    var g = document.createElement("div");
+    g.className = "kb-grid";
+    g.style.gridTemplateColumns = "repeat(" + data.cols + ", 1fr)";
+    g.style.width = (data.cols * unit + (data.cols - 1) * 5) + "px";
+    data.cells.forEach(function (cell) {
+      if (cell === null || cell === undefined) {
+        var sp = document.createElement("div");
+        sp.className = "key-spacer";
+        g.appendChild(sp);
+        return;
+      }
+      var el = makeKey2D(cell, unit);
+      if (cell.w > 1) el.style.gridColumn = "span " + cell.w;
+      g.appendChild(el);
+    });
+    return g;
+  }
+
+  function render2D(key) {
+    var L = LAYOUTS[key];
+    if (!L) return;
+    var unit = computeUnit();
+    lastUnit = unit;
+    lastWidth = containerWidth();
+    var kb = document.getElementById("kb");
+    kb.innerHTML = "";
+    var left = document.createElement("div");
+    left.className = "kb-left";
+    var right = document.createElement("div");
+    right.className = "kb-right";
+
+    L.blocks.forEach(function (b) {
+      var box = b.side === "right" ? right : left;
+      if (b.type === "main" || b.type === "media") {
+        var col = document.createElement("div");
+        col.className = "kb-column";
+        b.rows.forEach(function (row) {
+          var r = document.createElement("div");
+          r.className = "row";
+          row.forEach(function (kd) { r.appendChild(makeKey2D(kd, unit)); });
+          col.appendChild(r);
+        });
+        box.appendChild(col);
+      } else if (b.type === "grid") {
+        box.appendChild(buildGridEl(b.data, unit));
+      } else if (b.type === "side") {
+        var sideRow = document.createElement("div");
+        sideRow.className = "side";
+        b.children.forEach(function (ch) {
+          if (ch.type === "main" || ch.type === "media") {
+            var scol = document.createElement("div");
+            scol.className = "kb-column";
+            ch.rows.forEach(function (row) {
+              var r2 = document.createElement("div");
+              r2.className = "row";
+              row.forEach(function (kd) { r2.appendChild(makeKey2D(kd, unit)); });
+              scol.appendChild(r2);
+            });
+            sideRow.appendChild(scol);
+          } else if (ch.type === "grid") {
+            sideRow.appendChild(buildGridEl(ch.data, unit));
+          }
+        });
+        box.appendChild(sideRow);
+      }
+    });
+
+    if (right.childNodes.length) { kb.appendChild(left); kb.appendChild(right); }
+    else kb.appendChild(left);
+
+    collectKeys2D();
+  }
+
+  function applyHeat2D() {
+    var max = computeStats();
     for (var k in keyEls) {
       var el = keyEls[k];
       var c = counts[k] || 0;
       var t = max > 0 ? c / max : 0;
       el.style.background = heatColor(t);
       el.classList.toggle("is-max", max > 0 && c === max);
-      // 徽标：次数 > 0 时显示
       var badge = el.querySelector(".badge");
       if (c > 0) {
-        if (!badge) {
-          badge = document.createElement("span");
-          badge.className = "badge";
-          el.appendChild(badge);
-        }
+        if (!badge) { badge = document.createElement("span"); badge.className = "badge"; el.appendChild(badge); }
         badge.textContent = c.toLocaleString();
-      } else if (badge) {
-        badge.remove();
-      }
-      if (max > 0 && c === max && !maxKey) maxKey = k;
+      } else if (badge) { badge.remove(); }
     }
-
-    document.getElementById("maxInfo").textContent = maxKey
-      ? maxKey + "（" + counts[maxKey].toLocaleString() + " 次）"
-      : "-";
   }
 
-  // ---------- 按下动画 ----------
-  function playPress(key) {
+  function playPress2D(key) {
     var el = keyEls[key];
     if (!el) return;
     el.classList.remove("pressed");
-    void el.offsetWidth; // 强制重排以重启动画
+    void el.offsetWidth;
     el.classList.add("pressed");
     setTimeout(function () { el.classList.remove("pressed"); }, 240);
   }
@@ -360,12 +398,89 @@
     }
   }
 
+  function post(obj) {
+    if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage(obj);
+    else if (window.parent && window.parent.chrome && window.parent.chrome.webview) {
+      window.parent.chrome.webview.postMessage(obj);
+    }
+  }
+
+  function updateLayoutName(key) {
+    document.getElementById("layoutName").textContent = LAYOUTS[key].name;
+    document.querySelectorAll(".layout-btn").forEach(function (btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-layout") === key);
+    });
+  }
+
+  function rerender() {
+    render2D(currentLayout);
+    applyHeat2D();
+    updateLayoutName(currentLayout);
+  }
+
+  function scheduleRender() {
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(function () {
+      renderQueued = false;
+      var w = containerWidth();
+      if (Math.abs(w - lastWidth) < 1) return;
+      rerender();
+    });
+  }
+
+  var detachBtn = document.getElementById("detachBtn");
+  if (detachBtn) {
+    detachBtn.addEventListener("click", function () { post({ type: "detach" }); });
+  }
+
+  var dragState = null;
+  window.addEventListener("pointerdown", function (e) {
+    if (e.target.closest("button, a, input, select, textarea")) return;
+    dragState = { lx: e.clientX, ly: e.clientY };
+  });
+  window.addEventListener("pointermove", function (e) {
+    if (!dragState) return;
+    var dx = e.clientX - dragState.lx;
+    var dy = e.clientY - dragState.ly;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    dragState.lx = e.clientX;
+    dragState.ly = e.clientY;
+    post({ type: "dragDelta", dx: dx, dy: dy });
+  });
+  window.addEventListener("pointerup", function () { dragState = null; });
+  window.addEventListener("pointercancel", function () { dragState = null; });
+
+  var isTransparent = false;
+  try { isTransparent = localStorage.getItem("xassist_transparent") === "1"; } catch (e) { }
+  function applyTransparent() {
+    document.body.classList.toggle("transparent", isTransparent);
+    var btn = document.getElementById("transBtn");
+    if (btn) btn.textContent = isTransparent ? "Opaque" : "Transparent";
+  }
+  var transBtn = document.getElementById("transBtn");
+  if (transBtn) {
+    transBtn.addEventListener("click", function () {
+      isTransparent = !isTransparent;
+      try { localStorage.setItem("xassist_transparent", isTransparent ? "1" : "0"); } catch (e) { }
+      applyTransparent();
+    });
+  }
+  applyTransparent();
+
+  document.querySelectorAll(".layout-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      currentLayout = btn.getAttribute("data-layout");
+      rerender();
+    });
+  });
+
   function onPress(key, count) {
     var nk = normalizeKey(key);
     counts[nk] = count;
-    playPress(nk);
+    playPress2D(nk);
     pushRecent(key);
-    applyHeat();
+    applyHeat2D();
   }
 
   function onInit(payload) {
@@ -377,47 +492,41 @@
         }
       }
     }
-    applyHeat();
+    applyHeat2D();
   }
 
-  // ---------- 收集键盘 DOM ----------
-  document.querySelectorAll("#kb .key").forEach(function (el) {
-    var k = normalizeKey(el.getAttribute("data-k"));
-    keyEls[k] = el;
-    if (!el.querySelector(".cap-label")) {
-      var span = document.createElement("span");
-      span.className = "cap-label";
-      span.innerHTML = el.innerHTML;
-      el.innerHTML = "";
-      el.appendChild(span);
-    }
-    var flag = document.createElement("span");
-    flag.className = "max-flag";
-    flag.textContent = "MAX";
-    el.appendChild(flag);
-  });
-
-  // ---------- 接收来自 C# 的消息 ----------
   function handleMessage(data) {
     var msg = null;
     try { msg = typeof data === "string" ? JSON.parse(data) : data; } catch (e) { return; }
     if (!msg || !msg.type) return;
     if (msg.type === "press") onPress(msg.key, msg.count);
     else if (msg.type === "init") onInit(msg);
+    else if (msg.type === "setEnv") {
+      if (msg.overlay && detachBtn) detachBtn.style.display = "none";
+    } else if (msg.type === "setLayout") {
+      currentLayout = String(msg.layout);
+      rerender();
+    }
   }
 
   if (window.chrome && window.chrome.webview && window.chrome.webview.addEventListener) {
-    window.chrome.webview.addEventListener("message", function (e) {
-      handleMessage(e.data);
-    });
+    window.chrome.webview.addEventListener("message", function (e) { handleMessage(e.data); });
   } else if (window.parent && window.parent.chrome && window.parent.chrome.webview) {
-    window.parent.chrome.webview.addEventListener("message", function (e) {
-      handleMessage(e.data);
-    });
+    window.parent.chrome.webview.addEventListener("message", function (e) { handleMessage(e.data); });
   }
 
-  // 初次渲染（无数据时的底色）
-  applyHeat();
+  // Re-render when the container actually resizes (WebView2 settles over a few frames).
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(function () { scheduleRender(); }).observe(document.getElementById("view2d"));
+  } else {
+    window.addEventListener("resize", function () { scheduleRender(); });
+  }
+  window.addEventListener("resize", function () { scheduleRender(); });
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { scheduleRender(); });
+  }
+
+  rerender();
 })();
 </script>
 </body>

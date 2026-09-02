@@ -8,6 +8,7 @@ namespace XAssistant.Services;
 public class MouseClickHookService : IMouseClickHookService, IDisposable
 {
     public event Action<string>? MouseClicked; // 传入按钮名称 "Left"/"Middle"/"Right"
+    public event Action<string, int, int>? MouseClickedAt; // 按钮名称 + 屏幕坐标 X/Y
 
     private const int WH_MOUSE_LL = 14;
     private const int WM_LBUTTONDOWN = 0x0201;
@@ -55,20 +56,42 @@ public class MouseClickHookService : IMouseClickHookService, IDisposable
     {
         if (nCode >= 0)
         {
+            var mh = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
             switch ((int)wParam)
             {
                 case WM_LBUTTONDOWN:
                     MouseClicked?.Invoke("Left");
+                    MouseClickedAt?.Invoke("Left", mh.pt.X, mh.pt.Y);
                     break;
                 case WM_MBUTTONDOWN:
                     MouseClicked?.Invoke("Middle");
+                    MouseClickedAt?.Invoke("Middle", mh.pt.X, mh.pt.Y);
                     break;
                 case WM_RBUTTONDOWN:
                     MouseClicked?.Invoke("Right");
+                    MouseClickedAt?.Invoke("Right", mh.pt.X, mh.pt.Y);
                     break;
             }
         }
         return CallNextHookEx(_hookId, nCode, wParam, lParam);
+    }
+
+    // 低层鼠标钩子结构：含屏幕坐标
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MSLLHOOKSTRUCT
+    {
+        public POINT pt; // 屏幕坐标
+        public uint mouseData;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
     }
 
     // P/Invoke 声明

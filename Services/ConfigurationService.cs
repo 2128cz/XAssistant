@@ -94,4 +94,12 @@ public class ConfigurationService : IConfigurationService
         _appSettings.General.IsLogExpanded = expanded;
         Save();
     }
+
+    public string GetTheme() => _appSettings.General.Theme;
+
+    public void SetTheme(string theme)
+    {
+        _appSettings.General.Theme = theme;
+        Save();
+    }
 }

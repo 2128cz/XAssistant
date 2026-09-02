@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Assets\KeyboardAnimation\index.html">
+    <Content Include="Assets\KeyboardAnimation\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

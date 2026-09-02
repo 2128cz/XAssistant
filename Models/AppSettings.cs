@@ -29,4 +29,5 @@ public class GeneralSettings
     public double WindowWidth { get; set; } = 1280;
     public double WindowHeight { get; set; } = 720;
     public bool IsLogExpanded { get; set; } = false;
+    public string Theme { get; set; } = "Light"; // 界面主题：Light / Dark
 }

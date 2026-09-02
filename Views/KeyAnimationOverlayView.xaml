@@ -1,0 +1,24 @@
+<UserControl
+  x:Class="XAssistant.Views.KeyAnimationOverlayView"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  d:DesignHeight="520"
+  d:DesignWidth="1000"
+  mc:Ignorable="d">
+  <Grid
+    x:Name="RootGrid"
+    Background="Transparent">
+    <TextBlock
+      x:Name="ErrText"
+      Margin="12"
+      HorizontalAlignment="Center"
+      VerticalAlignment="Center"
+      FontSize="13"
+      Foreground="#FF6B6B"
+      TextWrapping="Wrap"
+      TextAlignment="Center"
+      Visibility="Collapsed" />
+  </Grid>
+</UserControl>

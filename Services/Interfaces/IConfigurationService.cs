@@ -42,4 +42,11 @@ public interface IConfigurationService
     // ---------- 日志面板状态 ----------
     bool GetIsLogExpanded();
     void SetIsLogExpanded(bool expanded);
+
+    // ---------- 界面主题 ----------
+    /// <summary>获取界面主题（"Light" / "Dark"）</summary>
+    string GetTheme();
+
+    /// <summary>设置界面主题并持久化</summary>
+    void SetTheme(string theme);
 }

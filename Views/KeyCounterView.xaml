@@ -98,9 +98,9 @@
                 <Border
                   Margin="0,0,4,4"
                   Padding="6,2"
-                  Background="#E8F0FE"
+                  Background="{DynamicResource KeyChipBackground}"
                   CornerRadius="3">
-                  <TextBlock FontFamily="Consolas" Text="{Binding}" />
+                  <TextBlock FontFamily="Consolas" Foreground="{DynamicResource KeyChipText}" Text="{Binding}" />
                 </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

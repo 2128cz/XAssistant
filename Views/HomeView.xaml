@@ -11,8 +11,8 @@
     <UserControl.Resources>
         <!--  卡片基础样式  -->
         <Style x:Key="CardStyle" TargetType="Border">
-            <Setter Property="Background" Value="White" />
-            <Setter Property="BorderBrush" Value="#E0E0E0" />
+            <Setter Property="Background" Value="{DynamicResource CardBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="12" />
             <Setter Property="Margin" Value="10" />
@@ -31,7 +31,7 @@
         <Style x:Key="ModuleTitleStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="15" />
             <Setter Property="FontWeight" Value="Normal" />
-            <Setter Property="Foreground" Value="#555555" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
             <Setter Property="Margin" Value="0,0,0,0" />
         </Style>
 
@@ -39,7 +39,7 @@
         <Style x:Key="TodayBigStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="32" />
             <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Foreground" Value="#FB64B6" />
+            <Setter Property="Foreground" Value="{DynamicResource HighlightNumber}" />
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="Margin" Value="0,0,0,6" />
         </Style>
@@ -55,14 +55,14 @@
         <Style x:Key="TotalNumberStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="20" />
             <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Foreground" Value="#FB64B6" />
+            <Setter Property="Foreground" Value="{DynamicResource HighlightNumber}" />
             <Setter Property="HorizontalAlignment" Value="Left" />
         </Style>
 
         <!--  总次数标签  -->
         <Style x:Key="TotalLabelStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13" />
-            <Setter Property="Foreground" Value="#666666" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
             <Setter Property="HorizontalAlignment" Value="Left" />
             <Setter Property="Margin" Value="0,2,0,0" />
         </Style>
@@ -70,7 +70,7 @@
         <!--  详情链接按钮  -->
         <Style x:Key="DetailLinkStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="#4A90D9" />
+            <Setter Property="Foreground" Value="{DynamicResource LinkBrush}" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="HorizontalAlignment" Value="Right" />
@@ -134,7 +134,7 @@
                                 Width="8"
                                 Height="8"
                                 Fill="{Binding MouseRecordingColor}"
-                                Stroke="Black"
+                                Stroke="{DynamicResource TextSecondary}"
                                 StrokeThickness="1" />
                             <TextBlock
                                 Foreground="{Binding MouseRecordingColor}"
@@ -203,7 +203,7 @@
                                 Width="8"
                                 Height="8"
                                 Fill="{Binding KeyRecordingColor}"
-                                Stroke="Black"
+                                Stroke="{DynamicResource TextSecondary}"
                                 StrokeThickness="1" />
                             <TextBlock
                                 Foreground="{Binding KeyRecordingColor}"
@@ -315,7 +315,7 @@
                                 <TextBlock
                                     Margin="0,3"
                                     FontSize="14"
-                                    Foreground="#333"
+                                    Foreground="{DynamicResource TextPrimary}"
                                     TextAlignment="Left">
                                     <Run Text="• " /><Run Text="{Binding DisplayName, Mode=OneWay}" />
                                 </TextBlock>
