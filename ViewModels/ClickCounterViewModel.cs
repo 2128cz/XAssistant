@@ -5,22 +5,47 @@ using CommunityToolkit.Mvvm.Input;
 using XAssistant.Models;
 using XAssistant.Services;
 using XAssistant.Services.Interfaces;
+using Point = System.Windows.Point;
 
 namespace XAssistant.ViewModels;
 
 public partial class ClickCounterViewModel : ViewModelBase, IDisposable
 {
-    /// <summary>移动取样节拍。10 Hz 足够让指示图标看着连续，也把文本分配限制在每秒十次。</summary>
-    private const int MovementSampleIntervalMs = 100;
+    /// <summary>
+    /// 移动取样节拍。20 Hz 是为了让背景轨迹曲线看着连续；文本读数也跟着这个节拍走，
+    /// 每秒二十次字符串分配对这个量级的数据仍然可忽略。
+    /// </summary>
+    private const int MovementSampleIntervalMs = 50;
 
-    /// <summary>一个取样窗口内多少像素的净位移算作把指示图标“打满”；按 10 Hz 约合 2200 px/s。</summary>
+    /// <summary>
+    /// 一个取样窗口内多少像素的净位移算作把指示图标“打满”。注意量纲是每拍位移而不是每秒速率：
+    /// 一次甩动的峰值只取决于它总共移动了多少像素，与被拆成一拍还是两拍无关，
+    /// 所以调快节拍不会把位移窗调敏感（只有持续匀速时因逐拍衰减而差约一成）。
+    /// </summary>
     private const double FullDeflectionPixels = 220;
 
-    /// <summary>每个节拍把上一次的偏移按该比例保留，停下后约 3 个节拍（300 ms）回到中心。</summary>
-    private const double DeflectionDecay = 0.55;
+    /// <summary>
+    /// 偏移回落到中心的时间常数（秒）。原本写死的“每拍乘 0.55”换算过来就是 e^(-t/0.167)。
+    /// 必须按秒而不是按拍定义：按拍固定比例时，回落时长等于跟着节拍变（时间常数 = -Δt/ln f），
+    /// 取样节拍从 100 ms 提到 50 ms 会让回落快一倍，图标变成手一停就弹回中心。
+    /// </summary>
+    private const double DeflectionTimeConstantSeconds = 0.167;
 
     /// <summary>速率的指数平滑权重：单个窗口的突发位移不会把读数抽成毛刺。</summary>
     private const double SpeedSmoothing = 0.3;
+
+    /// <summary>轨迹背景图的设计尺寸，需与 KeyboardHeatmap 里那块 Canvas 的宽高一致。</summary>
+    private const double TrailWidth = 260;
+    private const double TrailHeight = 46;
+
+    /// <summary>
+    /// 轨迹时间跨度。偏移本身约 0.17 秒就回中心，窗口拉太长只会看到一条贴零的直线，
+    /// 6 秒足够看清手上最近几次甩动的形状。
+    /// </summary>
+    private const int TrailWindowSeconds = 6;
+
+    /// <summary>横向每秒推进的像素，与输入节奏曲线同一套算法：按“距今多少秒”定 x，曲线因此连续左移。</summary>
+    private const double TrailPixelsPerSecond = TrailWidth / TrailWindowSeconds;
 
     /// <summary>累计移动像素落库的最小间隔，避免每个取样节拍都开一次 SQLite 连接。</summary>
     private const int MovementFlushIntervalMs = 1000;
@@ -39,6 +64,9 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
     private double _sessionWheelNotches;
     private long _clickSequence;
     private bool _disposed;
+
+    /// <summary>轨迹曲线的滑动样本：偏移值配上落地时刻，下标不需要与时间对应，旧点靠“距今多少秒”算 x 后自然滑出。</summary>
+    private readonly Queue<(DateTime At, double X, double Y)> _trail = new();
 
     [ObservableProperty]
     private int _leftClickCount;
@@ -83,6 +111,16 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private double _mouseOffsetY;
+
+    /// <summary>
+    /// 垫在鼠标读数下方的两条轨迹。给设计尺寸下的绝对坐标而非归一化值：
+    /// 这跟输入节奏曲线同一走法，由 View 层的 Viewbox 拉到实际像素，VM 不需要知道控件多大。
+    /// </summary>
+    [ObservableProperty]
+    private PointCollection _mouseTrailXPoints = new();
+
+    [ObservableProperty]
+    private PointCollection _mouseTrailYPoints = new();
 
     /// <summary>本段取样窗口的净位移读数。</summary>
     [ObservableProperty]
@@ -285,7 +323,7 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// 拉取一段鼠标移动量。钩子只累加、不推送，因此取样频率与钩子频率完全解耦；
-    /// 静止时不分配任何字符串，只有指示图标还在向中心回落才继续更新。
+    /// 静止时不分配任何字符串，只有指示图标还在向中心回落、或轨迹里还有未滑出的点时才继续更新。
     /// </summary>
     private void OnMovementTick(object? sender, EventArgs e)
     {
@@ -308,6 +346,8 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
         {
             Relax();
         }
+
+        RecordTrail();
 
         if (_pendingFlushPixels > 0
             && (DateTime.Now - _lastMovementFlushAt).TotalMilliseconds >= MovementFlushIntervalMs)
@@ -356,10 +396,11 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void Deflect(MouseMovementSample sample)
     {
+        var decay = DecayFor(sample.ElapsedSeconds);
         MouseOffsetX = Math.Clamp(
-            MouseOffsetX * DeflectionDecay + sample.DeltaX / FullDeflectionPixels, -1d, 1d);
+            MouseOffsetX * decay + sample.DeltaX / FullDeflectionPixels, -1d, 1d);
         MouseOffsetY = Math.Clamp(
-            MouseOffsetY * DeflectionDecay + sample.DeltaY / FullDeflectionPixels, -1d, 1d);
+            MouseOffsetY * decay + sample.DeltaY / FullDeflectionPixels, -1d, 1d);
     }
 
     private void ReportSpeed(MouseMovementSample sample)
@@ -383,7 +424,48 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
         MouseOffsetY = Decay(MouseOffsetY);
     }
 
-    private static double Decay(double value) => Math.Abs(value) < 0.01 ? 0 : value * DeflectionDecay;
+    /// <summary>静止回落用的衰减：没有样本可参，拿标称节拍当作窗口长度。</summary>
+    private static double Decay() => DecayFor(MovementSampleIntervalMs / 1000d);
+
+    private static double DecayFor(double seconds) => Math.Exp(-seconds / DeflectionTimeConstantSeconds);
+
+    private static double Decay(double value) => Math.Abs(value) < 0.01 ? 0 : value * Decay();
+
+    /// <summary>
+    /// 把当前偏移计入轨迹并重建两条曲线。只在还在动或轨迹未排空时动手：
+    /// 手停下来后旧点会继续向左滑出并自动清空，不会留下一条永远贴零的直线。
+    /// 时间用 UTC：本地钟被调整时，按“距今多少秒”算出的 x 不会跳变。
+    /// </summary>
+    private void RecordTrail()
+    {
+        var now = DateTime.UtcNow;
+        if (MouseOffsetX != 0 || MouseOffsetY != 0)
+            _trail.Enqueue((now, MouseOffsetX, MouseOffsetY));
+        while (_trail.Count > 0 && (now - _trail.Peek().At).TotalSeconds > TrailWindowSeconds)
+            _trail.Dequeue();
+        if (_trail.Count == 0)
+        {
+            if (MouseTrailXPoints.Count > 0)
+            {
+                MouseTrailXPoints = new PointCollection();
+                MouseTrailYPoints = new PointCollection();
+            }
+            return;
+        }
+        var mid = TrailHeight / 2;
+        // 留出 2 px 边距：连续两次扫动把偏移顶到 ±1 时，曲线不会被顶出画布外
+        var amplitude = mid - 2;
+        var xs = new PointCollection(_trail.Count);
+        var ys = new PointCollection(_trail.Count);
+        foreach (var (at, x, y) in _trail)
+        {
+            var px = TrailWidth - (now - at).TotalSeconds * TrailPixelsPerSecond;
+            xs.Add(new Point(px, mid - x * amplitude));
+            ys.Add(new Point(px, mid - y * amplitude));
+        }
+        MouseTrailXPoints = xs;
+        MouseTrailYPoints = ys;
+    }
 
     private void FlushMovement()
     {

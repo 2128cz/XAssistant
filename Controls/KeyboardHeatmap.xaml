@@ -71,6 +71,19 @@
                             <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
+                        <!--  轨迹背景：两条线分别是 X / Y 偏移，跨在右侧两列读数的下方。它声明在最前，因此画在文本之下而不是盖住它；
+                            IsHitTestVisible=False 让它不挡距离读数的气泡。260×46 是设计尺寸，必须与 ClickCounterViewModel 的 TrailWidth / TrailHeight 一致；
+                            高度显式钉成设计值：本行实高由左侧 62 的位移窗决定，Fill 会把纵向振幅和虚线间隔一起拉长变形  -->
+                        <Viewbox Grid.Column="2" Grid.ColumnSpan="2" Height="46" VerticalAlignment="Center"
+                                 Stretch="Fill" IsHitTestVisible="False">
+                            <Canvas Width="260" Height="46">
+                                <Path Data="M 0,23 L 260,23" Stroke="#1ABDD794" StrokeThickness="1"/>
+                                <Polyline Points="{Binding MouseTrailYPoints, ElementName=Root}" Stroke="{DynamicResource TextSecondary}"
+                                          StrokeThickness="1.2" StrokeDashArray="3 2" Opacity="0.45" StrokeLineJoin="Round"/>
+                                <Polyline Points="{Binding MouseTrailXPoints, ElementName=Root}" Stroke="{DynamicResource AccentBrush}"
+                                          StrokeThickness="1.3" Opacity="0.5" StrokeLineJoin="Round"/>
+                            </Canvas>
+                        </Viewbox>
                         <!--  位移窗：小鼠标图标朝指针移动方向偏移，并被钳在这个矩形内；偏移量由代码按 MouseOffsetX/Y 换算  -->
                         <Border x:Name="MoveField" Width="84" Height="62" BorderThickness="1" BorderBrush="#33BDD794" Background="#0ABDD794">
                             <Border.ToolTip>
@@ -100,8 +113,18 @@
                                 </Viewbox>
                             </Grid>
                         </Border>
-                        <TextBlock Grid.Column="1" Text="MSE" Foreground="{DynamicResource TextSecondary}" FontFamily="Consolas" FontSize="12"
-                                   FontWeight="SemiBold" VerticalAlignment="Center" Margin="16,0,24,0"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,24,0">
+                            <TextBlock Text="MSE" Foreground="{DynamicResource TextSecondary}" FontFamily="Consolas" FontSize="12" FontWeight="SemiBold"/>
+                            <!--  图例跟曲线用同一笔刷同一线型，不用再拿文字解释哪条是哪个轴  -->
+                            <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                                <Path Data="M 0,1 L 11,1" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.3" VerticalAlignment="Center"/>
+                                <TextBlock Text="X" FontFamily="Consolas" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="4,0,0,0"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                <Path Data="M 0,1 L 11,1" Stroke="{DynamicResource TextSecondary}" StrokeThickness="1.2" StrokeDashArray="3 2" VerticalAlignment="Center"/>
+                                <TextBlock Text="Y" FontFamily="Consolas" FontSize="9" Foreground="{DynamicResource TextSecondary}" Margin="4,0,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
                             <TextBlock Text="{Binding MouseDeltaText, ElementName=Root}" Foreground="{DynamicResource AccentBrush}"
                                        FontFamily="Consolas" FontSize="11"/>

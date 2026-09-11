@@ -49,6 +49,12 @@ public partial class KeyboardHeatmap : UserControl
     public static readonly DependencyProperty MouseButtonProperty = RegisterMouse<string>(nameof(MouseButton), string.Empty);
     public static readonly DependencyProperty MouseClickPulseProperty = RegisterMouse(nameof(MouseClickPulse), 0L, MouseClickChanged);
 
+    /// <summary>垫在鼠标读数下方的 X/Y 偏移轨迹，坐标已是控件内那块 Canvas 的设计尺寸，本控件不再换算。</summary>
+    public static readonly DependencyProperty MouseTrailXPointsProperty =
+        RegisterMouse(nameof(MouseTrailXPoints), new PointCollection());
+    public static readonly DependencyProperty MouseTrailYPointsProperty =
+        RegisterMouse(nameof(MouseTrailYPoints), new PointCollection());
+
     public IEnumerable? ItemsSource { get => (IEnumerable?)GetValue(ItemsSourceProperty); set => SetValue(ItemsSourceProperty, value); }
     public string RecentKey { get => (string)GetValue(RecentKeyProperty); set => SetValue(RecentKeyProperty, value); }
     public bool ShowHeader { get => (bool)GetValue(ShowHeaderProperty); set => SetValue(ShowHeaderProperty, value); }
@@ -66,6 +72,8 @@ public partial class KeyboardHeatmap : UserControl
     public string MouseDistanceText { get => (string)GetValue(MouseDistanceTextProperty); set => SetValue(MouseDistanceTextProperty, value); }
     public string MouseButton { get => (string)GetValue(MouseButtonProperty); set => SetValue(MouseButtonProperty, value); }
     public long MouseClickPulse { get => (long)GetValue(MouseClickPulseProperty); set => SetValue(MouseClickPulseProperty, value); }
+    public PointCollection MouseTrailXPoints { get => (PointCollection)GetValue(MouseTrailXPointsProperty); set => SetValue(MouseTrailXPointsProperty, value); }
+    public PointCollection MouseTrailYPoints { get => (PointCollection)GetValue(MouseTrailYPointsProperty); set => SetValue(MouseTrailYPointsProperty, value); }
 
     public ObservableCollection<KeyCap> KeyCaps { get; } = new();
     private INotifyCollectionChanged? _collection;
@@ -105,8 +113,9 @@ public partial class KeyboardHeatmap : UserControl
         name, typeof(T), typeof(KeyboardHeatmap), new PropertyMetadata(value, VisualPropertyChanged));
 
     /// <summary>
-    /// 鼠标移动相关属性的注册。这些值每 100 ms 变一次，绝不能再走 <see cref="VisualPropertyChanged"/>：
-    /// 那条路径会连带重建 144 个键帽的着色，把热力图的开销放大到跟随刷新频率。
+    /// 鼠标移动相关属性的注册。这些值随取样节拍高频变化（节拍定义在 ClickCounterViewModel），
+    /// 绝不能再走 <see cref="VisualPropertyChanged"/>：那条路径会连带重建 144 个键帽的着色，
+    /// 把热力图的开销放大到跟随刷新频率。
     /// </summary>
     private static DependencyProperty RegisterMouse<T>(string name, T value, PropertyChangedCallback? changed = null) =>
         DependencyProperty.Register(name, typeof(T), typeof(KeyboardHeatmap), new PropertyMetadata(value, changed));
@@ -415,8 +424,11 @@ public partial class KeyboardHeatmap : UserControl
     private const double ZoneRest = 0.12;
     private const double WheelRest = 0.34;
 
-    /// <summary>图标跟随时长；比取样窗口（100 ms）略长，让 10 Hz 的跳动连成滑行而不是台阶。</summary>
-    private static readonly Duration GlyphGlide = TimeSpan.FromMilliseconds(140);
+    /// <summary>
+    /// 图标跟随时长。必须短于取样节拍，否则每次动画只走完一小截就被新目标重启，
+    /// 图标会持续落后于手——节拍加快后原来的 140 ms 就犯了这个毛病。
+    /// </summary>
+    private static readonly Duration GlyphGlide = TimeSpan.FromMilliseconds(60);
 
     private static readonly Duration ZoneFade = TimeSpan.FromMilliseconds(420);
 
@@ -428,7 +440,7 @@ public partial class KeyboardHeatmap : UserControl
 
     /// <summary>
     /// 把归一化偏移换算成位移窗内的像素。ViewModel 不知道控件实际尺寸，而图标又必须被钳在矩形内，
-    /// 所以换算留在 View 层；用 TranslateTransform 而非 Canvas.Left，避免每 100 ms 触发一次布局。
+    /// 所以换算留在 View 层；用 TranslateTransform 而非 Canvas.Left，避免每个取样节拍触发一次布局。
     /// </summary>
     private void LayoutMouseGlyph()
     {
