@@ -39,6 +39,12 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
     private const double TrailHeight = 46;
 
     /// <summary>
+    /// 一个取样窗口内多少格滚轮算把曲线打满。量纲与 <see cref="FullDeflectionPixels"/> 一样是每拍位移而不是每秒速率；
+    /// 由于偏移按拍衰减，稳态振幅约等于该值的 3.9 倍（时间常数与节拍之比决定），所以单滚一格只顶到约四分之一。
+    /// </summary>
+    private const double FullDeflectionWheelNotches = 2;
+
+    /// <summary>
     /// 轨迹时间跨度。偏移本身约 0.17 秒就回中心，窗口拉太长只会看到一条贴零的直线，
     /// 6 秒足够看清手上最近几次甩动的形状。
     /// </summary>
@@ -62,11 +68,13 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
     private double _todayMovementPixels;
     private double _totalMovementPixels;
     private double _sessionWheelNotches;
+    /// <summary>滚轮曲线的当前振幅（-1..1）。逐拍衰减，不直接上屏，只用来画轨迹。</summary>
+    private double _wheelDeflection;
     private long _clickSequence;
     private bool _disposed;
 
     /// <summary>轨迹曲线的滑动样本：偏移值配上落地时刻，下标不需要与时间对应，旧点靠“距今多少秒”算 x 后自然滑出。</summary>
-    private readonly Queue<(DateTime At, double X, double Y)> _trail = new();
+    private readonly Queue<(DateTime At, double X, double Y, double Wheel)> _trail = new();
 
     [ObservableProperty]
     private int _leftClickCount;
@@ -121,6 +129,10 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private PointCollection _mouseTrailYPoints = new();
+
+    /// <summary>滚轮速率轨迹，与 X/Y 同一条时间轴；虚线画在控件那侧。</summary>
+    [ObservableProperty]
+    private PointCollection _mouseTrailWheelPoints = new();
 
     /// <summary>本段取样窗口的净位移读数。</summary>
     [ObservableProperty]
@@ -328,6 +340,9 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
     private void OnMovementTick(object? sender, EventArgs e)
     {
         var sample = _hookService.ReadMovementSample();
+        // 滚轮曲线逐拍都要推一下：没有滚轮的那一拍也得靠衰减把上一个脉冲拉回零线，否则台阶会留在曲线上
+        StepWheel(sample);
+
         if (sample is { } moved)
         {
             if (moved.WheelNotches != 0)
@@ -341,8 +356,13 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
                 Deflect(moved);
                 ReportSpeed(moved);
             }
+            else if (DisplacementSettling())
+            {
+                // 只滚了滚轮、指针没动的一拍：位移这边等同静止，图标该继续回落而不是冻在原地
+                Relax();
+            }
         }
-        else if (MouseOffsetX != 0 || MouseOffsetY != 0 || _smoothedPixelsPerSecond > 0)
+        else if (DisplacementSettling())
         {
             Relax();
         }
@@ -431,16 +451,35 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
 
     private static double Decay(double value) => Math.Abs(value) < 0.01 ? 0 : value * Decay();
 
+    /// <summary>位移这边还没静下来：指示图标仍在回落，或速率读数还没归零。</summary>
+    private bool DisplacementSettling() =>
+        MouseOffsetX != 0 || MouseOffsetY != 0 || _smoothedPixelsPerSecond > 0;
+
     /// <summary>
-    /// 把当前偏移计入轨迹并重建两条曲线。只在还在动或轨迹未排空时动手：
+    /// 滚轮折算成 -1..1 的曲线振幅。一格滚轮在单拍里只是一个矩形脉冲，
+    /// 不跟一套衰减就会把曲线画成上下台阶；衰减时间常数与位移共用，两条曲线才能横向对照。
+    /// </summary>
+    private void StepWheel(MouseMovementSample? sample)
+    {
+        // 无滚轮的一拍用标称节拍当作窗口长度，与 Decay() 同一处理
+        var (notches, elapsed) = sample is { } moved
+            ? (moved.WheelNotches, moved.ElapsedSeconds)
+            : (0d, MovementSampleIntervalMs / 1000d);
+        var deflected = _wheelDeflection * DecayFor(elapsed) + notches / FullDeflectionWheelNotches;
+        // 小于 0.01 直接归零：衰减的尾巴永远到不了 0，轨迹也就永远排不空，静止时会一直重建三条曲线
+        _wheelDeflection = Math.Abs(deflected) < 0.01 ? 0 : Math.Clamp(deflected, -1d, 1d);
+    }
+
+    /// <summary>
+    /// 把当前偏移计入轨迹并重建三条曲线。只在还在动或轨迹未排空时动手：
     /// 手停下来后旧点会继续向左滑出并自动清空，不会留下一条永远贴零的直线。
     /// 时间用 UTC：本地钟被调整时，按“距今多少秒”算出的 x 不会跳变。
     /// </summary>
     private void RecordTrail()
     {
         var now = DateTime.UtcNow;
-        if (MouseOffsetX != 0 || MouseOffsetY != 0)
-            _trail.Enqueue((now, MouseOffsetX, MouseOffsetY));
+        if (MouseOffsetX != 0 || MouseOffsetY != 0 || _wheelDeflection != 0)
+            _trail.Enqueue((now, MouseOffsetX, MouseOffsetY, _wheelDeflection));
         while (_trail.Count > 0 && (now - _trail.Peek().At).TotalSeconds > TrailWindowSeconds)
             _trail.Dequeue();
         if (_trail.Count == 0)
@@ -449,6 +488,7 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
             {
                 MouseTrailXPoints = new PointCollection();
                 MouseTrailYPoints = new PointCollection();
+                MouseTrailWheelPoints = new PointCollection();
             }
             return;
         }
@@ -457,14 +497,18 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
         var amplitude = mid - 2;
         var xs = new PointCollection(_trail.Count);
         var ys = new PointCollection(_trail.Count);
-        foreach (var (at, x, y) in _trail)
+        var wheels = new PointCollection(_trail.Count);
+        foreach (var (at, x, y, wheel) in _trail)
         {
             var px = TrailWidth - (now - at).TotalSeconds * TrailPixelsPerSecond;
             xs.Add(new Point(px, mid - x * amplitude));
             ys.Add(new Point(px, mid - y * amplitude));
+            // 往前滚（远离自己）时格数为正，画在零线上方
+            wheels.Add(new Point(px, mid - wheel * amplitude));
         }
         MouseTrailXPoints = xs;
         MouseTrailYPoints = ys;
+        MouseTrailWheelPoints = wheels;
     }
 
     private void FlushMovement()

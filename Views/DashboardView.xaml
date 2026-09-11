@@ -82,7 +82,8 @@
                                 MouseDistanceText="{Binding Mouse.MouseDistanceText}" MouseWheelText="{Binding Mouse.MouseWheelText}"
                                 MouseOffsetX="{Binding Mouse.MouseOffsetX}" MouseOffsetY="{Binding Mouse.MouseOffsetY}"
                                 MouseButton="{Binding Mouse.MouseButton}" MouseClickPulse="{Binding Mouse.MouseClickPulse}"
-                                MouseTrailXPoints="{Binding Mouse.MouseTrailXPoints}" MouseTrailYPoints="{Binding Mouse.MouseTrailYPoints}"/>
+                                MouseTrailXPoints="{Binding Mouse.MouseTrailXPoints}" MouseTrailYPoints="{Binding Mouse.MouseTrailYPoints}"
+                                MouseTrailWheelPoints="{Binding Mouse.MouseTrailWheelPoints}"/>
      </StackPanel></Grid>
     </Border>
     <!--  时段锚点由 PeriodRangeHint 给出：滚动窗口跟着当前时刻跑，不标起算点就读不出这些数字覆盖哪一段时间  -->

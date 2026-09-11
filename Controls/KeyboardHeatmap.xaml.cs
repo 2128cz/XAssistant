@@ -49,11 +49,13 @@ public partial class KeyboardHeatmap : UserControl
     public static readonly DependencyProperty MouseButtonProperty = RegisterMouse<string>(nameof(MouseButton), string.Empty);
     public static readonly DependencyProperty MouseClickPulseProperty = RegisterMouse(nameof(MouseClickPulse), 0L, MouseClickChanged);
 
-    /// <summary>垫在鼠标读数下方的 X/Y 偏移轨迹，坐标已是控件内那块 Canvas 的设计尺寸，本控件不再换算。</summary>
+    /// <summary>垫在鼠标读数下方的 X / Y 偏移与滚轮速率三条轨迹，坐标已是控件内那块 Canvas 的设计尺寸，本控件不再换算。</summary>
     public static readonly DependencyProperty MouseTrailXPointsProperty =
         RegisterMouse(nameof(MouseTrailXPoints), new PointCollection());
     public static readonly DependencyProperty MouseTrailYPointsProperty =
         RegisterMouse(nameof(MouseTrailYPoints), new PointCollection());
+    public static readonly DependencyProperty MouseTrailWheelPointsProperty =
+        RegisterMouse(nameof(MouseTrailWheelPoints), new PointCollection());
 
     public IEnumerable? ItemsSource { get => (IEnumerable?)GetValue(ItemsSourceProperty); set => SetValue(ItemsSourceProperty, value); }
     public string RecentKey { get => (string)GetValue(RecentKeyProperty); set => SetValue(RecentKeyProperty, value); }
@@ -74,6 +76,7 @@ public partial class KeyboardHeatmap : UserControl
     public long MouseClickPulse { get => (long)GetValue(MouseClickPulseProperty); set => SetValue(MouseClickPulseProperty, value); }
     public PointCollection MouseTrailXPoints { get => (PointCollection)GetValue(MouseTrailXPointsProperty); set => SetValue(MouseTrailXPointsProperty, value); }
     public PointCollection MouseTrailYPoints { get => (PointCollection)GetValue(MouseTrailYPointsProperty); set => SetValue(MouseTrailYPointsProperty, value); }
+    public PointCollection MouseTrailWheelPoints { get => (PointCollection)GetValue(MouseTrailWheelPointsProperty); set => SetValue(MouseTrailWheelPointsProperty, value); }
 
     public ObservableCollection<KeyCap> KeyCaps { get; } = new();
     private INotifyCollectionChanged? _collection;
