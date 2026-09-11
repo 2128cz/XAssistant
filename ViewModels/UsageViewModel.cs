@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.IO.Pipes;
 using System.Text;
 using System.Windows.Threading;
@@ -36,6 +37,9 @@ public partial class UsageViewModel : ViewModelBase
     private long _todayCorrectedSeconds; // 根据事件时间戳计算的今日总秒数
 
     private volatile bool _isRefreshing;
+
+    /// <summary>上一次管道可用性；仅在状态跳变时记日志，不每 5 秒刷一条</summary>
+    private bool? _pipeAvailable;
 
     [ObservableProperty]
     private ObservableCollection<SessionEvent> _sessionEvents = new();
@@ -81,27 +85,20 @@ public partial class UsageViewModel : ViewModelBase
 
     private async Task<long> RefreshTodayAsync()
     {
+        // 从管道获取服务端缓存值（可能不准）；服务未启动是常态，用返回值表达失败而不是抛异常
+        long? pipeSeconds = await Task.Run(TryReadPipeSeconds);
+        LogPipeStateChange(pipeSeconds.HasValue);
+        if (!pipeSeconds.HasValue)
+            return FallbackToDatabase();
+
         try
         {
-            // 从管道获取服务端缓存值（可能不准）
-            var pipeSeconds = await GetTodaySecondsFromPipeAsync();
-
             // 基于事件时间戳计算今日实际使用时长
             var eventSeconds = _todayCorrectedSeconds;
             if (_activeSessionStartTime.HasValue)
             {
                 eventSeconds += (long)(DateTime.Now - _activeSessionStartTime.Value).TotalSeconds;
             }
-
-            // 如果管道值和事件计算值差距大于5秒，记录警告并优先使用事件计算值
-            // if (Math.Abs(pipeSeconds - eventSeconds) > 5)
-            // {
-            //     _logger.LogWarning(
-            //         "今日使用时长不一致：管道 {Pipe}s vs 事件计算 {Event}s，采用事件计算值",
-            //         pipeSeconds,
-            //         eventSeconds
-            //     );
-            // }
 
             var ts = TimeSpan.FromSeconds(eventSeconds);
             SetTodayUsageSeconds(eventSeconds, isCorrected: true);
@@ -114,24 +111,41 @@ public partial class UsageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "管道获取今日秒数失败，回退到数据库");
-            try
-            {
-                var dbSeconds = LoadTodaySecondsFromDb();
-                var ts = TimeSpan.FromSeconds(dbSeconds);
-                SetTodayUsageSeconds(dbSeconds, isCorrected: false);
-                TodayUsageText =
-                    $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2} (数据库)";
-                return dbSeconds;
-            }
-            catch (Exception dbEx)
-            {
-                _logger.LogError(dbEx, "数据库读取今日秒数也失败");
-                SetTodayUsageSeconds(null, isCorrected: false);
-                TodayUsageText = "无法获取";
-                return 0;
-            }
+            _logger.LogWarning(ex, "事件计算今日时长失败，回退到数据库");
+            return FallbackToDatabase();
         }
+    }
+
+    private long FallbackToDatabase()
+    {
+        try
+        {
+            var dbSeconds = LoadTodaySecondsFromDb();
+            var ts = TimeSpan.FromSeconds(dbSeconds);
+            SetTodayUsageSeconds(dbSeconds, isCorrected: false);
+            TodayUsageText = $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2} (数据库)";
+            return dbSeconds;
+        }
+        catch (Exception dbEx)
+        {
+            _logger.LogError(dbEx, "数据库读取今日秒数也失败");
+            SetTodayUsageSeconds(null, isCorrected: false);
+            TodayUsageText = "无法获取";
+            return 0;
+        }
+    }
+
+    /// <summary>管道可用性与旧行为一致（不可用则走数据库），但只在状态变化时记一条日志</summary>
+    private void LogPipeStateChange(bool available)
+    {
+        if (_pipeAvailable == available)
+            return;
+
+        _pipeAvailable = available;
+        if (available)
+            _logger.LogInformation("使用时长服务管道已连接");
+        else
+            _logger.LogInformation("使用时长服务管道不可用，改用数据库值（服务是否已安装并启动？）");
     }
 
     private void SetTodayUsageSeconds(long? seconds, bool isCorrected)
@@ -549,14 +563,37 @@ public partial class UsageViewModel : ViewModelBase
         return $"{(int)ts.TotalDays}d {ts.Hours}h {ts.Minutes}m";
     }
 
-    private static async Task<long> GetTodaySecondsFromPipeAsync()
+    /// <summary>
+    /// 读取服务端缓存的今日秒数；不可用时返回 null。
+    /// 先查 \\.\pipe\ 命名空间再连：服务未启动时根本不进入 Connect，避开每 5 秒一次的
+    /// TimeoutException（.NET 8 没有移植 PipeClientStream.TryWaitForConnection）。
+    /// 本方法会阻塞，因此只在 Task.Run 里调用。
+    /// </summary>
+    private static long? TryReadPipeSeconds()
     {
-        using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.In);
-        await client.ConnectAsync(2000);
-        var buffer = new byte[256];
-        var bytesRead = await client.ReadAsync(buffer, 0, buffer.Length);
-        var data = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-        return long.Parse(data);
+        // 服务端存在时，命名管道会以文件形式出现在 \\.\pipe\ 下；File.Exists 本身不抛异常
+        if (!File.Exists(@"\\.\pipe\" + PipeName))
+            return null;
+
+        try
+        {
+            using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.In);
+            client.Connect(800);
+
+            var buffer = new byte[256];
+            int bytesRead = client.Read(buffer, 0, buffer.Length);
+            if (bytesRead <= 0)
+                return null;
+
+            var text = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
+            return long.TryParse(text, out var seconds) ? seconds : null;
+        }
+        catch (Exception ex)
+            when (ex is IOException or TimeoutException or UnauthorizedAccessException)
+        {
+            // 探测与连接之间服务退出的竞态：视为不可用，不记异常
+            return null;
+        }
     }
 
     private static long LoadTodaySecondsFromDb()

@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using System.IO;
 using System.Text.Json;
 using System.Windows.Data;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
@@ -17,22 +18,41 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IStartupService _startupService;
     private readonly ILogBufferService _logBuffer;
     private readonly IConfigurationService _configService;
+    private readonly DispatcherTimer _logRefreshTimer;
+    private volatile bool _logsDirty;
     public DashboardViewModel Dashboard { get; }
 
-    [ObservableProperty] private double _windowWidth;
-    [ObservableProperty] private double _windowHeight;
-    [ObservableProperty] private bool _isLogExpanded;
-    [ObservableProperty] private bool _isStartWithWindowsEnabled;
-    [ObservableProperty] private string _logLevelFilter = "All";
-    [ObservableProperty] private DateTime _logDate = DateTime.Today;
-    [ObservableProperty] private string _exportStatus = "记录由现有服务保存";
+    [ObservableProperty]
+    private double _windowWidth;
+
+    [ObservableProperty]
+    private double _windowHeight;
+
+    [ObservableProperty]
+    private bool _isLogExpanded;
+
+    [ObservableProperty]
+    private bool _isStartWithWindowsEnabled;
+
+    [ObservableProperty]
+    private string _logLevelFilter = "All";
+
+    [ObservableProperty]
+    private DateTime _logDate = DateTime.Today;
+
+    [ObservableProperty]
+    private string _exportStatus = "记录由现有服务保存";
+
+    /// <summary>事件列表的物化快照，仅在日志弹窗展开时才重建</summary>
+    [ObservableProperty]
+    private LogEntry[] _filteredLogs = [];
+
+    /// <summary>当前筛选条件下的日志条数；按钮角标常驻可见，因此收起时也会更新</summary>
+    [ObservableProperty]
+    private int _filteredLogCount;
 
     public string[] LogLevelOptions { get; } = ["All", "Verbose", "Debug", "Information", "Warning", "Error", "Fatal"];
     public ObservableCollection<LogEntry> AllLogs => _logBuffer.LogEntries;
-    public IEnumerable<LogEntry> FilteredLogs => SnapshotLogs().Where(entry => entry.Timestamp.Date == LogDate.Date
-        && (LogLevelFilter == "All" || entry.Level.Equals(LogLevelFilter, StringComparison.OrdinalIgnoreCase)))
-        .OrderByDescending(entry => entry.Timestamp);
-    public int FilteredLogCount => FilteredLogs.Count();
     public string StartupDescription => IsStartWithWindowsEnabled ? "已开启 · 登录系统后在后台记录" : "已关闭 · 手动启动工作台";
 
     public MainWindowViewModel(IStartupService startupService, ILogBufferService logBuffer,
@@ -48,25 +68,97 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _isLogExpanded = configService.GetIsLogExpanded();
         _isStartWithWindowsEnabled = startupService.IsStartWithWindowsEnabled();
         AllLogs.CollectionChanged += LogsChanged;
+
+        // 日志去抖：每来一条只置脏标记，由定时器统一刷一次，避免逐条重建列表
+        _logRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _logRefreshTimer.Tick += (_, _) =>
+        {
+            if (_logsDirty)
+                RefreshLogView();
+        };
+        _logRefreshTimer.Start();
+        RefreshLogView();
     }
 
     partial void OnWindowWidthChanged(double value) => _configService.SetWindowWidth(value);
     partial void OnWindowHeightChanged(double value) => _configService.SetWindowHeight(value);
-    partial void OnIsLogExpandedChanged(bool value) => _configService.SetIsLogExpanded(value);
     partial void OnIsStartWithWindowsEnabledChanged(bool value)
     {
         _startupService.SetAutoStart(value);
         OnPropertyChanged(nameof(StartupDescription));
     }
-    partial void OnLogLevelFilterChanged(string value) => NotifyLogs();
-    partial void OnLogDateChanged(DateTime value) => NotifyLogs();
-    private void LogsChanged(object? sender, NotifyCollectionChangedEventArgs e) => NotifyLogs();
-    private void NotifyLogs()
+    partial void OnLogLevelFilterChanged(string value) => RefreshLogView();
+    partial void OnLogDateChanged(DateTime value) => RefreshLogView();
+    partial void OnIsLogExpandedChanged(bool value)
     {
-        OnPropertyChanged(nameof(FilteredLogs));
-        OnPropertyChanged(nameof(FilteredLogCount));
+        _configService.SetIsLogExpanded(value);
+        // 刚展开时立即物化一次，保证弹窗打开就有内容
+        if (value)
+            RefreshLogView();
     }
-    [RelayCommand] private void ClearLogs() => BindingOperations.AccessCollection(AllLogs, AllLogs.Clear, true);
+
+    /// <summary>集合变更只置脏标记，O(1)；真正的快照由 _logRefreshTimer 合并处理</summary>
+    private void LogsChanged(object? sender, NotifyCollectionChangedEventArgs e) => _logsDirty = true;
+
+    private void RefreshLogView()
+    {
+        _logsDirty = false;
+        FilteredLogCount = CountMatchedLogs();
+
+        // 事件列表位于 Popup 内，收起时不需要物化，否则常驻运行会持续重建上千行容器
+        if (IsLogExpanded)
+            FilteredLogs = BuildFilteredLogs();
+    }
+
+    /// <summary>条数只遍历计数，不分配中间数组：按钮角标常驻可见，这条路径每 0.5 秒都会走</summary>
+    private int CountMatchedLogs()
+    {
+        var date = LogDate.Date;
+        var level = LogLevelFilter;
+        int count = 0;
+        BindingOperations.AccessCollection(
+            AllLogs,
+            () =>
+            {
+                foreach (var entry in AllLogs)
+                {
+                    if (entry.Timestamp.Date == date
+                        && (level == "All"
+                            || entry.Level.Equals(level, StringComparison.OrdinalIgnoreCase)))
+                        count++;
+                }
+            },
+            false
+        );
+        return count;
+    }
+
+    private LogEntry[] BuildFilteredLogs()
+    {
+        var date = LogDate.Date;
+        var level = LogLevelFilter;
+        LogEntry[] result = [];
+        BindingOperations.AccessCollection(
+            AllLogs,
+            () =>
+                result = AllLogs
+                    .Where(entry =>
+                        entry.Timestamp.Date == date
+                        && (level == "All"
+                            || entry.Level.Equals(level, StringComparison.OrdinalIgnoreCase))
+                    )
+                    .OrderByDescending(entry => entry.Timestamp)
+                    .ToArray(),
+            false
+        );
+        return result;
+    }
+    [RelayCommand]
+    private void ClearLogs()
+    {
+        BindingOperations.AccessCollection(AllLogs, AllLogs.Clear, true);
+        RefreshLogView(); // 角标归零要立即生效，不等去抖定时器
+    }
     [RelayCommand] private void CloseLogs() => IsLogExpanded = false;
 
     [RelayCommand]
@@ -86,7 +178,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             Applications = Dashboard.Apps.AppUsageList.ToArray()
         });
     }
-    [RelayCommand] private void ExportLogs() => SaveJson("XAssistant-events", FilteredLogs.ToArray());
+    [RelayCommand] private void ExportLogs() => SaveJson("XAssistant-events", BuildFilteredLogs());
 
     private void SaveJson(string prefix, object value)
     {
@@ -103,14 +195,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             ExportStatus = "导出失败 · " + exception.Message;
         }
     }
-    private LogEntry[] SnapshotLogs()
-    {
-        LogEntry[] result = [];
-        BindingOperations.AccessCollection(AllLogs, () => result = AllLogs.ToArray(), false);
-        return result;
-    }
     public void Dispose()
     {
+        _logRefreshTimer.Stop();
         AllLogs.CollectionChanged -= LogsChanged;
         Dashboard.Dispose();
     }

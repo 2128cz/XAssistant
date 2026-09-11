@@ -777,6 +777,14 @@ public sealed class ProcessUsageTracker : IDisposable
         {
             var pid = kvp.Key;
             var pending = kvp.Value;
+
+            // 先探活：待确认进程多半已经退出，直接 GetProcessById 会抛 ArgumentException
+            if (!ProcessInfoHelper.IsProcessAlive((int)pid))
+            {
+                _pendingProcesses.TryRemove(pid, out _);
+                continue;
+            }
+
             try
             {
                 using var proc = Process.GetProcessById((int)pid);
@@ -797,7 +805,12 @@ public sealed class ProcessUsageTracker : IDisposable
                     }
                 }
             }
-            catch
+            catch (Exception ex)
+                when (
+                    ex is ArgumentException
+                        or InvalidOperationException
+                        or NotSupportedException
+                )
             {
                 // _logger.LogDebug(
                 //     ex,
@@ -812,13 +825,23 @@ public sealed class ProcessUsageTracker : IDisposable
 
     private static string? GetWindowTitle(uint processId)
     {
+        // 每 5 秒对每个被追踪应用调一次：先探活，避免为已退出进程抛异常
+        if (!ProcessInfoHelper.IsProcessAlive((int)processId))
+            return null;
+
         try
         {
             using var proc = Process.GetProcessById((int)processId);
             return proc.MainWindowTitle?.Trim();
         }
-        catch
+        catch (Exception ex)
+            when (
+                ex is ArgumentException
+                    or InvalidOperationException
+                    or NotSupportedException
+            )
         {
+            // 探活与读取之间进程退出的竞态
             return null;
         }
     }
@@ -857,12 +880,8 @@ public sealed class ProcessUsageTracker : IDisposable
             using var proc = Process.GetProcessById((int)processId);
             if (proc.SessionId == 0)
                 return false;
-            string? path = null;
-            try
-            {
-                path = proc.MainModule?.FileName;
-            }
-            catch { }
+            // 走 Win32 而不是 proc.MainModule：后者对无权限/位数不匹配的进程会抛异常
+            ProcessInfoHelper.TryGetProcessPath(proc.Id, out string? path);
             if (!string.IsNullOrEmpty(path))
             {
                 var dir = Path.GetDirectoryName(path) ?? "";
@@ -911,12 +930,8 @@ public sealed class ProcessUsageTracker : IDisposable
                 // _logger.LogDebug("跳过无窗口进程 {Proc}", procName);
                 return false;
             }
-            string? path = null;
-            try
-            {
-                path = proc.MainModule?.FileName;
-            }
-            catch { }
+            // 走 Win32 而不是 proc.MainModule：枚举几百个进程时每个都可能抛异常
+            ProcessInfoHelper.TryGetProcessPath(proc.Id, out string? path);
             if (!string.IsNullOrEmpty(path))
             {
                 var dir = Path.GetDirectoryName(path) ?? "";
