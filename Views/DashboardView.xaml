@@ -29,16 +29,37 @@
      <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <Grid><Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition Height="*"/><RowDefinition Height="28"/></Grid.RowDefinitions>
       <DockPanel><TextBlock Text="最近输入 →" Style="{StaticResource QuietText}" DockPanel.Dock="Left" Margin="0,0,18,0"/><ItemsControl ItemsSource="{Binding Keyboard.RecentKeySequence}" HorizontalAlignment="Right" ClipToBounds="True"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" FontFamily="Consolas" Foreground="{DynamicResource TextSecondary}" FontSize="15" Margin="8,0"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></DockPanel>
-      <Grid Grid.Row="1" ClipToBounds="True"><Viewbox Stretch="Fill"><Canvas Width="900" Height="220"><Path Stroke="{DynamicResource CardBorderBrush}" StrokeThickness="1" Data="M0,30 L900,30 M0,90 L900,90 M0,150 L900,150 M0,219 L900,219 M1,0 L1,220 M150,0 L150,220 M300,0 L300,220 M450,0 L450,220 M600,0 L600,220 M750,0 L750,220 M899,0 L899,220"/><Polyline Points="{Binding RatePoints}" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2.3" StrokeLineJoin="Round"/></Canvas></Viewbox></Grid>
-      <DockPanel Grid.Row="2" Margin="0,10,0,0"><TextBlock DockPanel.Dock="Right" Text="现在" Style="{StaticResource QuietText}"/><TextBlock DockPanel.Dock="Left" Text="−60 s" Style="{StaticResource QuietText}"/><TextBlock Text="每秒敲击 · 本次记录的实时采样" HorizontalAlignment="Center" Style="{StaticResource QuietText}"/></DockPanel>
+      <Grid Grid.Row="1" ClipToBounds="True"><Viewbox Stretch="Fill"><Canvas Width="900" Height="220"><Path Stroke="{DynamicResource CardBorderBrush}" StrokeThickness="1" Data="M0,30 L900,30 M0,90 L900,90 M0,150 L900,150 M0,219 L900,219 M1,0 L1,220 M150,0 L150,220 M300,0 L300,220 M450,0 L450,220 M600,0 L600,220 M750,0 L750,220 M899,0 L899,220"/><Polyline Points="{Binding RatePoints}" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2.3" StrokeLineJoin="Round"/></Canvas></Viewbox>
+       <!--  峰值示意线：高度由 DashboardView 代码按 PeakLineRatio 定位；标注留在 Viewbox 之外，否则会被非等比拉伸压扁  -->
+       <Canvas x:Name="PeakSurface" IsHitTestVisible="False" SizeChanged="OnPeakSurfaceSizeChanged">
+        <Grid x:Name="PeakRuleHost" Canvas.Left="0" Height="26" Width="{Binding ActualWidth, ElementName=PeakSurface}">
+         <Line X1="0" Y1="13" X2="{Binding ActualWidth, ElementName=PeakRuleHost}" Y2="13" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1" StrokeDashArray="5 4" Opacity="0.7"/>
+         <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,0" Padding="6,1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0">
+          <StackPanel Orientation="Horizontal">
+           <TextBlock Text="峰值" Style="{StaticResource QuietText}" FontSize="10"/>
+           <TextBlock Text="{Binding PeakCps, StringFormat={}{0:F1}}" Style="{StaticResource MonoText}" FontSize="12" Foreground="{DynamicResource AccentBrush}" Margin="4,0,0,0"/>
+           <TextBlock Text="次 / s" Style="{StaticResource QuietText}" FontSize="10" Margin="3,0,0,0"/>
+           <TextBlock Text="{Binding PeakAtText}" Style="{StaticResource MonoText}" FontSize="10" Margin="8,0,0,0"/>
+          </StackPanel>
+         </Border>
+         <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1,0" Padding="6,1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,10,0">
+          <StackPanel Orientation="Horizontal">
+           <TextBlock Text="{Binding CadenceSummary}" Style="{StaticResource QuietText}" FontSize="9"/>
+           <TextBlock Text="{Binding AxisCps, StringFormat={}轴上限 {0:0.#} 次/s}" Style="{StaticResource MonoText}" FontSize="9" Margin="8,0,0,0"/>
+          </StackPanel>
+         </Border>
+        </Grid>
+       </Canvas>
+      </Grid>
+      <DockPanel Grid.Row="2" Margin="0,10,0,0"><TextBlock DockPanel.Dock="Right" Text="现在" Style="{StaticResource QuietText}"/><TextBlock DockPanel.Dock="Left" Text="−60 s" Style="{StaticResource QuietText}"/><TextBlock Text="每秒敲击 · 近 1 秒滚动窗口 / 连续滚动的 60 秒" HorizontalAlignment="Center" Style="{StaticResource QuietText}"/></DockPanel>
      </Grid>
      <UniformGrid Grid.Column="2" Columns="2" Rows="3">
       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="实时速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding CurrentCps, StringFormat=F1}" Style="{StaticResource MetricText}"/><TextBlock Text="近 60 秒 · 次 / s" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
-      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="距上次按下" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Keyboard.LastKeyIntervalMs}" Style="{StaticResource MetricText}"/><TextBlock Text="相邻 Keydown · ms" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
-      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="平均间隔" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Keyboard.AverageKeyIntervalMs, StringFormat=F0}" Style="{StaticResource MetricText}"/><TextBlock Text="近 60 秒间隔 · ms" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
+      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="距上次按下" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Keyboard.LastKeyIntervalMs}" Style="{StaticResource MetricText}"/><TextBlock Text="{Binding LastIntervalHint}" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
+      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="平均间隔" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Keyboard.AverageKeyIntervalMs, StringFormat=F0}" Style="{StaticResource MetricText}"/><TextBlock Text="{Binding AverageIntervalHint}" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="今日平均速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding AverageCps, StringFormat=F1}" Style="{StaticResource MetricText}"/><TextBlock Text="键盘记录 · 次 / s" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="最快速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding PeakCps, StringFormat=F1}" Style="{StaticResource MetricText}"/><TextBlock Text="工作台峰值 / 1 秒" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
-      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="本次按住" Style="{StaticResource MetricLabel}"/><TextBlock Text="—" Style="{StaticResource MetricText}"/><TextBlock Text="现有记录未提供释放时刻" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
+      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="间隔速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding IntervalRateText}" Style="{StaticResource MetricText}"/><TextBlock Text="相邻间隔倒数推算 · 次 / s" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
      </UniformGrid>
     </Grid>
     <TextBlock Text="输 入 节 奏" Foreground="{DynamicResource DashboardNumber}" FontSize="15" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-29,0,0,40" Grid.RowSpan="2"><TextBlock.LayoutTransform><RotateTransform Angle="-90"/></TextBlock.LayoutTransform></TextBlock>
@@ -50,7 +71,7 @@
     <Border Style="{StaticResource DashboardPanel}" MinHeight="561" Padding="20" Margin="0,0,0,18">
      <Grid><TextBlock Text="144" FontFamily="Consolas" FontSize="106" Foreground="{DynamicResource DashboardWatermark}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-25,164,0"/><StackPanel>
       <DockPanel Margin="0,0,0,24"><ComboBox DockPanel.Dock="Right" Width="120" ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}"/><TextBlock Text="键盘热力图" Style="{StaticResource SectionHeading}" VerticalAlignment="Center"/></DockPanel>
-      <DockPanel Margin="0,0,0,18"><TextBlock Text="低 ▰ ▰ ▰ ▰ ▰ 高" DockPanel.Dock="Right" Foreground="{DynamicResource AccentBrush}" FontSize="10"/><TextBlock Text="按键下方为累计次数，颜色越亮代表使用越频繁" Style="{StaticResource QuietText}"/></DockPanel>
+      <!-- 色阶条与最少/最多次数由 KeyboardHeatmap 自己渲染，与按键着色同源 -->
       <controls:KeyboardHeatmap ShowHeader="False" IsRecording="{Binding Keyboard.IsRecording}" ItemsSource="{Binding DisplayKeyCounts}" RecentKey="{Binding LastKeyText}" LeftClickCount="{Binding Mouse.LeftClickToday}" MiddleClickCount="{Binding Mouse.MiddleClickToday}" RightClickCount="{Binding Mouse.RightClickToday}"/>
      </StackPanel></Grid>
     </Border>

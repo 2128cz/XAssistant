@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Point = System.Windows.Point;
 using XAssistant.Models;
 
 namespace XAssistant.ViewModels;
@@ -13,12 +14,35 @@ namespace XAssistant.ViewModels;
 /// <summary>Single-page presentation of the existing recording services and view models.</summary>
 public partial class DashboardViewModel : ViewModelBase, IDisposable
 {
+    /// <summary>
+    /// 曲线重绘节拍。横坐标改为按“距今多少秒”计算后，曲线会随每个节拍连续左移；
+    /// 100 ms 一档的位移约 0.9 像素，肉眼已经是平滑滚动，而不是每秒跳一格。
+    /// </summary>
+    private const int RenderIntervalMs = 100;
+
+    /// <summary>速率采样节拍。速率取自近 1 秒滚动窗口，本身变化很慢，250 ms 足以还原细节。</summary>
+    private const int SampleIntervalMs = 250;
+
+    /// <summary>排行榜仍按 1 秒合并刷新，避免把整表排序的成本随重绘节拍放大十倍。</summary>
+    private const int RankingIntervalMs = 1000;
+
+    /// <summary>画布尺寸与时间跨度，需与 DashboardView 里 Canvas 的 900×220 及“−60 s”标注一致。</summary>
+    private const double ChartWidth = 900;
+    private const double ChartHeight = 220;
+    private const int WindowSeconds = 60;
+
     private readonly DispatcherTimer _timer;
     private readonly Queue<DateTime> _recentPressTimes = new();
-    private readonly List<double> _rateSamples = new();
+    private readonly List<RateSample> _rateSamples = new();
     private readonly HashSet<KeyCountItem> _observedKeyItems = new();
+    private DateTime _lastSampleAt;
+    private DateTime _lastRankingAt;
+    private DateTime _lastClockSecond;
     private bool _keyRankingDirty = true;
     private bool _disposed;
+
+    /// <summary>一个速率采样点：值配上落地时刻，横坐标才有连续可导出的时间轴。</summary>
+    private readonly record struct RateSample(DateTime At, double Value);
 
     public ClickCounterViewModel Mouse { get; }
     public KeyCounterViewModel Keyboard { get; }
@@ -52,6 +76,18 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private double _peakCps;
 
+    /// <summary>纵轴上限：由峰值向上取到“好看”的刻度，保证峰值线不会与图表顶边重合。</summary>
+    [ObservableProperty]
+    private double _axisCps = 1;
+
+    /// <summary>峰值出现的时刻。</summary>
+    [ObservableProperty]
+    private DateTime _peakCpsAt;
+
+    /// <summary>峰值线在图表内的相对高度（0 = 顶边，1 = 底边），由 View 层按控件实际像素换算。</summary>
+    [ObservableProperty]
+    private double _peakLineRatio;
+
     [ObservableProperty]
     private PointCollection _ratePoints = new();
 
@@ -66,6 +102,39 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     public int DayBeforeYesterdayKeyCount => Keyboard.DayBeforeYesterdayKeyCounts.Sum(item => item.Count);
     public int PeriodTotalCount => GetPeriodKeys().Sum(item => item.Count);
     public double AverageCps => Keyboard.TodayAverageKeysPerMinute / 60d;
+
+    /// <summary>最近一次按键间隔的换算副行，与“距上次按下”同一数据、只换单位。</summary>
+    public string LastIntervalHint => IntervalHint(Keyboard.LastKeyIntervalMs, "按此间隔", "等待两次按键");
+
+    /// <summary>近 60 秒平均间隔的换算副行。</summary>
+    public string AverageIntervalHint => IntervalHint(Keyboard.AverageKeyIntervalMs, "近 60 秒", "窗口不足两次");
+
+    /// <summary>“间隔速率”卡片的主数值：由平均按键间隔倒数推算的每秒按下数。</summary>
+    public string IntervalRateText => Keyboard.AverageKeyIntervalMs > 0
+        ? CpsOf(Keyboard.AverageKeyIntervalMs)
+        : "—";
+
+    /// <summary>间隔为 0 在上游是“样本不足”的哨兵值，不能当成极快连击。</summary>
+    private static string IntervalHint(double intervalMs, string scope, string emptyHint) => intervalMs > 0
+        ? $"ms · {scope}≈{CpsOf(intervalMs)} 次/s"
+        : $"ms · {emptyHint}";
+
+    /// <summary>毫秒间隔换算为次 / s；不足 1 ms 已超过可显示上限，给封顶占位而不是除零。</summary>
+    private static string CpsOf(double intervalMs) => intervalMs < 1
+        ? "1000+"
+        : (1000d / intervalMs).ToString("F1", CultureInfo.CurrentCulture);
+
+    /// <summary>峰值出现时刻的显示文本。</summary>
+    public string PeakAtText => PeakCpsAt == default ? "—" : PeakCpsAt.ToString("HH:mm:ss");
+
+    /// <summary>曲线采样与窗口参数，直接从常量生成，避免文案与实现漂移。</summary>
+    public string CadenceSummary => $"采样 {SampleIntervalMs} ms · 重绘 {RenderIntervalMs} ms · 窗口 {WindowSeconds} s · 速率=近 1 秒";
+
+    public bool HasPeak => PeakCps > 0;
+
+    partial void OnPeakCpsAtChanged(DateTime value) => OnPropertyChanged(nameof(PeakAtText));
+
+    partial void OnPeakCpsChanged(double value) => OnPropertyChanged(nameof(HasPeak));
     public bool IsRecording => Keyboard.IsRecording || Mouse.IsRecording;
     public string RecordingStatus => Keyboard.IsRecording && Mouse.IsRecording
         ? "记录中" : IsRecording ? "部分记录中" : "已暂停";
@@ -142,9 +211,9 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
             collection.CollectionChanged += OnKeyCollectionChanged;
         ReconcileKeySubscriptions();
 
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(RenderIntervalMs) };
         _timer.Tick += OnTimerTick;
-        UpdateClock();
+        UpdateClock(DateTime.Now);
         RefreshKeyRanking();
         RefreshUsage();
         CurrentCps = Keyboard.KeysPerMinute / 60d;
@@ -194,33 +263,88 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
 
     private void OnTimerTick(object? sender, EventArgs e)
     {
-        UpdateClock();
-        UpdateCurrentCps();
-        _rateSamples.Add(InstantCps);
-        if (_rateSamples.Count > 60)
-            _rateSamples.RemoveAt(0);
-        PeakCps = Math.Max(PeakCps, InstantCps);
-        var scale = Math.Max(1d, PeakCps);
-        var points = new PointCollection(_rateSamples.Count);
-        for (var index = 0; index < _rateSamples.Count; index++)
-            points.Add(new System.Windows.Point((60 - _rateSamples.Count + index) * 900d / 59d,
-                220d - Math.Min(1d, _rateSamples[index] / scale) * 220d));
-        points.Freeze();
-        RatePoints = points;
-        if (_keyRankingDirty)
+        var now = DateTime.Now;
+        // 时钟按整秒更新即可，别跟着十倍节拍重复分配字符串
+        if (now.Ticks / TimeSpan.TicksPerSecond != _lastClockSecond.Ticks / TimeSpan.TicksPerSecond)
+        {
+            _lastClockSecond = now;
+            UpdateClock(now);
+        }
+        UpdateCurrentCps(now);
+        TrackPeak(InstantCps, now);
+        if (_rateSamples.Count == 0 || (now - _lastSampleAt).TotalMilliseconds >= SampleIntervalMs)
+        {
+            _lastSampleAt = now;
+            _rateSamples.Add(new RateSample(now, InstantCps));
+        }
+        RebuildRatePoints(now);
+        if (_keyRankingDirty && (now - _lastRankingAt).TotalMilliseconds >= RankingIntervalMs)
+        {
+            _lastRankingAt = now;
             RefreshKeyRanking();
+        }
     }
 
-    private void UpdateClock()
+    /// <summary>
+    /// 用采样时刻而非序号定位横坐标：x = 900 - 距今秒数 × 每秒像素，整条曲线因此连续左移；
+    /// 最右端补一个“此刻”的实时点，曲线始终贴着“现在”这条边线。
+    /// </summary>
+    private void RebuildRatePoints(DateTime now)
     {
-        var now = DateTime.Now;
+        var unitsPerSecond = ChartWidth / WindowSeconds;
+        var scale = Math.Max(1d, AxisCps);
+        // 额外保留一秒跨度的最旧样本，让左侧线段伸出画布外被裁剪，而不是提前出现断口
+        while (_rateSamples.Count > 0 && (now - _rateSamples[0].At).TotalSeconds > WindowSeconds + 1)
+            _rateSamples.RemoveAt(0);
+        var points = new PointCollection(_rateSamples.Count + 1);
+        foreach (var sample in _rateSamples)
+        {
+            // 系统时钟被回拨时 age 可能为负，钳到 0 以免点跑到“现在”右侧
+            var age = Math.Max(0, (now - sample.At).TotalSeconds);
+            points.Add(new Point(ChartWidth - age * unitsPerSecond, RateY(sample.Value, scale)));
+        }
+        points.Add(new Point(ChartWidth, RateY(InstantCps, scale)));
+        points.Freeze();
+        RatePoints = points;
+    }
+
+    private static double RateY(double value, double scale) =>
+        ChartHeight - Math.Min(1d, value / scale) * ChartHeight;
+
+    /// <summary>候选纵轴上限，与曲线可能达到的整数速率对齐。</summary>
+    private static readonly double[] AxisSteps =
+        [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 150, 200, 300, 500];
+
+    /// <summary>
+    /// 记录峰值并刷新示意线。纵轴不直接跟着峰值走，而是取一个带余量的整刻度，
+    /// 否则曲线最高点永远触顶、峰值线与图表顶边重合，示意线就没有意义了。
+    /// </summary>
+    private void TrackPeak(double value, DateTime now)
+    {
+        if (value <= PeakCps) return;
+        PeakCps = value;
+        PeakCpsAt = now;
+        AxisCps = NiceAxisCeiling(value);
+        PeakLineRatio = Math.Clamp(1d - value / AxisCps, 0d, 1d);
+    }
+
+    private static double NiceAxisCeiling(double peak)
+    {
+        var target = Math.Max(1d, peak * 1.1d);
+        foreach (var step in AxisSteps)
+            if (target <= step) return step;
+        return Math.Ceiling(target / 500d) * 500d;
+    }
+
+    private void UpdateClock(DateTime now)
+    {
         ClockText = now.ToString("HH:mm:ss");
         DateText = now.ToString("yyyy年 M月 d日 dddd", CultureInfo.GetCultureInfo("zh-CN"));
     }
 
-    private void UpdateCurrentCps()
+    private void UpdateCurrentCps(DateTime now)
     {
-        var cutoff = DateTime.Now.AddSeconds(-1);
+        var cutoff = now.AddSeconds(-1);
         while (_recentPressTimes.TryPeek(out var timestamp) && timestamp <= cutoff)
             _recentPressTimes.Dequeue();
         InstantCps = _recentPressTimes.Count;
@@ -245,8 +369,9 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
                 while (RecentKeys.Count > 30)
                     RecentKeys.RemoveAt(0);
             }
-            UpdateCurrentCps();
-            PeakCps = Math.Max(PeakCps, InstantCps);
+            var now = DateTime.Now;
+            UpdateCurrentCps(now);
+            TrackPeak(InstantCps, now);
         }
         OnPropertyChanged(nameof(LastKeyText));
     }
@@ -260,6 +385,14 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(AverageCps));
         if (e.PropertyName == nameof(KeyCounterViewModel.KeysPerMinute))
             CurrentCps = Keyboard.KeysPerMinute / 60d;
+        if (e.PropertyName is nameof(KeyCounterViewModel.LastKeyIntervalMs)
+            or nameof(KeyCounterViewModel.AverageKeyIntervalMs))
+        {
+            // 间隔变化即换算变化，三个展示字段一起重报，避开在 XAML 里做数学
+            OnPropertyChanged(nameof(LastIntervalHint));
+            OnPropertyChanged(nameof(AverageIntervalHint));
+            OnPropertyChanged(nameof(IntervalRateText));
+        }
         if (e.PropertyName == nameof(KeyCounterViewModel.IsRecording))
             NotifyRecording();
     }
