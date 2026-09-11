@@ -139,6 +139,13 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     public string RecordingStatus => Keyboard.IsRecording && Mouse.IsRecording
         ? "记录中" : IsRecording ? "部分记录中" : "已暂停";
     public string LastKeyText => RecentKeys.Count > 0 ? RecentKeys[^1].Key : "等待输入";
+
+    /// <summary>
+    /// 「最近输入」条带的倒序镜像。配合条带自身的 RightToLeft 面板，最新按键从右侧起排，
+    /// 空间不足时溢出落在左侧并被裁掉，看到的始终是当前按下的键，也不会伸到旁边的卡片上。
+    /// 做成独立集合而不是绑 Reverse() 视图，是为了让每次按键只增删一个容器，而不是重建 30 个。
+    /// </summary>
+    public ObservableCollection<string> RecentKeyChips { get; } = new();
     public string KeyboardChangeText => YesterdayKeyCount == 0
         ? "暂无昨日对比"
         : $"较昨日 {(TodayKeyCount - YesterdayKeyCount) / (double)YesterdayKeyCount:+0.0%;-0.0%;0.0%}";
@@ -210,6 +217,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         foreach (var collection in AllKeyCollections())
             collection.CollectionChanged += OnKeyCollectionChanged;
         ReconcileKeySubscriptions();
+        RebuildRecentKeyChips();
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(RenderIntervalMs) };
         _timer.Tick += OnTimerTick;
@@ -353,6 +361,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
 
     private void OnRecentKeySequenceChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        MirrorRecentKeySequence(e);
         if (e.Action == NotifyCollectionChangedAction.Reset)
         {
             // Pausing resets cadence, but the observed event history remains available.
@@ -375,6 +384,31 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         }
         OnPropertyChanged(nameof(LastKeyText));
     }
+
+    /// <summary>
+    /// 把源的增量变化映射到倒序集合上。源只会在末尾追加、超限时从头裁掉一项，
+    /// 因此镜像只需在头部插入、末尾移除；不符合该形状的变化整体重建一次兜底。
+    /// </summary>
+    private void MirrorRecentKeySequence(NotifyCollectionChangedEventArgs e)
+    {
+        var source = Keyboard.RecentKeySequence;
+        if (e.Action == NotifyCollectionChangedAction.Add
+            && e.NewItems?.Count == 1 && e.NewStartingIndex == source.Count - 1)
+        {
+            RecentKeyChips.Insert(0, (string)e.NewItems[0]!);
+            return;
+        }
+        if (e.Action == NotifyCollectionChangedAction.Remove
+            && e.OldItems?.Count == 1 && e.OldStartingIndex == 0 && RecentKeyChips.Count > 0)
+        {
+            RecentKeyChips.RemoveAt(RecentKeyChips.Count - 1);
+            return;
+        }
+        RebuildRecentKeyChips();
+    }
+
+    private void RebuildRecentKeyChips() =>
+        ReconcileCollection(RecentKeyChips, Keyboard.RecentKeySequence.Reverse().ToList(), key => key);
 
     private void OnKeyboardPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
