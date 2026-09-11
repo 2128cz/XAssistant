@@ -218,20 +218,38 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     }
     public string TodayCorrectedUsageText => Usage.TodayUsageText;
     public string YesterdayUsageText => FormatHistoryDay(DateTime.Today.AddDays(-1));
-    public string SelectedOriginalUsageText => SelectedUsage?.FormattedTime ?? "—";
-    public string SelectedCorrectedUsageText => IsTodaySelected && Usage.TodayUsageSeconds is long todaySeconds
-        ? FormatDuration(todaySeconds) + (Usage.IsTodayUsageCorrected ? string.Empty : " (数据库)")
-        : SelectedUsage?.FormattedCorrectedTime ?? "—";
-    public string SelectedUsageDifferenceText => IsTodaySelected && Usage.TodayUsageSeconds.HasValue
-        ? Usage.IsTodayUsageCorrected ? "实时累计中" : "暂无实时校正"
-        : SelectedUsage?.CorrectedSeconds is long corrected
-            ? FormatSignedDuration(corrected - SelectedUsage.Seconds) : "—";
     public string SelectedCorrectionReason => IsTodaySelected && Usage.TodayUsageSeconds.HasValue
         ? Usage.IsTodayUsageCorrected
             ? "今日有效时长含进行中的会话；原始记录为数据库快照，暂不比较差值。"
             : "今日实时服务不可用，当前采用数据库值，暂不计算实时校正差值。"
         : SelectedUsage?.CorrectionReason ?? "暂无校正说明";
     private bool IsTodaySelected => SelectedSessionDate == DateTime.Today.ToString("yyyy-MM-dd");
+
+    // ===== 会话表的读数：秒数由 AppUsageViewModel 给，这里只做单位换算与文案 =====
+
+    /// <summary>当天全部应用会话已落盘的累计。它与“校正后”的差，就是进行中会话尚未写库的那段。</summary>
+    public string AppSessionRawText => Apps.SessionRawSeconds > 0 ? FormatDuration(Apps.SessionRawSeconds) : "—";
+
+    /// <summary>补算量。为零说明没有进程在跑，显示 00:00:00 会被读成“测到了个零”。</summary>
+    public string AppSessionCorrectionText => Apps.SessionTotalSeconds > Apps.SessionRawSeconds
+        ? FormatSignedDuration(Apps.SessionTotalSeconds - Apps.SessionRawSeconds)
+        : "无未落盘量";
+
+    public string AppSessionTotalText => Apps.SessionTotalSeconds > 0 ? FormatDuration(Apps.SessionTotalSeconds) : "—";
+
+    public string AppSessionRunningText => Apps.RunningProcessCount.ToString("N0");
+
+    public string AppSessionTrackedText => Apps.TrackedProcessCount.ToString("N0");
+
+    /// <summary>
+    /// 会话表口径说明。应用是并行各自计时的，合计时长明显大于自然日时长，
+    /// 这句话不写出来，读者第一反应是数字算错了。
+    /// </summary>
+    public string AppSessionNote => Apps.TrackedProcessCount == 0
+        ? $"{SelectedSessionDate} 没有进程会话记录"
+        : $"{Apps.TrackedProcessCount} 个应用并行各自计时，合计可超过自然日时长；"
+            + "进行中的行按最后落盘时刻补算（追踪器每 5 秒落盘一次，补算上限 90 秒）。";
+
     public string WordFrequencyStatus => "暂无词频数据 · 当前仅记录按键名称，不采集输入文本";
 
     public DashboardViewModel(
@@ -250,6 +268,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         Mouse.PropertyChanged += OnMousePropertyChanged;
         Keyboard.PropertyChanged += OnKeyboardPropertyChanged;
         Usage.PropertyChanged += OnUsagePropertyChanged;
+        Apps.PropertyChanged += OnAppsPropertyChanged;
         Keyboard.RecentKeySequence.CollectionChanged += OnRecentKeySequenceChanged;
         foreach (var collection in AllKeyCollections())
             collection.CollectionChanged += OnKeyCollectionChanged;
@@ -271,7 +290,14 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         RefreshKeyRanking();
     }
 
-    partial void OnSelectedSessionDateChanged(string value) => RefreshSelectedUsage();
+    partial void OnSelectedSessionDateChanged(string value)
+    {
+        RefreshSelectedUsage();
+        // 会话表现在按进程记账，日期得同时驱动它的查询，否则换日期只有上面那排在动
+        if (DateTime.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var date))
+            Apps.SelectedDate = date;
+    }
 
     [RelayCommand]
     private void ToggleRecording()
@@ -586,8 +612,11 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
 
     private void RefreshUsage()
     {
+        // 进程库和使用库是两个数据源：服务没装好的日子只有前者有记录，
+        // 日期选项只取自后者的话，那些日子就根本选不到
         var dates = Usage.History.Select(item => item.Date)
             .Concat(Usage.SessionEvents.Select(item => item.Date))
+            .Concat(Apps.AvailableDates)
             .Append(DateTime.Today.ToString("yyyy-MM-dd"))
             .Where(date => !string.IsNullOrWhiteSpace(date))
             .Distinct().OrderByDescending(date => date, StringComparer.Ordinal).ToList();
@@ -618,10 +647,34 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
 
     private void NotifySelectedUsage()
     {
-        OnPropertyChanged(nameof(SelectedOriginalUsageText));
-        OnPropertyChanged(nameof(SelectedCorrectedUsageText));
-        OnPropertyChanged(nameof(SelectedUsageDifferenceText));
         OnPropertyChanged(nameof(SelectedCorrectionReason));
+    }
+
+    private void OnAppsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(AppUsageViewModel.SessionRawSeconds):
+            case nameof(AppUsageViewModel.SessionTotalSeconds):
+            case nameof(AppUsageViewModel.RunningProcessCount):
+            case nameof(AppUsageViewModel.TrackedProcessCount):
+                NotifyAppSessions();
+                break;
+            // 进程库的日期是异步读回来的，读回来后要重拼一次下拉选项
+            case nameof(AppUsageViewModel.AvailableDates):
+                RefreshUsage();
+                break;
+        }
+    }
+
+    private void NotifyAppSessions()
+    {
+        OnPropertyChanged(nameof(AppSessionRawText));
+        OnPropertyChanged(nameof(AppSessionCorrectionText));
+        OnPropertyChanged(nameof(AppSessionTotalText));
+        OnPropertyChanged(nameof(AppSessionRunningText));
+        OnPropertyChanged(nameof(AppSessionTrackedText));
+        OnPropertyChanged(nameof(AppSessionNote));
     }
 
     private string FormatHistoryDay(DateTime day)
@@ -680,6 +733,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         Mouse.PropertyChanged -= OnMousePropertyChanged;
         Keyboard.PropertyChanged -= OnKeyboardPropertyChanged;
         Usage.PropertyChanged -= OnUsagePropertyChanged;
+        Apps.PropertyChanged -= OnAppsPropertyChanged;
         Keyboard.RecentKeySequence.CollectionChanged -= OnRecentKeySequenceChanged;
         foreach (var collection in AllKeyCollections())
             collection.CollectionChanged -= OnKeyCollectionChanged;
