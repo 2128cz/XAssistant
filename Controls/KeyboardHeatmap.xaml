@@ -28,15 +28,14 @@
                            HorizontalAlignment="Right" Margin="0,0,0,18"/>
                 <Grid x:Name="HeaderLegend" Margin="0,0,0,18">
                     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <TextBlock Text="按键下方为累计次数，颜色越亮代表使用越频繁" Style="{StaticResource HeatmapNote}"/>
+                    <TextBlock Text="按键颜色按本时段最少/最多次数归一化，越亮使用越频繁" Style="{StaticResource HeatmapNote}"/>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="LegendMinText" Text="-" Style="{StaticResource HeatmapNote}" FontFamily="Consolas" FontSize="10" Margin="0,0,6,0"/>
                         <TextBlock Text="低" Style="{StaticResource HeatmapNote}" FontSize="10" Margin="0,0,5,0"/>
-                        <Border Width="22" Height="8" Background="#202D30" CornerRadius="2" Margin="0,0,5,0"/>
-                        <Border Width="22" Height="8" Background="#304C43" CornerRadius="2" Margin="0,0,5,0"/>
-                        <Border Width="22" Height="8" Background="#4F7750" CornerRadius="2" Margin="0,0,5,0"/>
-                        <Border Width="22" Height="8" Background="#8BB855" CornerRadius="2" Margin="0,0,5,0"/>
-                        <Border Width="22" Height="8" Background="#C4FF75" CornerRadius="2" Margin="0,0,5,0"/>
-                        <TextBlock Text="高" Style="{StaticResource HeatmapNote}" FontSize="10"/>
+                        <!-- 渐变条的 Stop 由代码按 HeatRamp 生成，与按键着色同源，保证深浅顺序一致 -->
+                        <Border x:Name="LegendBar" Width="120" Height="8" CornerRadius="2"/>
+                        <TextBlock Text="高" Style="{StaticResource HeatmapNote}" FontSize="10" Margin="5,0,6,0"/>
+                        <TextBlock x:Name="LegendMaxText" Text="-" Style="{StaticResource HeatmapNote}" FontFamily="Consolas" FontSize="10"/>
                     </StackPanel>
                 </Grid>
                 <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch">

@@ -14,6 +14,7 @@ using UserControl = System.Windows.Controls.UserControl;
 using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
+using Point = System.Windows.Point;
 
 namespace XAssistant.Controls;
 
@@ -55,6 +56,20 @@ public partial class KeyboardHeatmap : UserControl
     private bool _observing;
     private bool _refreshPending;
     private static readonly Dictionary<string, string> Aliases;
+
+    /// <summary>热力色阶，从低到高单调变亮。按键着色与图例渐变条共用这一份，避免两处描述漂移。</summary>
+    private static readonly byte[][] HeatRamp =
+    {
+        new byte[] { 0x20, 0x2D, 0x30 },
+        new byte[] { 0x30, 0x4C, 0x43 },
+        new byte[] { 0x4F, 0x77, 0x50 },
+        new byte[] { 0x8B, 0xB8, 0x55 },
+        new byte[] { 0xC4, 0xFF, 0x75 },
+    };
+
+    /// <summary>有记录的按键最低档强度：让“按得最少”与“从未按过”保持可见色差，而不是掉进同一个底色。</summary>
+    private const double PressedFloor = 0.18;
+
     static KeyboardHeatmap() { Aliases = BuildAliases(); }
 
     public KeyboardHeatmap()
@@ -62,6 +77,7 @@ public partial class KeyboardHeatmap : UserControl
         foreach (var key in Layout)
             KeyCaps.Add(new KeyCap(key));
         InitializeComponent();
+        LegendBar.Background = BuildRampBrush();
         Loaded += (_, _) => { _observing = true; ObserveSource(); Refresh(); };
         Unloaded += (_, _) => { _observing = false; DetachSource(); };
         Refresh();
@@ -139,7 +155,8 @@ public partial class KeyboardHeatmap : UserControl
     {
         if (!IsInitialized) return;
         var chromeVisibility = ShowHeader ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var element in new UIElement[] { TopAccent, KeyboardWatermark, SideCode, SideTitle, HeaderPeriod, HeaderLegend })
+        // HeaderLegend 不再跟随 ShowHeader 隐藏：色阶条是读图必需的解释性元素
+        foreach (var element in new UIElement[] { TopAccent, KeyboardWatermark, SideCode, SideTitle, HeaderPeriod })
             element.Visibility = chromeVisibility;
         ContentStack.Margin = ShowHeader ? new Thickness(20, 20, 20, 18) : new Thickness(0);
         FrameBorder.BorderThickness = ShowHeader ? new Thickness(1) : new Thickness(0);
@@ -163,13 +180,22 @@ public partial class KeyboardHeatmap : UserControl
                 names.Add($"{name}: {count:N0}");
             }
         }
-        long maximum = counts.Count == 0 ? 0 : counts.Values.Max();
+        // 只统计有记录的按键：min/max 构成归一化区间，未记录键保持最低色
+        long maximum = 0, minimum = 0;
+        foreach (var value in counts.Values)
+        {
+            if (value <= 0) continue;
+            if (value > maximum) maximum = value;
+            if (minimum == 0 || value < minimum) minimum = value;
+        }
+        LegendMinText.Text = maximum > 0 ? minimum.ToString("N0", CultureInfo.CurrentCulture) : "-";
+        LegendMaxText.Text = maximum > 0 ? maximum.ToString("N0", CultureInfo.CurrentCulture) : "-";
         Aliases.TryGetValue(Normalize(RecentKey), out var recent);
         foreach (var cap in KeyCaps)
         {
             counts.TryGetValue(cap.Id, out var count);
             sources.TryGetValue(cap.Id, out var names);
-            cap.Update(count, maximum, IsRecording && cap.Id == recent, names);
+            cap.Update(count, minimum, maximum, IsRecording && cap.Id == recent, names);
         }
         MouseCountsText.Text = $"{MousePeriodLabel} 左 {LeftClickCount:N0} / 中 {MiddleClickCount:N0} / 右 {RightClickCount:N0}";
         StatusText.Text = IsRecording ? "● 正在记录 · 144 键扩展布局" : "○ 已暂停 · 144 键扩展布局";
@@ -274,10 +300,17 @@ public partial class KeyboardHeatmap : UserControl
         public string Tooltip { get; private set; } = string.Empty;
         internal KeyCap(KeyDefinition key) { Id = key.Id; Label = key.Label; X = key.X; Y = key.Y; Width = key.Width; }
 
-        internal void Update(long count, long maximum, bool recent, List<string>? sourceNames)
+        internal void Update(long count, long minimum, long maximum, bool recent, List<string>? sourceNames)
         {
             Count = count;
-            double intensity = maximum == 0 ? 0 : (double)count / maximum;
+            // 最少/最多次数归一化：本时段有记录的键铺满整个色阶，按得最多的始终是最亮
+            double intensity = count <= 0
+                ? 0
+                : maximum <= minimum
+                    ? 1
+                    : PressedFloor
+                        + (1 - PressedFloor)
+                        * ((double)(count - minimum) / (maximum - minimum));
             HeatBrush = HeatColor(intensity);
             LabelBrush = intensity >= 0.72 ? MakeBrush(0x20, 0x31, 0x1A) : MakeBrush(0xDA, 0xE7, 0xDD);
             CountBrush = intensity >= 0.72 ? MakeBrush(0x43, 0x65, 0x28) : MakeBrush(0x98, 0xB4, 0xA7);
@@ -289,24 +322,55 @@ public partial class KeyboardHeatmap : UserControl
             Tooltip = $"{identity} · {Count:N0} 次" + (sourceNames is { Count: > 0 } ? "\n" + string.Join("\n", sourceNames) : "\n此时间段无对应记录");
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
         }
+    }
 
-        private static Brush HeatColor(double intensity)
-        {
-            byte[][] colors = { new byte[] { 0x20, 0x2D, 0x30 }, new byte[] { 0x30, 0x4C, 0x43 },
-                new byte[] { 0x4F, 0x77, 0x50 }, new byte[] { 0x8B, 0xB8, 0x55 }, new byte[] { 0xC4, 0xFF, 0x75 } };
-            double position = Math.Clamp(intensity, 0, 1) * 4;
-            int index = Math.Min((int)position, 3);
-            double mix = position - index;
-            byte Channel(int channel) => (byte)Math.Round(colors[index][channel] + (colors[index + 1][channel] - colors[index][channel]) * mix);
-            return MakeBrush(Channel(0), Channel(1), Channel(2));
-        }
+    /// <summary>把归一化强度 [0,1] 映射到色阶上的颜色，与 <see cref="BuildRampBrush"/> 同源。</summary>
+    private static Color RampColor(double intensity)
+    {
+        double position = Math.Clamp(intensity, 0, 1) * (HeatRamp.Length - 1);
+        int index = Math.Min((int)position, HeatRamp.Length - 2);
+        double mix = position - index;
+        byte Channel(int channel)
+            => (byte)Math.Round(HeatRamp[index][channel]
+                + (HeatRamp[index + 1][channel] - HeatRamp[index][channel]) * mix);
+        return Color.FromRgb(Channel(0), Channel(1), Channel(2));
+    }
 
-        private static Brush MakeBrush(byte r, byte g, byte b, byte a = 255)
+    private static Brush HeatColor(double intensity)
+    {
+        var brush = new SolidColorBrush(RampColor(intensity));
+        brush.Freeze();
+        return brush;
+    }
+
+    private static Brush MakeBrush(byte r, byte g, byte b, byte a = 255)
+    {
+        var brush = new SolidColorBrush(Color.FromArgb(a, r, g, b));
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>
+    /// 图例渐变条。按“条上位置 -> 实际映射后的颜色”采样，
+    /// 因此条的最左端就是“按得最少的键”的真实颜色，而不是色阶原点的底色。
+    /// </summary>
+    private static Brush BuildRampBrush()
+    {
+        var gradient = new LinearGradientBrush
         {
-            var brush = new SolidColorBrush(Color.FromArgb(a, r, g, b));
-            brush.Freeze();
-            return brush;
+            // MappingMode 默认 RelativeToBoundingBox：(0,0)->(1,0) 就是从左到右
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(1, 0),
+        };
+        const int steps = 24;
+        for (int i = 0; i <= steps; i++)
+        {
+            double offset = (double)i / steps;
+            gradient.GradientStops.Add(new GradientStop(
+                RampColor(PressedFloor + (1 - PressedFloor) * offset), offset));
         }
+        gradient.Freeze();
+        return gradient;
     }
 
     internal readonly record struct KeyDefinition(string Id, string Label, double X, double Y, double Width);

@@ -45,7 +45,7 @@
 <body>
 
   <div id="errbar" style="display:none; position:fixed; bottom:0; left:0; right:0; background:#c62828; color:#fff; font-size:11px; padding:4px 8px; z-index:99999;"></div>
-  <div class="title">XAssistant <b>.</b> Keyboard Heatmap (more clicks = more orange-red)</div>
+  <div class="title">XAssistant <b>.</b> Keyboard Heatmap (colour normalised to the min / max key count)</div>
 
   <div class="toolbar">
     <span>Layout:</span>
@@ -64,7 +64,11 @@
 
   <div class="footer">
     <div class="stat">Total: <b id="total">0</b></div>
+    <div class="stat">Min: <b id="minInfo">-</b></div>
     <div class="stat">Max: <b id="maxInfo">-</b></div>
+    <div class="stat" style="display:flex;align-items:center;gap:6px;">低
+      <span id="heatBar" style="width:110px;height:8px;border-radius:2px;display:inline-block;"></span>高
+    </div>
     <div class="recent"><span>Recent:</span><div id="recentKeys" style="display:flex;gap:5px;flex-wrap:wrap;"></div></div>
   </div>
 
@@ -188,16 +192,31 @@
     return "hsl(" + hue + ", " + sat + "%, " + light + "%)";
   }
 
+  // 有按过的键最低档强度：让“按得最少”与“从未按过”保持可见色差
+  var PRESSED_FLOOR = 0.18;
+
+  // 最少/最多次数归一化；max <= min（只有一个键有记录或全部相等）时归到最热
+  function heatIntensity(count, min, max) {
+    if (max <= min) return 1;
+    return PRESSED_FLOOR + (1 - PRESSED_FLOOR) * (count - min) / (max - min);
+  }
+
   function computeStats() {
     var values = [];
-    for (var k in counts) values.push(counts[k]);
-    var max = values.length ? Math.max.apply(null, values) : 0;
+    var pressed = [];
+    for (var k in counts) {
+      values.push(counts[k]);
+      if (counts[k] > 0) pressed.push(counts[k]);
+    }
+    var max = pressed.length ? Math.max.apply(null, pressed) : 0;
+    var min = pressed.length ? Math.min.apply(null, pressed) : 0;
     var total = values.reduce(function (a, b) { return a + b; }, 0);
     maxKey = null;
     for (var k in counts) { if (max > 0 && counts[k] === max && !maxKey) maxKey = k; }
     document.getElementById("total").textContent = total.toLocaleString();
+    document.getElementById("minInfo").textContent = min > 0 ? min.toLocaleString() : "-";
     document.getElementById("maxInfo").textContent = maxKey ? maxKey + " (" + counts[maxKey].toLocaleString() + ")" : "-";
-    return max;
+    return { min: min, max: max };
   }
 
   function makeKey2D(kd, unit) {
@@ -361,13 +380,17 @@
   }
 
   function applyHeat2D() {
-    var max = computeStats();
+    var stats = computeStats();
     for (var k in keyEls) {
       var el = keyEls[k];
       var c = counts[k] || 0;
-      var t = max > 0 ? c / max : 0;
-      el.style.background = heatColor(t);
-      el.classList.toggle("is-max", max > 0 && c === max);
+      if (c > 0) {
+        el.style.background = heatColor(heatIntensity(c, stats.min, stats.max));
+      } else {
+        // 未按键：回落到 CSS 的中性底色，不占用色阶
+        el.style.background = "";
+      }
+      el.classList.toggle("is-max", stats.max > 0 && c === stats.max);
       var badge = el.querySelector(".badge");
       if (c > 0) {
         if (!badge) { badge = document.createElement("span"); badge.className = "badge"; el.appendChild(badge); }
@@ -417,6 +440,18 @@
     applyHeat2D();
     updateLayoutName(currentLayout);
   }
+
+  // 图例色标：按与按键相同的映射采样，保证条上的深浅顺序和键上的一致
+  (function paintHeatBar() {
+    var bar = document.getElementById("heatBar");
+    if (!bar) return;
+    var stops = [];
+    for (var i = 0; i <= 12; i++) {
+      var offset = i / 12;
+      stops.push(heatColor(PRESSED_FLOOR + (1 - PRESSED_FLOOR) * offset) + " " + (offset * 100).toFixed(1) + "%");
+    }
+    bar.style.background = "linear-gradient(to right, " + stops.join(", ") + ")";
+  })();
 
   function scheduleRender() {
     if (renderQueued) return;
