@@ -46,6 +46,13 @@ public partial class KeyCounterViewModel : ViewModelBase
     // 前天
     public ObservableCollection<KeyCountItem> DayBeforeYesterdayKeyCounts { get; } = new();
 
+    /// <summary>
+    /// 滚动窗口（最近 N 小时）的计数。与上面几个按天集合的关键区别：窗口会自己往前滑，
+    /// 一个新按键都没有时旧按键也在持续掉出边界，所以只能定时整体重算，
+    /// 不能像它们那样靠每次按键 +1 的增量累加维护。
+    /// </summary>
+    public ObservableCollection<KeyCountItem> RollingKeyCounts { get; } = new();
+
     [ObservableProperty]
     private bool _isRecording;
 
@@ -218,6 +225,28 @@ public partial class KeyCounterViewModel : ViewModelBase
             item.Count++;
         else
             collection.Add(new KeyCountItem { Key = key, Count = 1 });
+    }
+
+    /// <summary>把 <see cref="RollingKeyCounts"/> 重算成“从现在起往前 hours 小时”。</summary>
+    public void RefreshRollingWindow(int hours)
+    {
+        if (hours <= 0)
+            return;
+        var now = DateTime.Now;
+        var counts = _dbService.GetKeyCounts(now.AddHours(-hours), now);
+        // 逐项就地改值：掉出窗口的键删掉，新出现的键补上，计数不变的键什么都不做。
+        // 只要实例身份稳定，热力图就不会因为一次无害的重算把 144 个键帽全部重建
+        foreach (var pair in counts)
+        {
+            var item = RollingKeyCounts.FirstOrDefault(x => x.Key == pair.Key);
+            if (item == null)
+                RollingKeyCounts.Add(new KeyCountItem { Key = pair.Key, Count = pair.Value });
+            else
+                item.Count = pair.Value;
+        }
+        foreach (var expired in RollingKeyCounts
+                     .Where(item => !counts.ContainsKey(item.Key)).ToArray())
+            RollingKeyCounts.Remove(expired);
     }
 
     private void LoadAllCounts()

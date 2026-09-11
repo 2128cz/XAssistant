@@ -32,6 +32,13 @@ public class KeyDatabaseService : IKeyDatabaseService
                 PressTime TEXT NOT NULL
             );";
         cmd.ExecuteNonQuery();
+
+        // 时段筛选要按 PressTime 取区间，而记录是逐条插入、只增不减的，没有索引就等于每次全表扫描。
+        // 把 Key 一起放进索引让查询走 index-only scan：GROUP BY 既不用回表，也不必再建临时 B 树。
+        cmd.CommandText =
+            @"CREATE INDEX IF NOT EXISTS IX_KeyPressRecords_PressTime_Key
+              ON KeyPressRecords(PressTime, Key);";
+        cmd.ExecuteNonQuery();
     }
 
     public void SaveKeyPress(KeyPressRecord record)

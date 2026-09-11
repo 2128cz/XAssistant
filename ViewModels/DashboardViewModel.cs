@@ -50,7 +50,23 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     public AppUsageViewModel Apps { get; }
     public SettingsViewModel Settings { get; }
 
-    public string[] KeyboardPeriodOptions { get; } = { "今天", "总计", "昨天", "前天" };
+    /// <summary>
+    /// 滚动窗口选项。标签与小时数在同一处定义：“N 小时”的时长不再需要从文案里反向解析，
+    /// 改标签或加一档都不会让文案与实现漂移。
+    /// 标签不带“最近”前缀是为了塞进右栏时段标签条的窄格，
+    /// 完整说法由 <see cref="PeriodRangeHint"/> 直接按小时数给出。
+    /// </summary>
+    private static readonly (string Label, int Hours)[] RollingWindows =
+    {
+        ("1 小时", 1),
+        ("6 小时", 6),
+        ("12 小时", 12),
+    };
+
+    /// <summary>按“新→旧”排：今天、滚动窗口、再是整天粒度。</summary>
+    public string[] KeyboardPeriodOptions { get; } = new[] { "今天" }
+        .Concat(RollingWindows.Select(window => window.Label))
+        .Append("总计").Append("昨天").Append("前天").ToArray();
 
     [ObservableProperty]
     private string _selectedKeyboardPeriod = "今天";
@@ -101,6 +117,27 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     public int YesterdayKeyCount => Keyboard.YesterdayKeyCounts.Sum(item => item.Count);
     public int DayBeforeYesterdayKeyCount => Keyboard.DayBeforeYesterdayKeyCounts.Sum(item => item.Count);
     public int PeriodTotalCount => GetPeriodKeys().Sum(item => item.Count);
+
+    /// <summary>
+    /// 当前时段的锚点。滚动窗口必须说清“从何时起算”：它跟着当前时刻跑，
+    /// 同一个选项在不同时刻给出的是完全不同的区间，不标出来就没法解读这些数字。
+    /// </summary>
+    public string PeriodRangeHint
+    {
+        get
+        {
+            var hours = RollingHours;
+            if (hours > 0)
+                return $"近 {hours} 小时·{DateTime.Now.AddHours(-hours):MM-dd HH:mm} 起，向前滚动";
+            return SelectedKeyboardPeriod switch
+            {
+                "总计" => "全部已记录历史",
+                "昨天" => $"{DateTime.Today.AddDays(-1):yyyy-MM-dd} 全天",
+                "前天" => $"{DateTime.Today.AddDays(-2):yyyy-MM-dd} 全天",
+                _ => $"{DateTime.Today:yyyy-MM-dd} 00:00 起",
+            };
+        }
+    }
     public double AverageCps => Keyboard.TodayAverageKeysPerMinute / 60d;
 
     /// <summary>最近一次按键间隔的换算副行，与“距上次按下”同一数据、只换单位。</summary>
@@ -259,15 +296,22 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         yield return Keyboard.TodayKeyCounts;
         yield return Keyboard.YesterdayKeyCounts;
         yield return Keyboard.DayBeforeYesterdayKeyCounts;
+        yield return Keyboard.RollingKeyCounts;
     }
 
-    private ObservableCollection<KeyCountItem> GetPeriodKeys() => SelectedKeyboardPeriod switch
-    {
-        "总计" => Keyboard.KeyCounts,
-        "昨天" => Keyboard.YesterdayKeyCounts,
-        "前天" => Keyboard.DayBeforeYesterdayKeyCounts,
-        _ => Keyboard.TodayKeyCounts,
-    };
+    /// <summary>选中项对应的滚动窗口小时数；不是滚动窗口选项时为 0。</summary>
+    private int RollingHours => RollingWindows
+        .FirstOrDefault(window => window.Label == SelectedKeyboardPeriod).Hours;
+
+    private ObservableCollection<KeyCountItem> GetPeriodKeys() => RollingHours > 0
+        ? Keyboard.RollingKeyCounts
+        : SelectedKeyboardPeriod switch
+        {
+            "总计" => Keyboard.KeyCounts,
+            "昨天" => Keyboard.YesterdayKeyCounts,
+            "前天" => Keyboard.DayBeforeYesterdayKeyCounts,
+            _ => Keyboard.TodayKeyCounts,
+        };
 
     private void OnTimerTick(object? sender, EventArgs e)
     {
@@ -286,6 +330,10 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
             _rateSamples.Add(new RateSample(now, InstantCps));
         }
         RebuildRatePoints(now);
+        // 滚动窗口会自己向前滚：一个按键都没有时，旧按键也在持续掉出边界，
+        // 因此不能只靠按键事件把排行榜标脏，选中这类时段时要按固定节拍强制重算
+        if (RollingHours > 0 && (now - _lastRankingAt).TotalMilliseconds >= RankingIntervalMs)
+            _keyRankingDirty = true;
         if (_keyRankingDirty && (now - _lastRankingAt).TotalMilliseconds >= RankingIntervalMs)
         {
             _lastRankingAt = now;
@@ -488,6 +536,10 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
 
     private void RefreshKeyRanking()
     {
+        // 先重算窗口再排序：否则排行、热力图与“当前时段累计”会各自读到上一个窗口的尾巴
+        var hours = RollingHours;
+        if (hours > 0)
+            Keyboard.RefreshRollingWindow(hours);
         var sorted = GetPeriodKeys().OrderByDescending(item => item.Count)
             .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase).ToList();
         ReconcileCollection(DisplayKeyCounts, sorted, item => item.Key);
@@ -516,6 +568,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         ReconcileCollection(TopKeys, stableRanks, item => item.Key);
         _keyRankingDirty = false;
         OnPropertyChanged(nameof(PeriodTotalCount));
+        OnPropertyChanged(nameof(PeriodRangeHint));
     }
 
     private void OnUsagePropertyChanged(object? sender, PropertyChangedEventArgs e)

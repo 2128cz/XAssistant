@@ -72,7 +72,7 @@
    <StackPanel>
     <Border Style="{StaticResource DashboardPanel}" MinHeight="561" Padding="20" Margin="0,0,0,18">
      <Grid><TextBlock Text="144" FontFamily="Consolas" FontSize="106" Foreground="{DynamicResource DashboardWatermark}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-25,164,0"/><StackPanel>
-      <DockPanel Margin="0,0,0,24"><ComboBox DockPanel.Dock="Right" Width="120" ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}"/><TextBlock Text="键盘热力图" Style="{StaticResource SectionHeading}" VerticalAlignment="Center"/></DockPanel>
+      <DockPanel Margin="0,0,0,24"><ComboBox DockPanel.Dock="Right" Width="120" ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}" ToolTip="{Binding PeriodRangeHint}"/><TextBlock Text="键盘热力图" Style="{StaticResource SectionHeading}" VerticalAlignment="Center"/></DockPanel>
       <!-- 色阶条与最少/最多次数由 KeyboardHeatmap 自己渲染，与按键着色同源；位移图标只收归一化偏移，像素换算在控件里 -->
       <controls:KeyboardHeatmap ShowHeader="False" IsRecording="{Binding Keyboard.IsRecording}" ItemsSource="{Binding DisplayKeyCounts}" RecentKey="{Binding LastKeyText}"
                                 LeftClickCount="{Binding Mouse.LeftClickToday}" MiddleClickCount="{Binding Mouse.MiddleClickToday}" RightClickCount="{Binding Mouse.RightClickToday}"
@@ -82,7 +82,8 @@
                                 MouseButton="{Binding Mouse.MouseButton}" MouseClickPulse="{Binding Mouse.MouseClickPulse}"/>
      </StackPanel></Grid>
     </Border>
-    <DockPanel Margin="0,0,0,22"><TextBlock DockPanel.Dock="Right" Text="刷新 1 s" Style="{StaticResource QuietText}"/><TextBlock Text="◇  热力图与排行共享所选时段；未映射的扩展按键保持为空。" Style="{StaticResource QuietText}"/></DockPanel>
+    <!--  时段锚点由 PeriodRangeHint 给出：滚动窗口跟着当前时刻跑，不标起算点就读不出这些数字覆盖哪一段时间  -->
+    <DockPanel Margin="0,0,0,22"><TextBlock DockPanel.Dock="Right" Text="刷新 1 s" Style="{StaticResource QuietText}"/><TextBlock Style="{StaticResource QuietText}"><Run Text="◇  "/><Run Text="{Binding PeriodRangeHint, Mode=OneWay}"/><Run Text=" · 热力图与排行共享该时段"/></TextBlock></DockPanel>
     <Expander x:Name="KeyDetails" Header="完整按键记录 / 鼠标历史" Margin="0,0,0,24">
      <StackPanel Margin="0,12,0,0"><DockPanel Margin="0,0,0,12"><Button Content="刷新按键数据" Command="{Binding Keyboard.RefreshDataCommand}" DockPanel.Dock="Right"/><TextBlock Text="{Binding PeriodTotalCount, StringFormat='当前时段累计 {0:N0} 次'}" VerticalAlignment="Center"/></DockPanel>
       <DataGrid Height="240" ItemsSource="{Binding DisplayKeyCounts}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"><DataGrid.Columns><DataGridTextColumn Header="按键" Binding="{Binding Key}" Width="*"/><DataGridTextColumn Header="次数" Binding="{Binding Count, StringFormat=N0}" Width="*"/></DataGrid.Columns></DataGrid>
@@ -92,7 +93,8 @@
     </Expander>
    </StackPanel>
    <StackPanel Grid.Column="2">
-    <Border Style="{StaticResource DashboardPanel}" Height="398" Padding="24,18" Margin="0,0,0,20">
+    <!--  MinHeight 而不是固定高：时段标签条占两行后内容变高，固定高度会把底部排名裁掉  -->
+    <Border Style="{StaticResource DashboardPanel}" MinHeight="398" Padding="24,18" Margin="0,0,0,20">
      <Grid><TextBlock Text="TODAY" Foreground="{DynamicResource DashboardWatermark}" FontFamily="Consolas" FontSize="32" HorizontalAlignment="Right" Margin="0,42,0,0"/><StackPanel>
       <ListBox ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}" Style="{StaticResource PeriodSelector}" Margin="0,0,0,14"/>
       <TextBlock Text="敲击次数" Foreground="{DynamicResource AccentBrush}" FontSize="12"/><TextBlock Text="从高到低排序" Style="{StaticResource QuietText}" FontSize="10" Margin="0,5,0,10"/>
