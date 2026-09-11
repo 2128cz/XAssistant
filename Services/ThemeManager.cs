@@ -35,7 +35,7 @@ public static class ThemeManager
         var existing = app.Resources.MergedDictionaries
             .FirstOrDefault(m =>
                 m.Source != null
-                && m.Source.OriginalString.Contains("/Themes/", StringComparison.OrdinalIgnoreCase)
+                && m.Source.OriginalString.Contains("Themes/", StringComparison.OrdinalIgnoreCase)
             );
         if (existing != null)
             app.Resources.MergedDictionaries.Remove(existing);

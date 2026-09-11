@@ -53,12 +53,12 @@
             <RadioButton
               Margin="0,0,30,0"
               Command="{Binding ApplyLightCommand}"
-              Content="☀ 浅色（默认）"
+              Content="☀ 浅色 · 苔绿"
               GroupName="Theme"
               IsChecked="{Binding IsDarkTheme, Converter={StaticResource InverseBool}, Mode=OneWay}" />
             <RadioButton
               Command="{Binding ApplyDarkCommand}"
-              Content="🌙 深色"
+              Content="🌙 深色 · KeyScope（默认）"
               GroupName="Theme"
               IsChecked="{Binding IsDarkTheme, Mode=OneWay}" />
           </StackPanel>

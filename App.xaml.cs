@@ -54,7 +54,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ILogBufferService>(logBuffer);
 
         // 注册其他应用服务
-        services.AddSingleton<HomeViewModel>();
+        services.AddSingleton<DashboardViewModel>();
         services.AddSingleton<IMouseClickHookService, MouseClickHookService>();
         services.AddSingleton<IClickDatabaseService, ClickDatabaseService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -224,6 +224,7 @@ public partial class App : System.Windows.Application
         // 防止重复保存（如果已经通过 SessionEnding 或 ShutdownApplication 保存过）
         SaveDataAndStopTracker();
 
+        Services.GetRequiredService<MainWindowViewModel>().Dispose();
         _globalHotkey?.Dispose();
         _notifyIcon?.Dispose();
         // 移除事件订阅，避免内存泄漏

@@ -33,6 +33,10 @@ public partial class HomeViewModel : ViewModelBase
         _appUsage.PropertyChanged += OnAppUsagePropertyChanged;
     }
 
+    // Reuse the live child view models; no duplicate timers or recording services.
+    public KeyCounterViewModel Keyboard => _keyCounter;
+    public UsageViewModel Usage => _usage;
+
     // ========== 鼠标点击模块 ==========
     public string MouseRecordingStatus => _clickCounter.MouseRecordingStatus;
     public System.Windows.Media.Brush MouseRecordingColor => _clickCounter.MouseRecordingColor;

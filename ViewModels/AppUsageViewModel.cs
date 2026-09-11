@@ -11,11 +11,12 @@ namespace XAssistant.ViewModels;
 
 public partial class AppUsageViewModel : ViewModelBase
 {
-    private static readonly string DbPath = Path.Combine(
+    private static string DbPath => Path.Combine(
         AppDataPathHelper.GetAppDataFolder(),
         "app_usage.db"
     );
     private readonly DispatcherTimer _timer;
+    private readonly bool _monitoringEnabled;
     private readonly ILogger<AppUsageViewModel> _logger;
 
     [ObservableProperty]
@@ -28,13 +29,17 @@ public partial class AppUsageViewModel : ViewModelBase
 
     private const int RefreshIntervalSeconds = 2;
 
-    public AppUsageViewModel(ILogger<AppUsageViewModel> logger)
+    public AppUsageViewModel(ILogger<AppUsageViewModel> logger, bool startMonitoring = true)
     {
         _logger = logger;
+        _monitoringEnabled = startMonitoring;
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(RefreshIntervalSeconds) };
         _timer.Tick += async (_, _) => await RefreshAsync();
-        _timer.Start();
-        _ = RefreshAsync();
+        if (startMonitoring)
+        {
+            _timer.Start();
+            _ = RefreshAsync();
+        }
     }
 
     partial void OnSelectedDateChanged(DateTime value)
@@ -44,7 +49,7 @@ public partial class AppUsageViewModel : ViewModelBase
 
     private async Task RefreshAsync()
     {
-        if (_isRefreshing)
+        if (!_monitoringEnabled || _isRefreshing)
             return;
         _isRefreshing = true;
         try
