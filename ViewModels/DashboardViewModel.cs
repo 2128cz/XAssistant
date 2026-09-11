@@ -622,6 +622,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         _disposed = true;
         _timer.Stop();
         _timer.Tick -= OnTimerTick;
+        // 鼠标里程靠定时落库，退出前让它的最后一次冲刷把不足 1 秒的尾数写进去
+        Mouse.Dispose();
         Mouse.PropertyChanged -= OnMousePropertyChanged;
         Keyboard.PropertyChanged -= OnKeyboardPropertyChanged;
         Usage.PropertyChanged -= OnUsagePropertyChanged;

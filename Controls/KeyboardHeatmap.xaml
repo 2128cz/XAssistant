@@ -68,20 +68,54 @@
                 <Border BorderBrush="#4DADC488" BorderThickness="0,1,0,0" Margin="0,18,0,0" Padding="0,10,0,10">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="42"/><ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Border Height="42" BorderThickness="1" BorderBrush="#33BDD794" Background="#0ABDD794">
-                            <Canvas Width="24" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <Path Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.7" Data="M 12,2 C 5,2 5,8 5,10 L 5,17 C 5,24 19,24 19,17 L 19,10 C 19,8 19,2 12,2 Z M 12,3 L 12,10"/>
-                            </Canvas>
+                        <!--  位移窗：小鼠标图标朝指针移动方向偏移，并被钳在这个矩形内；偏移量由代码按 MouseOffsetX/Y 换算  -->
+                        <Border x:Name="MoveField" Width="84" Height="62" BorderThickness="1" BorderBrush="#33BDD794" Background="#0ABDD794">
+                            <Border.ToolTip>
+                                <ToolTip Content="图标朝指针移动方向偏移，越快偏得越远，停下后回到中心；边界外不再位移"/>
+                            </Border.ToolTip>
+                            <Grid x:Name="MoveSurface" ClipToBounds="True" SizeChanged="OnMoveSurfaceSizeChanged">
+                                <!--  内缩标记矩形：与代码里的 GlyphInset 同值，图标边缘正好停在这条线上  -->
+                                <Border Margin="3" BorderThickness="1" BorderBrush="#14BDD794"/>
+                                <Border Height="1" Background="#1ABDD794" VerticalAlignment="Center"/>
+                                <Border Width="1" Background="#1ABDD794" HorizontalAlignment="Center"/>
+                                <Viewbox x:Name="MouseGlyph" Width="20" Height="23" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                                    <Viewbox.RenderTransform>
+                                        <TranslateTransform x:Name="GlyphShift"/>
+                                    </Viewbox.RenderTransform>
+                                    <!--  内部几何按 22×26 作画，由 Viewbox 等比缩到上面声明的尺寸；改图标尺寸不必重排子元素  -->
+                                    <Grid Width="22" Height="26">
+                                        <Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1.4" CornerRadius="11,11,10,10" Background="#260C1210"/>
+                                        <!--  三块可点亮区域：点击时由代码把对应块的不透明度拉到顶再淡回  -->
+                                        <Border x:Name="LeftClickZone" Width="9" Height="12" Margin="0.8,0.8,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                CornerRadius="10,3,0,0" Background="{DynamicResource AccentBrush}" Opacity="0.12"/>
+                                        <Border x:Name="RightClickZone" Width="9" Height="12" Margin="0,0.8,0.8,0" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                CornerRadius="3,10,0,0" Background="{DynamicResource AccentBrush}" Opacity="0.12"/>
+                                        <Border x:Name="WheelZone" Width="2.8" Height="7" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,3.2,0,0"
+                                                CornerRadius="1.4" Background="{DynamicResource AccentBrush}" Opacity="0.34"/>
+                                        <Path Stroke="{DynamicResource AccentBrush}" StrokeThickness="1" Opacity="0.4" Data="M 2.4,13.6 L 19.6,13.6"/>
+                                    </Grid>
+                                </Viewbox>
+                            </Grid>
                         </Border>
                         <TextBlock Grid.Column="1" Text="MSE" Foreground="{DynamicResource TextSecondary}" FontFamily="Consolas" FontSize="12"
                                    FontWeight="SemiBold" VerticalAlignment="Center" Margin="16,0,24,0"/>
-                        <TextBlock Grid.Column="2" Text="{Binding MouseMovementText, ElementName=Root}" Foreground="{DynamicResource AccentBrush}"
-                                   FontFamily="Consolas" FontSize="11" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding MouseDeltaText, ElementName=Root}" Foreground="{DynamicResource AccentBrush}"
+                                       FontFamily="Consolas" FontSize="11"/>
+                            <TextBlock Text="{Binding MouseMovementText, ElementName=Root}" Style="{StaticResource HeatmapNote}"
+                                       FontSize="10" Margin="0,4,0,0"/>
+                        </StackPanel>
                         <StackPanel Grid.Column="3" VerticalAlignment="Center">
                             <TextBlock x:Name="MouseCountsText" Foreground="#9AAEA5" FontSize="11" HorizontalAlignment="Right"/>
+                            <TextBlock Text="{Binding MouseDistanceText, ElementName=Root}" Foreground="{DynamicResource AccentBrush}" FontFamily="Consolas"
+                                       FontSize="11" HorizontalAlignment="Right" Margin="0,4,0,0">
+                                <TextBlock.ToolTip>
+                                    <ToolTip Content="按指针走过的屏幕路径乘以显示器点距折算；开了“提高指针精确度”时会低估手的真实行程"/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
                             <TextBlock Text="{Binding MouseWheelText, ElementName=Root}" Style="{StaticResource HeatmapNote}"
                                        FontSize="10" HorizontalAlignment="Right" Margin="0,4,0,0"/>
                         </StackPanel>

@@ -33,6 +33,16 @@ public class ClickDatabaseService : IClickDatabaseService
             );
         ";
         command.ExecuteNonQuery();
+
+        // 移动量按天聚合：一次采样一行会在几天内堆出上千万条记录，而查询只需要“今日 / 累计”
+        command.CommandText =
+            @"
+            CREATE TABLE IF NOT EXISTS MouseMovementDays (
+                Date TEXT PRIMARY KEY,
+                Pixels REAL NOT NULL
+            );
+        ";
+        command.ExecuteNonQuery();
     }
 
     public void SaveClick(MouseClickRecord record)
@@ -114,5 +124,42 @@ public class ClickDatabaseService : IClickDatabaseService
         while (reader.Read())
             counts[reader.GetString(0)] = reader.GetInt32(1);
         return counts;
+    }
+
+    public void AddMovementPixels(DateTime date, double pixels)
+    {
+        if (pixels <= 0)
+            return;
+        using var connection = new SqliteConnection(ConnectionString);
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText =
+            @"
+            INSERT INTO MouseMovementDays (Date, Pixels) VALUES (@d, @p)
+            ON CONFLICT(Date) DO UPDATE SET Pixels = Pixels + @p;
+        ";
+        cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
+        cmd.Parameters.AddWithValue("@p", pixels);
+        cmd.ExecuteNonQuery();
+    }
+
+    public double GetMovementPixels(DateTime date)
+    {
+        using var connection = new SqliteConnection(ConnectionString);
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT Pixels FROM MouseMovementDays WHERE Date = @d";
+        cmd.Parameters.AddWithValue("@d", date.ToString("yyyy-MM-dd"));
+        return cmd.ExecuteScalar() is double value ? value : 0d;
+    }
+
+    public double GetTotalMovementPixels()
+    {
+        using var connection = new SqliteConnection(ConnectionString);
+        connection.Open();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COALESCE(SUM(Pixels), 0) FROM MouseMovementDays";
+        // SUM 对 REAL 列返回 Real，但全表为空时 COALESCE 给出整数 0
+        return Convert.ToDouble(cmd.ExecuteScalar() ?? 0d);
     }
 }

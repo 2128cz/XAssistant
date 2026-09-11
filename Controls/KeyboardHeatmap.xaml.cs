@@ -9,6 +9,7 @@ using System.Linq;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using UserControl = System.Windows.Controls.UserControl;
 using Brush = System.Windows.Media.Brush;
@@ -34,8 +35,19 @@ public partial class KeyboardHeatmap : UserControl
     public static readonly DependencyProperty LeftClickCountProperty = Register(nameof(LeftClickCount), 0);
     public static readonly DependencyProperty MiddleClickCountProperty = Register(nameof(MiddleClickCount), 0);
     public static readonly DependencyProperty RightClickCountProperty = Register(nameof(RightClickCount), 0);
-    public static readonly DependencyProperty MouseMovementTextProperty = Register(nameof(MouseMovementText), "移动数据未采集");
-    public static readonly DependencyProperty MouseWheelTextProperty = Register(nameof(MouseWheelText), "滚轮数据未采集");
+    public static readonly DependencyProperty MouseMovementTextProperty = RegisterMouse<string>(nameof(MouseMovementText), "移动数据未采集");
+    public static readonly DependencyProperty MouseWheelTextProperty = RegisterMouse<string>(nameof(MouseWheelText), "滚轮数据未采集");
+
+    /// <summary>小鼠标图标在位移窗内的归一化偏移（-1..1），像素换算由本控件按实际尺寸完成。</summary>
+    public static readonly DependencyProperty MouseOffsetXProperty = RegisterMouse(nameof(MouseOffsetX), 0d, MouseOffsetChanged);
+    public static readonly DependencyProperty MouseOffsetYProperty = RegisterMouse(nameof(MouseOffsetY), 0d, MouseOffsetChanged);
+
+    public static readonly DependencyProperty MouseDeltaTextProperty = RegisterMouse<string>(nameof(MouseDeltaText), "Δx 0 · Δy 0 px");
+    public static readonly DependencyProperty MouseDistanceTextProperty = RegisterMouse<string>(nameof(MouseDistanceText), "移动 今日 0.00 m · 累计 0.00 m");
+
+    /// <summary>最近一次按下的键名（Left/Middle/Right），与自增的 <see cref="MouseClickPulse"/> 配合点亮对应区域。</summary>
+    public static readonly DependencyProperty MouseButtonProperty = RegisterMouse<string>(nameof(MouseButton), string.Empty);
+    public static readonly DependencyProperty MouseClickPulseProperty = RegisterMouse(nameof(MouseClickPulse), 0L, MouseClickChanged);
 
     public IEnumerable? ItemsSource { get => (IEnumerable?)GetValue(ItemsSourceProperty); set => SetValue(ItemsSourceProperty, value); }
     public string RecentKey { get => (string)GetValue(RecentKeyProperty); set => SetValue(RecentKeyProperty, value); }
@@ -48,6 +60,12 @@ public partial class KeyboardHeatmap : UserControl
     public int RightClickCount { get => (int)GetValue(RightClickCountProperty); set => SetValue(RightClickCountProperty, value); }
     public string MouseMovementText { get => (string)GetValue(MouseMovementTextProperty); set => SetValue(MouseMovementTextProperty, value); }
     public string MouseWheelText { get => (string)GetValue(MouseWheelTextProperty); set => SetValue(MouseWheelTextProperty, value); }
+    public double MouseOffsetX { get => (double)GetValue(MouseOffsetXProperty); set => SetValue(MouseOffsetXProperty, value); }
+    public double MouseOffsetY { get => (double)GetValue(MouseOffsetYProperty); set => SetValue(MouseOffsetYProperty, value); }
+    public string MouseDeltaText { get => (string)GetValue(MouseDeltaTextProperty); set => SetValue(MouseDeltaTextProperty, value); }
+    public string MouseDistanceText { get => (string)GetValue(MouseDistanceTextProperty); set => SetValue(MouseDistanceTextProperty, value); }
+    public string MouseButton { get => (string)GetValue(MouseButtonProperty); set => SetValue(MouseButtonProperty, value); }
+    public long MouseClickPulse { get => (long)GetValue(MouseClickPulseProperty); set => SetValue(MouseClickPulseProperty, value); }
 
     public ObservableCollection<KeyCap> KeyCaps { get; } = new();
     private INotifyCollectionChanged? _collection;
@@ -78,13 +96,26 @@ public partial class KeyboardHeatmap : UserControl
             KeyCaps.Add(new KeyCap(key));
         InitializeComponent();
         LegendBar.Background = BuildRampBrush();
-        Loaded += (_, _) => { _observing = true; ObserveSource(); Refresh(); };
+        Loaded += (_, _) => { _observing = true; ObserveSource(); Refresh(); LayoutMouseGlyph(); };
         Unloaded += (_, _) => { _observing = false; DetachSource(); };
         Refresh();
     }
 
     private static DependencyProperty Register<T>(string name, T value) => DependencyProperty.Register(
         name, typeof(T), typeof(KeyboardHeatmap), new PropertyMetadata(value, VisualPropertyChanged));
+
+    /// <summary>
+    /// 鼠标移动相关属性的注册。这些值每 100 ms 变一次，绝不能再走 <see cref="VisualPropertyChanged"/>：
+    /// 那条路径会连带重建 144 个键帽的着色，把热力图的开销放大到跟随刷新频率。
+    /// </summary>
+    private static DependencyProperty RegisterMouse<T>(string name, T value, PropertyChangedCallback? changed = null) =>
+        DependencyProperty.Register(name, typeof(T), typeof(KeyboardHeatmap), new PropertyMetadata(value, changed));
+
+    private static void MouseOffsetChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) =>
+        ((KeyboardHeatmap)d).LayoutMouseGlyph();
+
+    private static void MouseClickChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) =>
+        ((KeyboardHeatmap)d).FlashMouseButton(((KeyboardHeatmap)d).MouseButton);
 
     private static void SourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -372,6 +403,78 @@ public partial class KeyboardHeatmap : UserControl
         gradient.Freeze();
         return gradient;
     }
+
+    // ===== 位移窗内的小鼠标图标 =====
+
+    /// <summary>图标可移动范围还要向内收这么多像素，避免图标压住位移窗边框；与 XAML 里的标记矩形 Margin 同值。</summary>
+    private const double GlyphInset = 3;
+
+    /// <summary>点击时点亮的亮度，以及各块静置亮度；与 KeyboardHeatmap.xaml 里的初值一致。</summary>
+    private const double ZoneLit = 0.95;
+
+    private const double ZoneRest = 0.12;
+    private const double WheelRest = 0.34;
+
+    /// <summary>图标跟随时长；比取样窗口（100 ms）略长，让 10 Hz 的跳动连成滑行而不是台阶。</summary>
+    private static readonly Duration GlyphGlide = TimeSpan.FromMilliseconds(140);
+
+    private static readonly Duration ZoneFade = TimeSpan.FromMilliseconds(420);
+
+    private static readonly Duration ZoneRelease = TimeSpan.FromMilliseconds(220);
+
+    private UIElement? _litZone;
+
+    private void OnMoveSurfaceSizeChanged(object sender, SizeChangedEventArgs e) => LayoutMouseGlyph();
+
+    /// <summary>
+    /// 把归一化偏移换算成位移窗内的像素。ViewModel 不知道控件实际尺寸，而图标又必须被钳在矩形内，
+    /// 所以换算留在 View 层；用 TranslateTransform 而非 Canvas.Left，避免每 100 ms 触发一次布局。
+    /// </summary>
+    private void LayoutMouseGlyph()
+    {
+        if (MoveSurface is null || MouseGlyph is null || GlyphShift is null)
+            return;
+        var reachX = Math.Max(0, (MoveSurface.ActualWidth - MouseGlyph.ActualWidth) / 2 - GlyphInset);
+        var reachY = Math.Max(0, (MoveSurface.ActualHeight - MouseGlyph.ActualHeight) / 2 - GlyphInset);
+        Glide(TranslateTransform.XProperty, Math.Clamp(MouseOffsetX, -1d, 1d) * reachX);
+        Glide(TranslateTransform.YProperty, Math.Clamp(MouseOffsetY, -1d, 1d) * reachY);
+    }
+
+    private void Glide(DependencyProperty axis, double target) => GlyphShift.BeginAnimation(axis,
+        new DoubleAnimation(target, GlyphGlide)
+        {
+            EasingFunction = new QuarticEase { EasingMode = EasingMode.EaseOut },
+        });
+
+    /// <summary>点亮本次点击对应的区域；同一时刻只保留一块亮起，其余淡回静置亮度。</summary>
+    private void FlashMouseButton(string? button)
+    {
+        if (LeftClickZone is null)
+            return;
+        // 用 UIElement 接：本文件没有 using System.Windows.Controls（避开与 WinForms 的类型歧义）
+        UIElement? zone = button switch
+        {
+            "Left" => LeftClickZone,
+            "Right" => RightClickZone,
+            "Middle" => WheelZone,
+            _ => null,
+        };
+        if (zone is null)
+            return;
+        var previous = _litZone;
+        if (previous is not null && !ReferenceEquals(previous, zone))
+            FadeToRest(previous);
+        _litZone = zone;
+        // 先写局部值当作动画起点：连点同一区域时从满亮接着淡出，不会先闪回静置亮度
+        zone.Opacity = ZoneLit;
+        zone.BeginAnimation(OpacityProperty, new DoubleAnimation(RestOpacity(zone), ZoneFade));
+    }
+
+    private void FadeToRest(UIElement zone) =>
+        zone.BeginAnimation(OpacityProperty, new DoubleAnimation(RestOpacity(zone), ZoneRelease));
+
+    /// <summary>滚轮块静置时更亮：它没有左右键那样的分界，靠亮度才能认出来。</summary>
+    private double RestOpacity(UIElement zone) => ReferenceEquals(zone, WheelZone) ? WheelRest : ZoneRest;
 
     internal readonly record struct KeyDefinition(string Id, string Label, double X, double Y, double Width);
 

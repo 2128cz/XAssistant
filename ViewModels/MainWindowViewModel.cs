@@ -171,6 +171,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             Keys = Dashboard.DisplayKeyCounts.Select(key => new { key.Key, key.Count }).ToArray(),
             Mouse = new { Dashboard.Mouse.LeftClickCount, Dashboard.Mouse.MiddleClickCount, Dashboard.Mouse.RightClickCount,
                 Dashboard.Mouse.LeftClickToday, Dashboard.Mouse.MiddleClickToday, Dashboard.Mouse.RightClickToday,
+                Dashboard.Mouse.TodayDistanceMeters, Dashboard.Mouse.TotalDistanceMeters,
                 Dashboard.Mouse.SelectedDate, Dashboard.Mouse.SelectedDateLeftCount, Dashboard.Mouse.SelectedDateMiddleCount, Dashboard.Mouse.SelectedDateRightCount },
             Usage = Dashboard.Usage.History.ToArray(),
             SessionEvents = Dashboard.Usage.SessionEvents.ToArray(),

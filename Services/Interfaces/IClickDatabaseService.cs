@@ -21,4 +21,16 @@ public interface IClickDatabaseService
     Dictionary<string, int> GetClickCounts();
 
     Dictionary<string, int> GetClickCountsByDate(DateTime date);
+
+    /// <summary>
+    /// 把一段鼠标移动的路径像素累加到指定日期。移动事件每秒上千条，
+    /// 因此不逐条存记录，只按天维护一个累计值。
+    /// </summary>
+    void AddMovementPixels(DateTime date, double pixels);
+
+    /// <summary>指定日期已累计的移动路径像素。</summary>
+    double GetMovementPixels(DateTime date);
+
+    /// <summary>所有日期合计的移动路径像素。</summary>
+    double GetTotalMovementPixels();
 }

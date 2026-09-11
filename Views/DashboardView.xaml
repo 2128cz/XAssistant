@@ -73,8 +73,13 @@
     <Border Style="{StaticResource DashboardPanel}" MinHeight="561" Padding="20" Margin="0,0,0,18">
      <Grid><TextBlock Text="144" FontFamily="Consolas" FontSize="106" Foreground="{DynamicResource DashboardWatermark}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-25,164,0"/><StackPanel>
       <DockPanel Margin="0,0,0,24"><ComboBox DockPanel.Dock="Right" Width="120" ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}"/><TextBlock Text="键盘热力图" Style="{StaticResource SectionHeading}" VerticalAlignment="Center"/></DockPanel>
-      <!-- 色阶条与最少/最多次数由 KeyboardHeatmap 自己渲染，与按键着色同源 -->
-      <controls:KeyboardHeatmap ShowHeader="False" IsRecording="{Binding Keyboard.IsRecording}" ItemsSource="{Binding DisplayKeyCounts}" RecentKey="{Binding LastKeyText}" LeftClickCount="{Binding Mouse.LeftClickToday}" MiddleClickCount="{Binding Mouse.MiddleClickToday}" RightClickCount="{Binding Mouse.RightClickToday}"/>
+      <!-- 色阶条与最少/最多次数由 KeyboardHeatmap 自己渲染，与按键着色同源；位移图标只收归一化偏移，像素换算在控件里 -->
+      <controls:KeyboardHeatmap ShowHeader="False" IsRecording="{Binding Keyboard.IsRecording}" ItemsSource="{Binding DisplayKeyCounts}" RecentKey="{Binding LastKeyText}"
+                                LeftClickCount="{Binding Mouse.LeftClickToday}" MiddleClickCount="{Binding Mouse.MiddleClickToday}" RightClickCount="{Binding Mouse.RightClickToday}"
+                                MouseMovementText="{Binding Mouse.MouseMovementText}" MouseDeltaText="{Binding Mouse.MouseDeltaText}"
+                                MouseDistanceText="{Binding Mouse.MouseDistanceText}" MouseWheelText="{Binding Mouse.MouseWheelText}"
+                                MouseOffsetX="{Binding Mouse.MouseOffsetX}" MouseOffsetY="{Binding Mouse.MouseOffsetY}"
+                                MouseButton="{Binding Mouse.MouseButton}" MouseClickPulse="{Binding Mouse.MouseClickPulse}"/>
      </StackPanel></Grid>
     </Border>
     <DockPanel Margin="0,0,0,22"><TextBlock DockPanel.Dock="Right" Text="刷新 1 s" Style="{StaticResource QuietText}"/><TextBlock Text="◇  热力图与排行共享所选时段；未映射的扩展按键保持为空。" Style="{StaticResource QuietText}"/></DockPanel>
