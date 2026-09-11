@@ -69,7 +69,24 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         .Append("总计").Append("昨天").Append("前天").ToArray();
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KeyRankingPeriodMark))]
     private string _selectedKeyboardPeriod = "今天";
+
+    /// <summary>
+    /// 右栏水印跟着时段变。写死 TODAY 在选「1 小时」时就是在标一个没在显示的时段；
+    /// 改成竖排后不受行宽限制，长标签直写。
+    /// </summary>
+    public string KeyRankingPeriodMark => SelectedKeyboardPeriod switch
+    {
+        "今天" => "TODAY",
+        "昨天" => "YESTERDAY",
+        "前天" => "2 DAYS AGO",
+        "总计" => "ALL TIME",
+        // 新加整天档忘了配英文时，宁可回显中文原标签，也不要“LAST 0 HOURS”这种看不出的错
+        _ => RollingHours > 0
+            ? $"LAST {RollingHours} {(RollingHours == 1 ? "HOUR" : "HOURS")}"
+            : SelectedKeyboardPeriod,
+    };
 
     public ObservableCollection<KeyCountItem> DisplayKeyCounts { get; } = new();
     public ObservableCollection<DashboardKeyRank> TopKeys { get; } = new();

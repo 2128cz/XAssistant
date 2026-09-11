@@ -98,7 +98,7 @@
    <StackPanel Grid.Column="2">
     <!--  MinHeight 而不是固定高：时段标签条占两行后内容变高，固定高度会把底部排名裁掉  -->
     <Border Style="{StaticResource DashboardPanel}" MinHeight="398" Padding="24,18" Margin="0,0,0,20">
-     <Grid><TextBlock Text="TODAY" Foreground="{DynamicResource DashboardWatermark}" FontFamily="Consolas" FontSize="32" HorizontalAlignment="Right" Margin="0,42,0,0"/><StackPanel>
+     <Grid><TextBlock Text="{Binding KeyRankingPeriodMark}" Foreground="{DynamicResource DashboardWatermark}" FontFamily="Consolas" FontSize="32" HorizontalAlignment="Left" VerticalAlignment="Bottom"><TextBlock.LayoutTransform><RotateTransform Angle="90"/></TextBlock.LayoutTransform></TextBlock><StackPanel>
       <ListBox ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}" Style="{StaticResource PeriodSelector}" Margin="0,0,0,14"/>
       <TextBlock Text="敲击次数" Foreground="{DynamicResource AccentBrush}" FontSize="12"/><TextBlock Text="从高到低排序" Style="{StaticResource QuietText}" FontSize="10" Margin="0,5,0,10"/>
       <ItemsControl ItemsSource="{Binding TopKeys}"><ItemsControl.ItemTemplate><DataTemplate><Grid Height="52"><TextBlock Foreground="{DynamicResource TextSecondary}" FontFamily="Consolas" Margin="0,6,0,0"><Run Text="{Binding Rank, Mode=OneWay, StringFormat=D2}"/><Run Text="  "/><Run Text="{Binding Key, Mode=OneWay}"/></TextBlock><TextBlock Text="{Binding Count, StringFormat=N0}" Style="{StaticResource MetricText}" FontSize="39" Margin="0,4,0,0"/><ProgressBar Value="{Binding BarWidth}" Maximum="100" Height="2" VerticalAlignment="Bottom" BorderThickness="0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource CardBorderBrush}"/></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
