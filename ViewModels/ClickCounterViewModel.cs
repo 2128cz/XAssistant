@@ -113,6 +113,20 @@ public partial class ClickCounterViewModel : ViewModelBase
         LeftClickToday = today["Left"];
         MiddleClickToday = today["Middle"];
         RightClickToday = today["Right"];
+        SyncSelectedTodayCounts();
+        OnPropertyChanged(nameof(MouseTodayClicks));
+    }
+
+    // The selected-day panel shares today's in-memory values while recording.
+    // Older selected dates retain their database snapshot until the date changes.
+    private void SyncSelectedTodayCounts()
+    {
+        if (SelectedDate.Date != DateTime.Today)
+            return;
+
+        SelectedDateLeftCount = LeftClickToday;
+        SelectedDateMiddleCount = MiddleClickToday;
+        SelectedDateRightCount = RightClickToday;
     }
 
     private DateTime _lastRefreshDate = DateTime.Today;
@@ -156,10 +170,12 @@ public partial class ClickCounterViewModel : ViewModelBase
                     RightClickToday++;
                     break;
             }
+
+            SyncSelectedTodayCounts();
+            OnPropertyChanged(nameof(MouseTodayClicks));
         }
 
         // 通知聚合属性更新
-        OnPropertyChanged(nameof(MouseTodayClicks));
         OnPropertyChanged(nameof(MouseTotalClicks));
     }
 

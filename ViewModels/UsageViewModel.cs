@@ -19,6 +19,15 @@ public partial class UsageViewModel : ViewModelBase
     [ObservableProperty]
     private string _todayUsageText = "00:00:00";
 
+    private long? _todayUsageSeconds;
+    private bool _isTodayUsageCorrected;
+
+    /// <summary>Numeric value underlying TodayUsageText; null until available or after a read failure.</summary>
+    public long? TodayUsageSeconds => _todayUsageSeconds;
+
+    /// <summary>True for the event-based value including the active session; false for database fallback.</summary>
+    public bool IsTodayUsageCorrected => _isTodayUsageCorrected;
+
     [ObservableProperty]
     private ObservableCollection<DailyUsage> _history = new();
 
@@ -31,7 +40,7 @@ public partial class UsageViewModel : ViewModelBase
     [ObservableProperty]
     private ObservableCollection<SessionEvent> _sessionEvents = new();
 
-    public UsageViewModel(ILogger<UsageViewModel> logger)
+    public UsageViewModel(ILogger<UsageViewModel> logger, bool startMonitoring = true)
     {
         _logger = logger;
         _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
@@ -55,8 +64,11 @@ public partial class UsageViewModel : ViewModelBase
                 _isRefreshing = false;
             }
         };
-        _refreshTimer.Start();
-        _ = RefreshAllAsync();
+        if (startMonitoring)
+        {
+            _refreshTimer.Start();
+            _ = RefreshAllAsync();
+        }
     }
 
     private async Task RefreshAllAsync()
@@ -92,6 +104,7 @@ public partial class UsageViewModel : ViewModelBase
             // }
 
             var ts = TimeSpan.FromSeconds(eventSeconds);
+            SetTodayUsageSeconds(eventSeconds, isCorrected: true);
             TodayUsageText =
                 ts.TotalDays >= 1
                     ? $"{(int)ts.TotalDays} 天 {ts.Hours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}"
@@ -106,6 +119,7 @@ public partial class UsageViewModel : ViewModelBase
             {
                 var dbSeconds = LoadTodaySecondsFromDb();
                 var ts = TimeSpan.FromSeconds(dbSeconds);
+                SetTodayUsageSeconds(dbSeconds, isCorrected: false);
                 TodayUsageText =
                     $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2} (数据库)";
                 return dbSeconds;
@@ -113,10 +127,23 @@ public partial class UsageViewModel : ViewModelBase
             catch (Exception dbEx)
             {
                 _logger.LogError(dbEx, "数据库读取今日秒数也失败");
+                SetTodayUsageSeconds(null, isCorrected: false);
                 TodayUsageText = "无法获取";
                 return 0;
             }
         }
+    }
+
+    private void SetTodayUsageSeconds(long? seconds, bool isCorrected)
+    {
+        bool secondsChanged = _todayUsageSeconds != seconds;
+        bool sourceChanged = _isTodayUsageCorrected != isCorrected;
+        _todayUsageSeconds = seconds;
+        _isTodayUsageCorrected = isCorrected;
+        if (secondsChanged)
+            OnPropertyChanged(nameof(TodayUsageSeconds));
+        if (sourceChanged)
+            OnPropertyChanged(nameof(IsTodayUsageCorrected));
     }
 
     private async Task LoadHistoryAsync()

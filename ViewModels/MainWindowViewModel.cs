@@ -1,154 +1,117 @@
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Runtime.Versioning;
+using System.Collections.Specialized;
+using System.IO;
+using System.Text.Json;
+using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Win32;
 using XAssistant.Models;
 using XAssistant.Services.Interfaces;
 
 namespace XAssistant.ViewModels;
 
-public partial class MainWindowViewModel : ViewModelBase
+/// <summary>The desktop hosts one dashboard. All sections share the existing service instances.</summary>
+public partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly IStartupService _startupService;
     private readonly ILogBufferService _logBuffer;
     private readonly IConfigurationService _configService;
-    private readonly HomeViewModel _homeViewModel;
+    public DashboardViewModel Dashboard { get; }
 
-    [ObservableProperty]
-    private double _windowWidth;
+    [ObservableProperty] private double _windowWidth;
+    [ObservableProperty] private double _windowHeight;
+    [ObservableProperty] private bool _isLogExpanded;
+    [ObservableProperty] private bool _isStartWithWindowsEnabled;
+    [ObservableProperty] private string _logLevelFilter = "All";
+    [ObservableProperty] private DateTime _logDate = DateTime.Today;
+    [ObservableProperty] private string _exportStatus = "记录由现有服务保存";
 
-    partial void OnWindowWidthChanged(double value) => _configService.SetWindowWidth(value);
-
-    [ObservableProperty]
-    private double _windowHeight;
-
-    partial void OnWindowHeightChanged(double value) => _configService.SetWindowHeight(value);
-
-    [ObservableProperty]
-    private bool _isLogExpanded;
-
-    partial void OnIsLogExpandedChanged(bool value) => _configService.SetIsLogExpanded(value);
-
-    [ObservableProperty]
-    private ViewModelBase? _currentViewModel;
-
-    [ObservableProperty]
-    private bool _isStartWithWindowsEnabled;
-
-    // 日志集合（直接暴露底层集合，也可以做筛选）
+    public string[] LogLevelOptions { get; } = ["All", "Verbose", "Debug", "Information", "Warning", "Error", "Fatal"];
     public ObservableCollection<LogEntry> AllLogs => _logBuffer.LogEntries;
+    public IEnumerable<LogEntry> FilteredLogs => SnapshotLogs().Where(entry => entry.Timestamp.Date == LogDate.Date
+        && (LogLevelFilter == "All" || entry.Level.Equals(LogLevelFilter, StringComparison.OrdinalIgnoreCase)))
+        .OrderByDescending(entry => entry.Timestamp);
+    public int FilteredLogCount => FilteredLogs.Count();
+    public string StartupDescription => IsStartWithWindowsEnabled ? "已开启 · 登录系统后在后台记录" : "已关闭 · 手动启动工作台";
 
-    // 侧边栏导航项
-    public ObservableCollection<NavItem> NavItems { get; } =
-        new()
-        {
-            new NavItem("🏠", "首页", "Home"),
-            new NavItem("🖱️", "鼠标", "ClickCounter"),
-            new NavItem("⌨️", "键盘", "KeyCounter"),
-            new NavItem("🎹", "键盘动画", "KeyAnimation"),
-            new NavItem("💻", "电脑使用", "Usage"),
-            new NavItem("📊", "软件使用", "AppUsage"),
-            new NavItem("⚙️", "设置", "Settings"),
-        };
-
-    [ObservableProperty]
-    private NavItem? _selectedNavItem;
-
-    partial void OnSelectedNavItemChanged(NavItem? value)
-    {
-        if (value != null)
-            Navigate(value.PageName);
-    }
-
-    [ObservableProperty]
-    private string _logLevelFilter = "All";
-
-    public string[] LogLevelOptions { get; } =
-        { "All", "Verbose", "Debug", "Information", "Warning", "Error", "Fatal" };
-
-    // 计算属性：展示筛选后的日志（也可以在 xaml 中用 CollectionViewSource 过滤）
-    public IEnumerable<LogEntry> FilteredLogs =>
-        LogLevelFilter == "All"
-            ? AllLogs
-            : AllLogs.Where(l =>
-                l.Level.Equals(LogLevelFilter, StringComparison.OrdinalIgnoreCase)
-            );
-
-    public MainWindowViewModel(
-        IStartupService startupService,
-        ILogBufferService logBuffer,
-        IConfigurationService configService,
-        HomeViewModel homeViewModel
-    )
+    public MainWindowViewModel(IStartupService startupService, ILogBufferService logBuffer,
+        IConfigurationService configService, DashboardViewModel dashboard)
     {
         _startupService = startupService;
         _logBuffer = logBuffer;
         _configService = configService;
-        WindowWidth = _configService.GetWindowWidth();
-        WindowHeight = _configService.GetWindowHeight();
-        IsLogExpanded = _configService.GetIsLogExpanded();
-        CurrentViewModel = homeViewModel;
-        _homeViewModel = homeViewModel;
-        IsStartWithWindowsEnabled = _startupService.IsStartWithWindowsEnabled();
-
-        // 默认选中"首页"（触发导航）
-        SelectedNavItem = NavItems.First();
-
-        // 当日志集合变化时，通知 FilteredLogs 属性变化（简化方式）
-        _logBuffer.LogEntries.CollectionChanged += (_, _) =>
-        {
-            OnPropertyChanged(nameof(FilteredLogs));
-        };
+        Dashboard = dashboard;
+        // Reading configuration must not write back to the registry or configuration file.
+        _windowWidth = Math.Max(1100, configService.GetWindowWidth());
+        _windowHeight = Math.Max(700, configService.GetWindowHeight());
+        _isLogExpanded = configService.GetIsLogExpanded();
+        _isStartWithWindowsEnabled = startupService.IsStartWithWindowsEnabled();
+        AllLogs.CollectionChanged += LogsChanged;
     }
 
-    // 当日志筛选级别改变时，通知 FilteredLogs 更新
-    partial void OnLogLevelFilterChanged(string value)
-    {
-        OnPropertyChanged(nameof(FilteredLogs));
-    }
-
-    // 清空日志
-    [RelayCommand]
-    private void ClearLogs()
-    {
-        _logBuffer.LogEntries.Clear();
-    }
-
+    partial void OnWindowWidthChanged(double value) => _configService.SetWindowWidth(value);
+    partial void OnWindowHeightChanged(double value) => _configService.SetWindowHeight(value);
+    partial void OnIsLogExpandedChanged(bool value) => _configService.SetIsLogExpanded(value);
     partial void OnIsStartWithWindowsEnabledChanged(bool value)
     {
         _startupService.SetAutoStart(value);
+        OnPropertyChanged(nameof(StartupDescription));
     }
+    partial void OnLogLevelFilterChanged(string value) => NotifyLogs();
+    partial void OnLogDateChanged(DateTime value) => NotifyLogs();
+    private void LogsChanged(object? sender, NotifyCollectionChangedEventArgs e) => NotifyLogs();
+    private void NotifyLogs()
+    {
+        OnPropertyChanged(nameof(FilteredLogs));
+        OnPropertyChanged(nameof(FilteredLogCount));
+    }
+    [RelayCommand] private void ClearLogs() => BindingOperations.AccessCollection(AllLogs, AllLogs.Clear, true);
+    [RelayCommand] private void CloseLogs() => IsLogExpanded = false;
 
     [RelayCommand]
-    private void Navigate(string pageName)
+    private void ExportRecords()
     {
-        CurrentViewModel = pageName switch
+        SaveJson("XAssistant-records", new
         {
-            "Home" => _homeViewModel,
-            "ClickCounter" => App.Services.GetRequiredService<ClickCounterViewModel>(),
-            "KeyCounter" => App.Services.GetRequiredService<KeyCounterViewModel>(),
-            "KeyAnimation" => App.Services.GetRequiredService<KeyAnimationViewModel>(),
-            "Usage" => App.Services.GetRequiredService<UsageViewModel>(),
-            "AppUsage" => App.Services.GetRequiredService<AppUsageViewModel>(),
-            "Settings" => App.Services.GetRequiredService<SettingsViewModel>(),
-            _ => CurrentViewModel,
-        };
+            ExportedAt = DateTimeOffset.Now,
+            KeyboardPeriod = Dashboard.SelectedKeyboardPeriod,
+            Keys = Dashboard.DisplayKeyCounts.Select(key => new { key.Key, key.Count }).ToArray(),
+            Mouse = new { Dashboard.Mouse.LeftClickCount, Dashboard.Mouse.MiddleClickCount, Dashboard.Mouse.RightClickCount,
+                Dashboard.Mouse.LeftClickToday, Dashboard.Mouse.MiddleClickToday, Dashboard.Mouse.RightClickToday,
+                Dashboard.Mouse.SelectedDate, Dashboard.Mouse.SelectedDateLeftCount, Dashboard.Mouse.SelectedDateMiddleCount, Dashboard.Mouse.SelectedDateRightCount },
+            Usage = Dashboard.Usage.History.ToArray(),
+            SessionEvents = Dashboard.Usage.SessionEvents.ToArray(),
+            ApplicationsDate = Dashboard.Apps.SelectedDate,
+            Applications = Dashboard.Apps.AppUsageList.ToArray()
+        });
     }
-}
+    [RelayCommand] private void ExportLogs() => SaveJson("XAssistant-events", FilteredLogs.ToArray());
 
-/// <summary>侧边栏导航项（图标 + 文本 + 目标页面）</summary>
-public class NavItem
-{
-    public string Icon { get; }
-    public string Label { get; }
-    public string PageName { get; }
-
-    public NavItem(string icon, string label, string pageName)
+    private void SaveJson(string prefix, object value)
     {
-        Icon = icon;
-        Label = label;
-        PageName = pageName;
+        var dialog = new Microsoft.Win32.SaveFileDialog { Title = "导出记录", Filter = "JSON 文件 (*.json)|*.json",
+            FileName = $"{prefix}-{DateTime.Now:yyyyMMdd-HHmmss}.json" };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true }));
+            ExportStatus = $"已导出 · {Path.GetFileName(dialog.FileName)}";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            ExportStatus = "导出失败 · " + exception.Message;
+        }
+    }
+    private LogEntry[] SnapshotLogs()
+    {
+        LogEntry[] result = [];
+        BindingOperations.AccessCollection(AllLogs, () => result = AllLogs.ToArray(), false);
+        return result;
+    }
+    public void Dispose()
+    {
+        AllLogs.CollectionChanged -= LogsChanged;
+        Dashboard.Dispose();
     }
 }
