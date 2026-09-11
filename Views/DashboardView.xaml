@@ -29,7 +29,7 @@
     <DockPanel><TextBlock DockPanel.Dock="Right" Text="{Binding PeakCps, StringFormat='本次峰值 {0:F1} 次 / s'}" Style="{StaticResource QuietText}"/><TextBlock Style="{StaticResource MonoText}" Foreground="{DynamicResource AccentBrush}"><Run Text="● LIVE  /  "/><Run Text="{Binding RecordingStatus, Mode=OneWay}"/><Run Text="   最近输入 "/><Run Text="{Binding LastKeyText, Mode=OneWay}"/></TextBlock></DockPanel>
     <Grid Grid.Row="1">
      <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <Grid><Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition Height="*"/><RowDefinition Height="28"/></Grid.RowDefinitions>
+     <Grid><Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
       <DockPanel><TextBlock Text="最近输入 →" Style="{StaticResource QuietText}" DockPanel.Dock="Left" Margin="0,0,18,0"/>
        <!--  倒序集合 + RightToLeft 面板：最新一项从右侧起排，装不下时向左溢出并由自身裁剪，不会伸到右侧速率卡片上被遮住  -->
        <ItemsControl ItemsSource="{Binding RecentKeyChips}" FlowDirection="RightToLeft" ClipToBounds="True" VerticalAlignment="Center"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" FlowDirection="LeftToRight" FontFamily="Consolas" Foreground="{DynamicResource TextSecondary}" FontSize="15" Margin="8,0"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></DockPanel>
@@ -55,7 +55,7 @@
         </Grid>
        </Canvas>
       </Grid>
-      <DockPanel Grid.Row="2" Margin="0,10,0,0"><TextBlock DockPanel.Dock="Right" Text="现在" Style="{StaticResource QuietText}"/><TextBlock DockPanel.Dock="Left" Text="−60 s" Style="{StaticResource QuietText}"/><TextBlock Text="每秒敲击 · 近 1 秒滚动窗口 / 连续滚动的 60 秒" HorizontalAlignment="Center" Style="{StaticResource QuietText}"/></DockPanel>
+      <StackPanel Grid.Row="2"><DockPanel  Margin="0,10,0,0"><TextBlock DockPanel.Dock="Right" Text="现在" Style="{StaticResource QuietText}"/><TextBlock DockPanel.Dock="Left" Text="−60 s" Style="{StaticResource QuietText}"/><TextBlock Text="每秒敲击 · 近 1 秒滚动窗口 / 连续滚动的 60 秒" HorizontalAlignment="Center" Style="{StaticResource QuietText}"/></DockPanel></StackPanel>
      </Grid>
      <UniformGrid Grid.Column="2" Columns="2" Rows="3">
       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="实时速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding CurrentCps, StringFormat=F1}" Style="{StaticResource MetricText}"/><TextBlock Text="近 60 秒 · 次 / s" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
@@ -86,6 +86,7 @@
                                 MouseTrailWheelPoints="{Binding Mouse.MouseTrailWheelPoints}"/>
      </StackPanel></Grid>
     </Border>
+    <controls:VersePractice DataContext="{Binding Practice}" Margin="0,0,0,18"/>
     <!--  时段锚点由 PeriodRangeHint 给出：滚动窗口跟着当前时刻跑，不标起算点就读不出这些数字覆盖哪一段时间  -->
     <DockPanel Margin="0,0,0,22"><TextBlock DockPanel.Dock="Right" Text="刷新 1 s" Style="{StaticResource QuietText}"/><TextBlock Style="{StaticResource QuietText}"><Run Text="◇  "/><Run Text="{Binding PeriodRangeHint, Mode=OneWay}"/><Run Text=" · 热力图与排行共享该时段"/></TextBlock></DockPanel>
     <Expander x:Name="KeyDetails" Header="完整按键记录 / 鼠标历史" Margin="0,0,0,24">
@@ -132,10 +133,11 @@
      <Expander x:Name="HistorySection" Header="每日使用历史 · 会话事件" Margin="0,16,0,0"><StackPanel Margin="0,10,0,0"><DataGrid Height="200" ItemsSource="{Binding Usage.History}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"><DataGrid.Columns><DataGridTextColumn Header="日期" Binding="{Binding Date}" Width="120"/><DataGridTextColumn Header="原始时长" Binding="{Binding FormattedTime}" Width="140"/><DataGridTextColumn Header="校正时长" Binding="{Binding FormattedCorrectedTime}" Width="140"><DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/><Style.Triggers><DataTrigger Binding="{Binding HasDiscrepancy}" Value="True"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}"/></DataTrigger></Style.Triggers></Style></DataGridTextColumn.ElementStyle></DataGridTextColumn><DataGridTextColumn Header="修正原因" Binding="{Binding CorrectionReason}" Width="*"/></DataGrid.Columns></DataGrid><TextBlock Text="{Binding SelectedCorrectionReason}" TextWrapping="Wrap" Style="{StaticResource QuietText}" FontSize="11" Margin="0,10,0,0"/><TextBlock Text="会话事件 · 服务起止与休眠唤醒，用来核对上面的校正差值从哪来" Style="{StaticResource QuietText}" FontSize="11" Margin="0,16,0,8"/><DataGrid Height="180" ItemsSource="{Binding FilteredSessionEvents}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" BorderThickness="0"><DataGrid.Columns><DataGridTextColumn Header="会话事件" Binding="{Binding EventType}" Width="*"/><DataGridTextColumn Header="时间" Binding="{Binding Timestamp}" Width="1.7*"/><DataGridTextColumn Header="与上次间隔" Binding="{Binding TimeSincePrevious}" Width="*"/><DataGridTextColumn Header="本次会话时长" Binding="{Binding FormattedCumulativeUsage}" Width="*"/></DataGrid.Columns></DataGrid></StackPanel></Expander>
     </StackPanel>
    </Border>
-   <Border Grid.Column="2" Style="{StaticResource DashboardPanel}" Height="334" VerticalAlignment="Top" Padding="24,20">
-    <Grid><TextBlock Text="Aa" FontSize="96" FontFamily="Consolas" Foreground="{DynamicResource DashboardWatermark}" VerticalAlignment="Center"/><StackPanel><TextBlock Text="词频统计" Style="{StaticResource SectionHeading}"/><TextBlock Text="TEXT / FREQ" Style="{StaticResource MonoText}" FontSize="11"/><TextBlock Text="{Binding WordFrequencyStatus}" TextWrapping="Wrap" Style="{StaticResource QuietText}" Margin="0,38,0,0"/><TextBlock Text="—" FontFamily="Consolas" FontSize="54" Foreground="{DynamicResource DashboardNumber}" HorizontalAlignment="Right" Margin="0,24,0,0"/></StackPanel></Grid>
+   <Border Grid.Column="2" Style="{StaticResource DashboardPanel}" MinHeight="334" VerticalAlignment="Top" Padding="24,20">
+    <controls:WordFrequencyPanel DataContext="{Binding WordFrequency}"/>
    </Border>
   </Grid>
+  <controls:PracticeScoreboard DataContext="{Binding Practice}"/>
   <Expander x:Name="SettingsSection" Header="设备与记录设置" Margin="0,16,0,0">
    <Border Style="{StaticResource DashboardPanel}" Margin="0,12,0,0"><StackPanel>
     <WrapPanel Margin="0,0,0,16"><TextBlock Text="键盘记录" VerticalAlignment="Center" Margin="0,0,16,0"/><Button Content="开始" Command="{Binding Keyboard.StartRecordingCommand}" Margin="0,0,8,0"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Style.Triggers><DataTrigger Binding="{Binding Keyboard.IsRecording}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style></Button.Style></Button><Button Content="暂停" Command="{Binding Keyboard.StopRecordingCommand}" IsEnabled="{Binding Keyboard.IsRecording}" Margin="0,0,24,0"/><TextBlock Text="鼠标记录" VerticalAlignment="Center" Margin="0,0,16,0"/><Button Content="开始" Command="{Binding Mouse.StartRecordingCommand}" Margin="0,0,8,0"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Style.Triggers><DataTrigger Binding="{Binding Mouse.IsRecording}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style></Button.Style></Button><Button Content="暂停" Command="{Binding Mouse.StopRecordingCommand}" IsEnabled="{Binding Mouse.IsRecording}"/></WrapPanel>

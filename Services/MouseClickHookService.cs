@@ -11,6 +11,7 @@ public class MouseClickHookService : IMouseClickHookService, IDisposable
     public event Action<string>? MouseClicked; // 传入按钮名称 "Left"/"Middle"/"Right"
     public event Action<string, int, int>? MouseClickedAt; // 按钮名称 + 屏幕坐标 X/Y
 
+    private readonly InputEventDispatcher? _events;
     private const int WH_MOUSE_LL = 14;
     private const int WM_MOUSEMOVE = 0x0200;
     private const int WM_LBUTTONDOWN = 0x0201;
@@ -42,8 +43,9 @@ public class MouseClickHookService : IMouseClickHookService, IDisposable
     private int _pendingWheelDelta;
     private DateTime _lastReadAt;
 
-    public MouseClickHookService()
+    public MouseClickHookService(InputEventDispatcher? events = null)
     {
+        _events = events;
         _proc = HookCallback;
         _lastReadAt = DateTime.UtcNow;
     }
@@ -163,22 +165,31 @@ public class MouseClickHookService : IMouseClickHookService, IDisposable
                     _pendingWheelDelta += unchecked((short)(mh.mouseData >> 16));
                     break;
                 case WM_LBUTTONDOWN:
-                    MouseClicked?.Invoke("Left");
-                    MouseClickedAt?.Invoke("Left", mh.pt.X, mh.pt.Y);
+                    PublishClick("Left", mh.pt.X, mh.pt.Y);
                     break;
                 case WM_MBUTTONDOWN:
-                    MouseClicked?.Invoke("Middle");
-                    MouseClickedAt?.Invoke("Middle", mh.pt.X, mh.pt.Y);
+                    PublishClick("Middle", mh.pt.X, mh.pt.Y);
                     break;
                 case WM_RBUTTONDOWN:
-                    MouseClicked?.Invoke("Right");
-                    MouseClickedAt?.Invoke("Right", mh.pt.X, mh.pt.Y);
+                    PublishClick("Right", mh.pt.X, mh.pt.Y);
                     break;
             }
         }
         return CallNextHookEx(_hookId, nCode, wParam, lParam);
     }
 
+    private void PublishClick(string button, int x, int y)
+    {
+        void Deliver()
+        {
+            if (_events == null) { MouseClicked?.Invoke(button); MouseClickedAt?.Invoke(button, x, y); return; }
+            _events.Deliver(MouseClicked, button);
+            if (MouseClickedAt != null)
+                foreach (Action<string,int,int> handler in MouseClickedAt.GetInvocationList())
+                    _events.Deliver<(string Button,int X,int Y)>(p => handler(p.Button,p.X,p.Y), (button,x,y));
+        }
+        if (_events == null) Deliver(); else _events.Publish(Deliver);
+    }
     // 低层鼠标钩子结构：含屏幕坐标
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT

@@ -535,6 +535,7 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
         if (_disposed)
             return;
         _disposed = true;
+        _hookService.MouseClicked -= OnMouseClicked;
         _movementTimer.Stop();
         _movementTimer.Tick -= OnMovementTick;
         FlushMovement();

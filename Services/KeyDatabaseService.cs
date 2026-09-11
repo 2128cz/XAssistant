@@ -7,9 +7,10 @@ using XAssistant.Services.Interfaces;
 
 namespace XAssistant.Services;
 
-public class KeyDatabaseService : IKeyDatabaseService
+public class KeyDatabaseService : IKeyDatabaseService, IDisposable
 {
-    private static readonly string ConnectionString = InitializeConnectionString();
+    private readonly BackgroundBatchWriter<KeyPressRecord> _writer;
+    private readonly string ConnectionString;
 
     private static string InitializeConnectionString()
     {
@@ -19,8 +20,9 @@ public class KeyDatabaseService : IKeyDatabaseService
         return $"Data Source={dbPath}";
     }
 
-    public KeyDatabaseService()
+    public KeyDatabaseService(string? databasePath = null)
     {
+        ConnectionString = databasePath == null ? InitializeConnectionString() : new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString();
         using var connection = new SqliteConnection(ConnectionString);
         connection.Open();
         var cmd = connection.CreateCommand();
@@ -39,19 +41,23 @@ public class KeyDatabaseService : IKeyDatabaseService
             @"CREATE INDEX IF NOT EXISTS IX_KeyPressRecords_PressTime_Key
               ON KeyPressRecords(PressTime, Key);";
         cmd.ExecuteNonQuery();
+        _writer = new BackgroundBatchWriter<KeyPressRecord>(PersistBatch);
     }
 
-    public void SaveKeyPress(KeyPressRecord record)
+    public void SaveKeyPress(KeyPressRecord record) => _writer.Enqueue(new KeyPressRecord { Key = record.Key, PressTime = record.PressTime });
+    private void PersistBatch(IReadOnlyList<KeyPressRecord> records)
     {
         using var connection = new SqliteConnection(ConnectionString);
         connection.Open();
-        var cmd = connection.CreateCommand();
-        cmd.CommandText = "INSERT INTO KeyPressRecords (Key, PressTime) VALUES (@k, @t)";
-        cmd.Parameters.AddWithValue("@k", record.Key);
-        cmd.Parameters.AddWithValue("@t", record.PressTime.ToString("o"));
-        cmd.ExecuteNonQuery();
+        using var transaction = connection.BeginTransaction();
+        using var cmd = connection.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = "INSERT INTO KeyPressRecords (Key,PressTime) VALUES (@k,@t)";
+        var key = cmd.Parameters.Add("@k", SqliteType.Text); var time = cmd.Parameters.Add("@t", SqliteType.Text);
+        foreach (var record in records) { key.Value = record.Key; time.Value = record.PressTime.ToString("o"); cmd.ExecuteNonQuery(); }
+        transaction.Commit();
     }
-
+    public void Dispose() => _writer.Dispose();
     public Dictionary<string, int> GetKeyCounts()
     {
         return GetKeyCounts(null, null);

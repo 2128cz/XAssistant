@@ -10,6 +10,8 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
 {
     public event Action<string>? KeyPressed;
 
+    public event Action<string>? TextInput;
+    private readonly InputEventDispatcher? _events;
     private const int WH_KEYBOARD_LL = 13;
     private const int WM_KEYDOWN = 0x0100;
     private const int WM_SYSKEYDOWN = 0x0104;
@@ -26,17 +28,20 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern int GetKeyNameText(int lParam, StringBuilder lpString, int cchSize);
 
-    public KeyboardHookService(ILogger<KeyboardHookService> logger)
+    public KeyboardHookService(ILogger<KeyboardHookService> logger, InputEventDispatcher? events = null)
     {
         _logger = logger;
+        _events = events;
         _proc = HookCallback;
     }
 
     public void Start()
     {
+        if (_hookId != IntPtr.Zero) return;
         using var curProcess = Process.GetCurrentProcess();
         using var curModule = curProcess.MainModule!;
         _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(curModule.ModuleName), 0);
+        if (_hookId == IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
     }
 
     public void Stop()
@@ -45,6 +50,7 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
         {
             UnhookWindowsHookEx(_hookId);
             _hookId = IntPtr.Zero;
+            _pressedKeys.Clear();
         }
     }
 
@@ -64,11 +70,22 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
                 if (isKeyDown)
                 {
                     // 如果该键已经处于按下状态，则为长按重复，直接忽略
-                    if (_pressedKeys.Contains(keyName))
+                    if (_pressedKeys.Contains(keyName) && kb.vkCode != 8)
                         return CallNextHookEx(_hookId, nCode, wParam, lParam);
 
                     _pressedKeys.Add(keyName);
-                    KeyPressed?.Invoke(keyName);
+                    string? input = null;
+                    if (!_pressedKeys.Any(k => k.Contains("Ctrl") || k.Contains("Alt") || k.Contains("Windows")))
+                    {
+                        input = kb.vkCode switch { 8 => "\b", 13 => "\r", _ => TranslateInput(kb) };
+
+                    }
+                    void Deliver()
+                    {
+                        if (_events == null) { KeyPressed?.Invoke(keyName); if (!string.IsNullOrEmpty(input)) TextInput?.Invoke(input); }
+                        else { _events.Deliver(KeyPressed, keyName); if (!string.IsNullOrEmpty(input)) _events.Deliver(TextInput, input); }
+                    }
+                    if (_events == null) Deliver(); else _events.Publish(Deliver);
                 }
                 else // isKeyUp
                 {
@@ -79,6 +96,25 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
 
         return CallNextHookEx(_hookId, nCode, wParam, lParam);
     }
+
+    private string? TranslateInput(KBDLLHOOKSTRUCT key)
+    {
+        var state = new byte[256];
+        GetKeyboardState(state);
+        state[0x10] = (byte)(_pressedKeys.Any(k => k.Contains("Shift")) ? 0x80 : 0);
+        state[0x11] = state[0x12] = 0;
+        state[key.vkCode] |= 0x80;
+        var buffer = new StringBuilder(8);
+        var thread = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
+        // Flag 4 avoids changing the foreground application's dead-key state.
+        int count = ToUnicodeEx((uint)key.vkCode, (uint)key.scanCode, state, buffer, buffer.Capacity, 4, GetKeyboardLayout(thread));
+        return count > 0 ? new string(buffer.ToString().Take(count).Where(c => !char.IsControl(c)).ToArray()) : null;
+    }
+    [DllImport("user32.dll")] private static extern bool GetKeyboardState(byte[] state);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, IntPtr process);
+    [DllImport("user32.dll")] private static extern IntPtr GetKeyboardLayout(uint thread);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int ToUnicodeEx(uint key, uint scan, byte[] state, StringBuilder buffer, int size, uint flags, IntPtr layout);
 
     // 左右修饰键固定映射：GetKeyNameText 对左/右 Shift、Ctrl、Alt、Win 的命名依赖键盘布局
     // （部分布局自带 “Left/Right” 方位词，多数不区分），统一走这里保证左右稳定可区分。

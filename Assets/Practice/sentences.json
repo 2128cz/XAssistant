@@ -1,0 +1,3182 @@
+{
+  "version": 1,
+  "sentences": [
+    {
+      "id": "sonnet18",
+      "category": "莎士比亚",
+      "source": "William Shakespeare · Sonnet 18",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/shakespeares-sonnets/read/18/",
+      "translation": "我能否将你比作夏日？",
+      "words": [
+        {
+          "text": "Shall",
+          "ipa": "ʃæl",
+          "translation": "将会；是否",
+          "suffix": ""
+        },
+        {
+          "text": "I",
+          "ipa": "aɪ",
+          "translation": "我",
+          "suffix": ""
+        },
+        {
+          "text": "compare",
+          "ipa": "kəmˈpeə",
+          "translation": "比较；比作",
+          "suffix": ""
+        },
+        {
+          "text": "thee",
+          "ipa": "ðiː",
+          "translation": "你（古语宾格）",
+          "suffix": ""
+        },
+        {
+          "text": "to",
+          "ipa": "tə",
+          "translation": "向；与",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "summer's",
+          "ipa": "ˈsʌməz",
+          "translation": "夏日的",
+          "suffix": ""
+        },
+        {
+          "text": "day",
+          "ipa": "deɪ",
+          "translation": "一天",
+          "suffix": "?"
+        }
+      ]
+    },
+    {
+      "id": "hamlet-being",
+      "category": "莎士比亚",
+      "source": "William Shakespeare · Hamlet（标点适配）",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/Hamlet/read/",
+      "translation": "生存还是毁灭，这是个问题。",
+      "words": [
+        {
+          "text": "To",
+          "ipa": "tə",
+          "translation": "去；不定式标记",
+          "suffix": ""
+        },
+        {
+          "text": "be",
+          "ipa": "biː",
+          "translation": "存在；是",
+          "suffix": ""
+        },
+        {
+          "text": "or",
+          "ipa": "ɔː",
+          "translation": "或者",
+          "suffix": ""
+        },
+        {
+          "text": "not",
+          "ipa": "nɒt",
+          "translation": "不",
+          "suffix": ""
+        },
+        {
+          "text": "to",
+          "ipa": "tə",
+          "translation": "向；与",
+          "suffix": ""
+        },
+        {
+          "text": "be",
+          "ipa": "biː",
+          "translation": "存在；是",
+          "suffix": ","
+        },
+        {
+          "text": "that",
+          "ipa": "ðæt",
+          "translation": "那",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "question",
+          "ipa": "ˈkwestʃən",
+          "translation": "问题",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "world-stage",
+      "category": "莎士比亚",
+      "source": "William Shakespeare · As You Like It",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/as-you-like-it/read/",
+      "translation": "整个世界就是一座舞台。",
+      "words": [
+        {
+          "text": "All",
+          "ipa": "ɔːl",
+          "translation": "全部",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "world's",
+          "ipa": "wɜːldz",
+          "translation": "世界的",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "stage",
+          "ipa": "steɪdʒ",
+          "translation": "舞台",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "brevity",
+      "category": "莎士比亚",
+      "source": "William Shakespeare · Hamlet",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/Hamlet/read/",
+      "translation": "简洁是智慧的精髓。",
+      "words": [
+        {
+          "text": "Brevity",
+          "ipa": "ˈbrevəti",
+          "translation": "简洁",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "soul",
+          "ipa": "səʊl",
+          "translation": "灵魂；精髓",
+          "suffix": ""
+        },
+        {
+          "text": "of",
+          "ipa": "əv",
+          "translation": "……的",
+          "suffix": ""
+        },
+        {
+          "text": "wit",
+          "ipa": "wɪt",
+          "translation": "智慧；机智",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "thine-own-self",
+      "category": "莎士比亚",
+      "source": "William Shakespeare · Hamlet（节选）",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/Hamlet/read/",
+      "translation": "务必对你自己真诚。",
+      "words": [
+        {
+          "text": "To",
+          "ipa": "tə",
+          "translation": "向；与",
+          "suffix": ""
+        },
+        {
+          "text": "thine",
+          "ipa": "ðaɪn",
+          "translation": "你的（古语）",
+          "suffix": ""
+        },
+        {
+          "text": "own",
+          "ipa": "aʊn",
+          "translation": "自己的",
+          "suffix": ""
+        },
+        {
+          "text": "self",
+          "ipa": "self",
+          "translation": "自我",
+          "suffix": ""
+        },
+        {
+          "text": "be",
+          "ipa": "biː",
+          "translation": "存在；是",
+          "suffix": ""
+        },
+        {
+          "text": "true",
+          "ipa": "truː",
+          "translation": "真实的",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "glisters-gold",
+      "category": "莎士比亚",
+      "source": "William Shakespeare · The Merchant of Venice",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/the-merchant-of-venice/read/",
+      "translation": "发光的未必都是金子。",
+      "words": [
+        {
+          "text": "All",
+          "ipa": "ɔːl",
+          "translation": "全部",
+          "suffix": ""
+        },
+        {
+          "text": "that",
+          "ipa": "ðæt",
+          "translation": "那",
+          "suffix": ""
+        },
+        {
+          "text": "glisters",
+          "ipa": "ˈɡlɪstəz",
+          "translation": "闪光",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "not",
+          "ipa": "nɒt",
+          "translation": "不",
+          "suffix": ""
+        },
+        {
+          "text": "gold",
+          "ipa": "ɡəʊld",
+          "translation": "金子",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "rose-name",
+      "category": "莎士比亚",
+      "source": "William Shakespeare · Romeo and Juliet（节选）",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/romeo-and-juliet/read/",
+      "translation": "我们称作玫瑰的花，换个名字一样芬芳。",
+      "words": [
+        {
+          "text": "That",
+          "ipa": "ðæt",
+          "translation": "那",
+          "suffix": ""
+        },
+        {
+          "text": "which",
+          "ipa": "wɪtʃ",
+          "translation": "哪一个",
+          "suffix": ""
+        },
+        {
+          "text": "we",
+          "ipa": "wiː",
+          "translation": "我们",
+          "suffix": ""
+        },
+        {
+          "text": "call",
+          "ipa": "kɔːl",
+          "translation": "称作",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "rose",
+          "ipa": "rəʊz",
+          "translation": "玫瑰",
+          "suffix": ""
+        },
+        {
+          "text": "by",
+          "ipa": "baɪ",
+          "translation": "凭借；用",
+          "suffix": ""
+        },
+        {
+          "text": "any",
+          "ipa": "ˈeni",
+          "translation": "任何",
+          "suffix": ""
+        },
+        {
+          "text": "other",
+          "ipa": "ˈʌðə",
+          "translation": "其他的",
+          "suffix": ""
+        },
+        {
+          "text": "name",
+          "ipa": "neɪm",
+          "translation": "名字",
+          "suffix": ""
+        },
+        {
+          "text": "would",
+          "ipa": "wʊd",
+          "translation": "将会",
+          "suffix": ""
+        },
+        {
+          "text": "smell",
+          "ipa": "smel",
+          "translation": "闻起来",
+          "suffix": ""
+        },
+        {
+          "text": "as",
+          "ipa": "æz",
+          "translation": "如同",
+          "suffix": ""
+        },
+        {
+          "text": "sweet",
+          "ipa": "swiːt",
+          "translation": "甜美的",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "category": "经典格言",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "熟能生巧。",
+      "words": [
+        {
+          "text": "Practice",
+          "ipa": "ˈpræktɪs",
+          "translation": "练习",
+          "suffix": ""
+        },
+        {
+          "text": "makes",
+          "ipa": "meɪks",
+          "translation": "使成为",
+          "suffix": ""
+        },
+        {
+          "text": "perfect",
+          "ipa": "ˈpɜːfɪkt",
+          "translation": "完美；熟练",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "time",
+      "category": "经典格言",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "岁月不待人。",
+      "words": [
+        {
+          "text": "Time",
+          "ipa": "taɪm",
+          "translation": "时间",
+          "suffix": ""
+        },
+        {
+          "text": "and",
+          "ipa": "ænd",
+          "translation": "和",
+          "suffix": ""
+        },
+        {
+          "text": "tide",
+          "ipa": "taɪd",
+          "translation": "潮汐",
+          "suffix": ""
+        },
+        {
+          "text": "wait",
+          "ipa": "weɪt",
+          "translation": "等待",
+          "suffix": ""
+        },
+        {
+          "text": "for",
+          "ipa": "fɔː",
+          "translation": "为了；等待对象",
+          "suffix": ""
+        },
+        {
+          "text": "no",
+          "ipa": "nəʊ",
+          "translation": "没有",
+          "suffix": ""
+        },
+        {
+          "text": "man",
+          "ipa": "mæn",
+          "translation": "人",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "will",
+      "category": "经典格言",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "有志者事竟成。",
+      "words": [
+        {
+          "text": "Where",
+          "ipa": "weə",
+          "translation": "在……的地方",
+          "suffix": ""
+        },
+        {
+          "text": "there",
+          "ipa": "ðeə",
+          "translation": "那里；存在",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "will",
+          "ipa": "wɪl",
+          "translation": "意志",
+          "suffix": ","
+        },
+        {
+          "text": "there",
+          "ipa": "ðeə",
+          "translation": "那里；存在",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "way",
+          "ipa": "weɪ",
+          "translation": "道路；办法",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "journey",
+      "category": "经典格言",
+      "source": "传统格言 · 英文练习改写",
+      "sourceUrl": "",
+      "translation": "千里之行，始于足下。",
+      "words": [
+        {
+          "text": "A",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "journey",
+          "ipa": "ˈdʒɜːni",
+          "translation": "旅程",
+          "suffix": ""
+        },
+        {
+          "text": "of",
+          "ipa": "əv",
+          "translation": "……的",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "thousand",
+          "ipa": "ˈθaʊzənd",
+          "translation": "一千",
+          "suffix": ""
+        },
+        {
+          "text": "miles",
+          "ipa": "maɪlz",
+          "translation": "英里",
+          "suffix": ""
+        },
+        {
+          "text": "begins",
+          "ipa": "bɪˈɡɪnz",
+          "translation": "开始",
+          "suffix": ""
+        },
+        {
+          "text": "with",
+          "ipa": "wɪð",
+          "translation": "以；和",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "single",
+          "ipa": "ˈsɪŋɡəl",
+          "translation": "单独的",
+          "suffix": ""
+        },
+        {
+          "text": "step",
+          "ipa": "step",
+          "translation": "一步",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "actions-speak",
+      "category": "经典格言",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "行动胜于空谈。",
+      "words": [
+        {
+          "text": "Actions",
+          "ipa": "ˈækʃənz",
+          "translation": "行动",
+          "suffix": ""
+        },
+        {
+          "text": "speak",
+          "ipa": "spiːk",
+          "translation": "说话",
+          "suffix": ""
+        },
+        {
+          "text": "louder",
+          "ipa": "ˈlaʊdə",
+          "translation": "更响亮",
+          "suffix": ""
+        },
+        {
+          "text": "than",
+          "ipa": "ðæn",
+          "translation": "比",
+          "suffix": ""
+        },
+        {
+          "text": "words",
+          "ipa": "wɜːdz",
+          "translation": "话语",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "apple-day",
+      "category": "经典格言",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "一天一苹果，医生远离我。",
+      "words": [
+        {
+          "text": "An",
+          "ipa": "ən",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "apple",
+          "ipa": "ˈæpl",
+          "translation": "苹果",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "day",
+          "ipa": "deɪ",
+          "translation": "一天",
+          "suffix": ""
+        },
+        {
+          "text": "keeps",
+          "ipa": "kiːps",
+          "translation": "使保持",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "doctor",
+          "ipa": "ˈdɒktə",
+          "translation": "医生",
+          "suffix": ""
+        },
+        {
+          "text": "away",
+          "ipa": "əˈweɪ",
+          "translation": "远离",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "friend-need",
+      "category": "经典格言",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "患难之际的朋友才是真朋友。",
+      "words": [
+        {
+          "text": "A",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "friend",
+          "ipa": "frend",
+          "translation": "朋友",
+          "suffix": ""
+        },
+        {
+          "text": "in",
+          "ipa": "ɪn",
+          "translation": "在……内",
+          "suffix": ""
+        },
+        {
+          "text": "need",
+          "ipa": "niːd",
+          "translation": "需要；困难",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "friend",
+          "ipa": "frend",
+          "translation": "朋友",
+          "suffix": ""
+        },
+        {
+          "text": "indeed",
+          "ipa": "ɪnˈdiːd",
+          "translation": "确实",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "count",
+      "category": "数字练习",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "从一数到十。",
+      "words": [
+        {
+          "text": "Count",
+          "ipa": "kaʊnt",
+          "translation": "数数",
+          "suffix": ""
+        },
+        {
+          "text": "from",
+          "ipa": "frɒm",
+          "translation": "从",
+          "suffix": ""
+        },
+        {
+          "text": "1",
+          "ipa": "wʌn",
+          "translation": "一",
+          "suffix": ""
+        },
+        {
+          "text": "to",
+          "ipa": "tə",
+          "translation": "向；与",
+          "suffix": ""
+        },
+        {
+          "text": "10",
+          "ipa": "ten",
+          "translation": "十",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "answer",
+      "category": "数字练习",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "答案是四十二。",
+      "words": [
+        {
+          "text": "The",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "answer",
+          "ipa": "ˈɑːnsə",
+          "translation": "答案",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "42",
+          "ipa": "ˌfɔːti ˈtuː",
+          "translation": "四十二",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "books",
+      "category": "数字练习",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "在七天内读三本书。",
+      "words": [
+        {
+          "text": "Read",
+          "ipa": "riːd",
+          "translation": "阅读",
+          "suffix": ""
+        },
+        {
+          "text": "3",
+          "ipa": "θriː",
+          "translation": "三",
+          "suffix": ""
+        },
+        {
+          "text": "books",
+          "ipa": "bʊks",
+          "translation": "书籍",
+          "suffix": ""
+        },
+        {
+          "text": "in",
+          "ipa": "ɪn",
+          "translation": "在……内",
+          "suffix": ""
+        },
+        {
+          "text": "7",
+          "ipa": "ˈsevən",
+          "translation": "七",
+          "suffix": ""
+        },
+        {
+          "text": "days",
+          "ipa": "deɪz",
+          "translation": "天",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "coins",
+      "category": "数字练习",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "在三十天内攒下一百枚硬币。",
+      "words": [
+        {
+          "text": "Save",
+          "ipa": "seɪv",
+          "translation": "积攒",
+          "suffix": ""
+        },
+        {
+          "text": "100",
+          "ipa": "wʌn ˈhʌndrəd",
+          "translation": "一百",
+          "suffix": ""
+        },
+        {
+          "text": "coins",
+          "ipa": "kɔɪnz",
+          "translation": "硬币",
+          "suffix": ""
+        },
+        {
+          "text": "in",
+          "ipa": "ɪn",
+          "translation": "在……内",
+          "suffix": ""
+        },
+        {
+          "text": "30",
+          "ipa": "ˈθɜːti",
+          "translation": "三十",
+          "suffix": ""
+        },
+        {
+          "text": "days",
+          "ipa": "deɪz",
+          "translation": "天",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "week-year",
+      "category": "数字练习",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "一周有七天，一年有十二个月。",
+      "words": [
+        {
+          "text": "There",
+          "ipa": "ðeə",
+          "translation": "那里；存在",
+          "suffix": ""
+        },
+        {
+          "text": "are",
+          "ipa": "ɑː",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "7",
+          "ipa": "ˈsevən",
+          "translation": "七",
+          "suffix": ""
+        },
+        {
+          "text": "days",
+          "ipa": "deɪz",
+          "translation": "天",
+          "suffix": ""
+        },
+        {
+          "text": "in",
+          "ipa": "ɪn",
+          "translation": "在……内",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "week",
+          "ipa": "wiːk",
+          "translation": "周",
+          "suffix": ""
+        },
+        {
+          "text": "and",
+          "ipa": "ænd",
+          "translation": "和",
+          "suffix": ""
+        },
+        {
+          "text": "12",
+          "ipa": "twelv",
+          "translation": "十二",
+          "suffix": ""
+        },
+        {
+          "text": "months",
+          "ipa": "mʌnθs",
+          "translation": "月",
+          "suffix": ""
+        },
+        {
+          "text": "in",
+          "ipa": "ɪn",
+          "translation": "在……内",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "year",
+          "ipa": "jɪə",
+          "translation": "年",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "times-equals",
+      "category": "数字练习",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "三乘以四等于十二。",
+      "words": [
+        {
+          "text": "3",
+          "ipa": "θriː",
+          "translation": "三",
+          "suffix": ""
+        },
+        {
+          "text": "times",
+          "ipa": "taɪmz",
+          "translation": "乘以",
+          "suffix": ""
+        },
+        {
+          "text": "4",
+          "ipa": "fɔː",
+          "translation": "四",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "12",
+          "ipa": "twelv",
+          "translation": "十二",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "clock-meeting",
+      "category": "数字练习",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "我们下午三点见面。",
+      "words": [
+        {
+          "text": "We",
+          "ipa": "wiː",
+          "translation": "我们",
+          "suffix": ""
+        },
+        {
+          "text": "meet",
+          "ipa": "miːt",
+          "translation": "会面",
+          "suffix": ""
+        },
+        {
+          "text": "at",
+          "ipa": "æt",
+          "translation": "在（时刻）",
+          "suffix": ""
+        },
+        {
+          "text": "3",
+          "ipa": "θriː",
+          "translation": "三",
+          "suffix": ""
+        },
+        {
+          "text": "o'clock",
+          "ipa": "əˈklɒk",
+          "translation": "点钟",
+          "suffix": ""
+        },
+        {
+          "text": "in",
+          "ipa": "ɪn",
+          "translation": "在……内",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "afternoon",
+          "ipa": "ˌɑːftəˈnuːn",
+          "translation": "下午",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "best-worst-times",
+      "category": "文学名著",
+      "source": "Charles Dickens · A Tale of Two Cities（首段节选）",
+      "sourceUrl": "https://www.gutenberg.org/ebooks/98",
+      "translation": "那是最好的时代，也是最坏的时代。",
+      "words": [
+        {
+          "text": "It",
+          "ipa": "ɪt",
+          "translation": "它",
+          "suffix": ""
+        },
+        {
+          "text": "was",
+          "ipa": "wɒz",
+          "translation": "是（过去）",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "best",
+          "ipa": "best",
+          "translation": "最好的",
+          "suffix": ""
+        },
+        {
+          "text": "of",
+          "ipa": "əv",
+          "translation": "……的",
+          "suffix": ""
+        },
+        {
+          "text": "times",
+          "ipa": "taɪmz",
+          "translation": "时代",
+          "suffix": ","
+        },
+        {
+          "text": "it",
+          "ipa": "ɪt",
+          "translation": "它",
+          "suffix": ""
+        },
+        {
+          "text": "was",
+          "ipa": "wɒz",
+          "translation": "是（过去）",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "worst",
+          "ipa": "wɜːst",
+          "translation": "最坏的",
+          "suffix": ""
+        },
+        {
+          "text": "of",
+          "ipa": "əv",
+          "translation": "……的",
+          "suffix": ""
+        },
+        {
+          "text": "times",
+          "ipa": "taɪmz",
+          "translation": "时代",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "single-man-fortune",
+      "category": "文学名著",
+      "source": "Jane Austen · Pride and Prejudice（首句节选）",
+      "sourceUrl": "https://www.gutenberg.org/ebooks/1342",
+      "translation": "有钱的单身汉必定想娶个妻子。",
+      "words": [
+        {
+          "text": "A",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "single",
+          "ipa": "ˈsɪŋɡl",
+          "translation": "单身的",
+          "suffix": ""
+        },
+        {
+          "text": "man",
+          "ipa": "mæn",
+          "translation": "男人",
+          "suffix": ""
+        },
+        {
+          "text": "in",
+          "ipa": "ɪn",
+          "translation": "在……内",
+          "suffix": ""
+        },
+        {
+          "text": "possession",
+          "ipa": "pəˈzeʃn",
+          "translation": "持有",
+          "suffix": ""
+        },
+        {
+          "text": "of",
+          "ipa": "əv",
+          "translation": "……的",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "good",
+          "ipa": "ɡʊd",
+          "translation": "好的",
+          "suffix": ""
+        },
+        {
+          "text": "fortune",
+          "ipa": "ˈfɔːtʃən",
+          "translation": "财产；运气",
+          "suffix": ","
+        },
+        {
+          "text": "must",
+          "ipa": "mʌst",
+          "translation": "必定",
+          "suffix": ""
+        },
+        {
+          "text": "be",
+          "ipa": "biː",
+          "translation": "存在；是",
+          "suffix": ""
+        },
+        {
+          "text": "in",
+          "ipa": "ɪn",
+          "translation": "在……内",
+          "suffix": ""
+        },
+        {
+          "text": "want",
+          "ipa": "wɒnt",
+          "translation": "需要",
+          "suffix": ""
+        },
+        {
+          "text": "of",
+          "ipa": "əv",
+          "translation": "……的",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "wife",
+          "ipa": "waɪf",
+          "translation": "妻子",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "man-not-defeated",
+      "category": "文学名著",
+      "source": "Ernest Hemingway · The Old Man and the Sea",
+      "sourceUrl": "https://en.wikipedia.org/wiki/The_Old_Man_and_the_Sea",
+      "translation": "人可以被毁灭，但不能被打败。",
+      "words": [
+        {
+          "text": "A",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "man",
+          "ipa": "mæn",
+          "translation": "人",
+          "suffix": ""
+        },
+        {
+          "text": "can",
+          "ipa": "kæn",
+          "translation": "能够",
+          "suffix": ""
+        },
+        {
+          "text": "be",
+          "ipa": "biː",
+          "translation": "被（系动词）",
+          "suffix": ""
+        },
+        {
+          "text": "destroyed",
+          "ipa": "dɪˈstrɔɪd",
+          "translation": "被毁灭",
+          "suffix": ""
+        },
+        {
+          "text": "but",
+          "ipa": "bʌt",
+          "translation": "但是",
+          "suffix": ""
+        },
+        {
+          "text": "not",
+          "ipa": "nɒt",
+          "translation": "不",
+          "suffix": ""
+        },
+        {
+          "text": "defeated",
+          "ipa": "dɪˈfiːtɪd",
+          "translation": "被打败",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "do-not-others",
+      "category": "中国经典英译",
+      "source": "《论语 · 颜渊》英译 · 练习用简译",
+      "sourceUrl": "",
+      "translation": "自己不愿意的，不要施加给别人。",
+      "words": [
+        {
+          "text": "Do",
+          "ipa": "duː",
+          "translation": "做",
+          "suffix": ""
+        },
+        {
+          "text": "not",
+          "ipa": "nɒt",
+          "translation": "不",
+          "suffix": ""
+        },
+        {
+          "text": "do",
+          "ipa": "duː",
+          "translation": "做",
+          "suffix": ""
+        },
+        {
+          "text": "to",
+          "ipa": "tə",
+          "translation": "向；与",
+          "suffix": ""
+        },
+        {
+          "text": "others",
+          "ipa": "ˈʌðəz",
+          "translation": "其他人",
+          "suffix": ""
+        },
+        {
+          "text": "what",
+          "ipa": "wɒt",
+          "translation": "什么",
+          "suffix": ""
+        },
+        {
+          "text": "you",
+          "ipa": "juː",
+          "translation": "你",
+          "suffix": ""
+        },
+        {
+          "text": "do",
+          "ipa": "duː",
+          "translation": "做",
+          "suffix": ""
+        },
+        {
+          "text": "not",
+          "ipa": "nɒt",
+          "translation": "不",
+          "suffix": ""
+        },
+        {
+          "text": "want",
+          "ipa": "wɒnt",
+          "translation": "想要",
+          "suffix": ""
+        },
+        {
+          "text": "done",
+          "ipa": "dʌn",
+          "translation": "被做",
+          "suffix": ""
+        },
+        {
+          "text": "to",
+          "ipa": "tə",
+          "translation": "向；与",
+          "suffix": ""
+        },
+        {
+          "text": "yourself",
+          "ipa": "jɔːˈself",
+          "translation": "你自己",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "three-walk",
+      "category": "中国经典英译",
+      "source": "《论语 · 述而》英译 · 练习用简译",
+      "sourceUrl": "",
+      "translation": "三个人同行，其中必有我的老师。",
+      "words": [
+        {
+          "text": "When",
+          "ipa": "wen",
+          "translation": "当……时",
+          "suffix": ""
+        },
+        {
+          "text": "three",
+          "ipa": "θriː",
+          "translation": "三；三个人",
+          "suffix": ""
+        },
+        {
+          "text": "walk",
+          "ipa": "wɔːk",
+          "translation": "行走",
+          "suffix": ""
+        },
+        {
+          "text": "together",
+          "ipa": "təˈɡeðə",
+          "translation": "一起",
+          "suffix": ","
+        },
+        {
+          "text": "one",
+          "ipa": "wʌn",
+          "translation": "一个；其中一人",
+          "suffix": ""
+        },
+        {
+          "text": "can",
+          "ipa": "kæn",
+          "translation": "能够",
+          "suffix": ""
+        },
+        {
+          "text": "teach",
+          "ipa": "tiːtʃ",
+          "translation": "教导",
+          "suffix": ""
+        },
+        {
+          "text": "me",
+          "ipa": "miː",
+          "translation": "我（宾格）",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "knowing-wisdom",
+      "category": "中国经典英译",
+      "source": "《道德经》英译 · 练习用简译",
+      "sourceUrl": "",
+      "translation": "了解别人是智慧，认识自己才是开明。",
+      "words": [
+        {
+          "text": "Knowing",
+          "ipa": "ˈnəʊɪŋ",
+          "translation": "了解",
+          "suffix": ""
+        },
+        {
+          "text": "others",
+          "ipa": "ˈʌðəz",
+          "translation": "其他人",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "wisdom",
+          "ipa": "ˈwɪzdəm",
+          "translation": "智慧",
+          "suffix": ";"
+        },
+        {
+          "text": "knowing",
+          "ipa": "ˈnəʊɪŋ",
+          "translation": "了解",
+          "suffix": ""
+        },
+        {
+          "text": "yourself",
+          "ipa": "jɔːˈself",
+          "translation": "你自己",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "enlightenment",
+          "ipa": "ɪnˌlaɪtənˈment",
+          "translation": "开明；觉悟",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "coffee-order",
+      "category": "日常用语",
+      "source": "日常英语 · 原创练习",
+      "sourceUrl": "",
+      "translation": "请给我一杯加奶的咖啡。",
+      "words": [
+        {
+          "text": "Could",
+          "ipa": "kʊd",
+          "translation": "能；可以",
+          "suffix": ""
+        },
+        {
+          "text": "I",
+          "ipa": "aɪ",
+          "translation": "我",
+          "suffix": ""
+        },
+        {
+          "text": "have",
+          "ipa": "hæv",
+          "translation": "有；要",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "coffee",
+          "ipa": "ˈkɒfi",
+          "translation": "咖啡",
+          "suffix": ""
+        },
+        {
+          "text": "with",
+          "ipa": "wɪð",
+          "translation": "以；和",
+          "suffix": ""
+        },
+        {
+          "text": "milk",
+          "ipa": "mɪlk",
+          "translation": "牛奶",
+          "suffix": ","
+        },
+        {
+          "text": "please",
+          "ipa": "pliːz",
+          "translation": "请",
+          "suffix": "?"
+        }
+      ]
+    },
+    {
+      "id": "repeat-slowly",
+      "category": "日常用语",
+      "source": "日常英语 · 原创练习",
+      "sourceUrl": "",
+      "translation": "请你再说一遍，说慢一点好吗？",
+      "words": [
+        {
+          "text": "Could",
+          "ipa": "kʊd",
+          "translation": "能；可以",
+          "suffix": ""
+        },
+        {
+          "text": "you",
+          "ipa": "juː",
+          "translation": "你",
+          "suffix": ""
+        },
+        {
+          "text": "please",
+          "ipa": "pliːz",
+          "translation": "请",
+          "suffix": ""
+        },
+        {
+          "text": "say",
+          "ipa": "seɪ",
+          "translation": "说",
+          "suffix": ""
+        },
+        {
+          "text": "that",
+          "ipa": "ðæt",
+          "translation": "那",
+          "suffix": ""
+        },
+        {
+          "text": "again",
+          "ipa": "əˈɡen",
+          "translation": "再次",
+          "suffix": ""
+        },
+        {
+          "text": "more",
+          "ipa": "mɔː",
+          "translation": "更加",
+          "suffix": ""
+        },
+        {
+          "text": "slowly",
+          "ipa": "ˈsləʊli",
+          "translation": "缓慢地",
+          "suffix": "?"
+        }
+      ]
+    },
+    {
+      "id": "nearest-station",
+      "category": "日常用语",
+      "source": "日常英语 · 原创练习",
+      "sourceUrl": "",
+      "translation": "打扰一下，最近的火车站在哪里？",
+      "words": [
+        {
+          "text": "Excuse",
+          "ipa": "ɪkˈskjuːz",
+          "translation": "打扰",
+          "suffix": ""
+        },
+        {
+          "text": "me",
+          "ipa": "miː",
+          "translation": "我（宾格）",
+          "suffix": ","
+        },
+        {
+          "text": "where",
+          "ipa": "weə",
+          "translation": "在哪里",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "nearest",
+          "ipa": "ˈnɪəstɪst",
+          "translation": "最近的",
+          "suffix": ""
+        },
+        {
+          "text": "train",
+          "ipa": "treɪn",
+          "translation": "火车",
+          "suffix": ""
+        },
+        {
+          "text": "station",
+          "ipa": "ˈsteɪʃn",
+          "translation": "车站",
+          "suffix": "?"
+        }
+      ]
+    },
+    {
+      "id": "show-me-code",
+      "category": "程序员格言",
+      "source": "Linus Torvalds · 邮件列表发言",
+      "sourceUrl": "",
+      "translation": "空谈不值钱，把代码给我看。",
+      "words": [
+        {
+          "text": "Talk",
+          "ipa": "tɔːk",
+          "translation": "空谈",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "cheap",
+          "ipa": "tʃiːp",
+          "translation": "廉价的",
+          "suffix": "."
+        },
+        {
+          "text": "Show",
+          "ipa": "ʃəʊ",
+          "translation": "展示",
+          "suffix": ""
+        },
+        {
+          "text": "me",
+          "ipa": "miː",
+          "translation": "我（宾格）",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "code",
+          "ipa": "kəʊd",
+          "translation": "代码",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "premature-optimization",
+      "category": "程序员格言",
+      "source": "Donald Knuth · 结构式编程论文",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Premature_optimization",
+      "translation": "过早优化是万恶之源。",
+      "words": [
+        {
+          "text": "Premature",
+          "ipa": "ˈpriːmətʃə",
+          "translation": "过早的",
+          "suffix": ""
+        },
+        {
+          "text": "optimization",
+          "ipa": "ˌɒptɪmaɪˈzeɪʃn",
+          "translation": "优化",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "root",
+          "ipa": "ruːt",
+          "translation": "根源",
+          "suffix": ""
+        },
+        {
+          "text": "of",
+          "ipa": "əv",
+          "translation": "……的",
+          "suffix": ""
+        },
+        {
+          "text": "all",
+          "ipa": "ɔːl",
+          "translation": "全部",
+          "suffix": ""
+        },
+        {
+          "text": "evil",
+          "ipa": "ˈiːvl",
+          "translation": "邪恶",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "advanced-magic",
+      "category": "程序员格言",
+      "source": "Arthur C. Clarke · Profiles of the Future（第三定律）",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Clarke%27s_three_laws",
+      "translation": "任何足够先进的科技，都与魔法无异。",
+      "words": [
+        {
+          "text": "Any",
+          "ipa": "ˈeni",
+          "translation": "任何",
+          "suffix": ""
+        },
+        {
+          "text": "sufficiently",
+          "ipa": "səˈfɪʃntli",
+          "translation": "充分地",
+          "suffix": ""
+        },
+        {
+          "text": "advanced",
+          "ipa": "ədˈvɑːnst",
+          "translation": "先进的",
+          "suffix": ""
+        },
+        {
+          "text": "technology",
+          "ipa": "tekˈnɒlədʒi",
+          "translation": "技术",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "indistinguishable",
+          "ipa": "ˌɪndɪˈstɪŋɡwɪʃəbl",
+          "translation": "无法区分的",
+          "suffix": ""
+        },
+        {
+          "text": "from",
+          "ipa": "frɒm",
+          "translation": "从；自",
+          "suffix": ""
+        },
+        {
+          "text": "magic",
+          "ipa": "ˈmædʒɪk",
+          "translation": "魔法",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-tortoise-race",
+      "category": "伊索寓言",
+      "source": "Aesop · The Tortoise and the Hare",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Aesop%27s_Fables",
+      "translation": "慢而稳者赢得比赛。",
+      "words": [
+        {
+          "text": "Slow",
+          "ipa": "sləʊ",
+          "translation": "缓慢的",
+          "suffix": ""
+        },
+        {
+          "text": "but",
+          "ipa": "bʌt",
+          "translation": "但是",
+          "suffix": ""
+        },
+        {
+          "text": "steady",
+          "ipa": "ˈstedi",
+          "translation": "平稳的",
+          "suffix": ""
+        },
+        {
+          "text": "wins",
+          "ipa": "wɪnz",
+          "translation": "赢得",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "race",
+          "ipa": "reɪs",
+          "translation": "比赛",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-rainy-day",
+      "category": "伊索寓言",
+      "source": "Aesop · The Ant and the Grasshopper",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Aesop%27s_Fables",
+      "translation": "未雨绸约总不是坏事。",
+      "words": [
+        {
+          "text": "It",
+          "ipa": "ɪt",
+          "translation": "它",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "best",
+          "ipa": "best",
+          "translation": "最好的",
+          "suffix": ""
+        },
+        {
+          "text": "to",
+          "ipa": "tə",
+          "translation": "向；与",
+          "suffix": ""
+        },
+        {
+          "text": "save",
+          "ipa": "seɪv",
+          "translation": "积攒",
+          "suffix": ""
+        },
+        {
+          "text": "for",
+          "ipa": "fɔː",
+          "translation": "为了",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "rainy",
+          "ipa": "ˈreɪni",
+          "translation": "下雨的",
+          "suffix": ""
+        },
+        {
+          "text": "day",
+          "ipa": "deɪ",
+          "translation": "一天",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-sour-grapes",
+      "category": "伊索寓言",
+      "source": "Aesop · The Fox and the Grapes",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Aesop%27s_Fables",
+      "translation": "人们总轻视自己得不到的东西。",
+      "words": [
+        {
+          "text": "It",
+          "ipa": "ɪt",
+          "translation": "它",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "easy",
+          "ipa": "ˈiːzi",
+          "translation": "容易的",
+          "suffix": ""
+        },
+        {
+          "text": "to",
+          "ipa": "tə",
+          "translation": "向；与",
+          "suffix": ""
+        },
+        {
+          "text": "despise",
+          "ipa": "dɪˈspaɪz",
+          "translation": "轻视",
+          "suffix": ""
+        },
+        {
+          "text": "what",
+          "ipa": "wɒt",
+          "translation": "什么",
+          "suffix": ""
+        },
+        {
+          "text": "you",
+          "ipa": "juː",
+          "translation": "你",
+          "suffix": ""
+        },
+        {
+          "text": "cannot",
+          "ipa": "ˈkænɒt",
+          "translation": "不能",
+          "suffix": ""
+        },
+        {
+          "text": "get",
+          "ipa": "ɡet",
+          "translation": "得到",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-little-friends",
+      "category": "伊索寓言",
+      "source": "Aesop · The Lion and the Mouse",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Aesop%27s_Fables",
+      "translation": "小小的朋友也可能成为大大的朋友。",
+      "words": [
+        {
+          "text": "Little",
+          "ipa": "ˈlɪtl",
+          "translation": "小的",
+          "suffix": ""
+        },
+        {
+          "text": "friends",
+          "ipa": "frendz",
+          "translation": "朋友",
+          "suffix": ""
+        },
+        {
+          "text": "may",
+          "ipa": "meɪ",
+          "translation": "可能",
+          "suffix": ""
+        },
+        {
+          "text": "prove",
+          "ipa": "pruːv",
+          "translation": "证明是",
+          "suffix": ""
+        },
+        {
+          "text": "great",
+          "ipa": "ɡreɪt",
+          "translation": "伟大的",
+          "suffix": ""
+        },
+        {
+          "text": "friends",
+          "ipa": "frendz",
+          "translation": "朋友",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-gentle-force",
+      "category": "伊索寓言",
+      "source": "Aesop · The Wind and the Sun",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Aesop%27s_Fables",
+      "translation": "在武力失败的地方，温和常常获胜。",
+      "words": [
+        {
+          "text": "Gentleness",
+          "ipa": "ˈdʒentlnəs",
+          "translation": "温和",
+          "suffix": ""
+        },
+        {
+          "text": "often",
+          "ipa": "ˈɒfn",
+          "translation": "常常",
+          "suffix": ""
+        },
+        {
+          "text": "wins",
+          "ipa": "wɪnz",
+          "translation": "赢得",
+          "suffix": ""
+        },
+        {
+          "text": "where",
+          "ipa": "weə",
+          "translation": "在……的地方",
+          "suffix": ""
+        },
+        {
+          "text": "force",
+          "ipa": "fɔːs",
+          "translation": "武力",
+          "suffix": ""
+        },
+        {
+          "text": "fails",
+          "ipa": "feɪlz",
+          "translation": "失败",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-necessity",
+      "category": "伊索寓言",
+      "source": "Aesop · The Crow and the Pitcher",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Aesop%27s_Fables",
+      "translation": "需要是发明之母。",
+      "words": [
+        {
+          "text": "Necessity",
+          "ipa": "nəˈsesəti",
+          "translation": "需要",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "mother",
+          "ipa": "ˈmʌðə",
+          "translation": "母亲",
+          "suffix": ""
+        },
+        {
+          "text": "of",
+          "ipa": "əv",
+          "translation": "……的",
+          "suffix": ""
+        },
+        {
+          "text": "invention",
+          "ipa": "ɪnˈvenʃn",
+          "translation": "发明",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-golden-eggs",
+      "category": "伊索寓言",
+      "source": "Aesop · The Goose that Laid the Golden Eggs",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Aesop%27s_Fables",
+      "translation": "贪婪的人连鹅带金蛋一同失去了。",
+      "words": [
+        {
+          "text": "The",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "greedy",
+          "ipa": "ˈɡriːdi",
+          "translation": "贪婪的",
+          "suffix": ""
+        },
+        {
+          "text": "man",
+          "ipa": "mæn",
+          "translation": "人",
+          "suffix": ""
+        },
+        {
+          "text": "lost",
+          "ipa": "lɒst",
+          "translation": "失去",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "goose",
+          "ipa": "ɡuːs",
+          "translation": "鹅",
+          "suffix": ""
+        },
+        {
+          "text": "and",
+          "ipa": "ænd",
+          "translation": "和",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "golden",
+          "ipa": "ˈɡəʊldən",
+          "translation": "金子的",
+          "suffix": ""
+        },
+        {
+          "text": "eggs",
+          "ipa": "eɡz",
+          "translation": "蛋",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-dog-shadow",
+      "category": "伊索寓言",
+      "source": "Aesop · The Dog and His Shadow",
+      "sourceUrl": "",
+      "translation": "他想抢水里的影子，连嘴边的肉也丢了。",
+      "words": [
+        {
+          "text": "He",
+          "ipa": "hiː",
+          "translation": "他",
+          "suffix": ""
+        },
+        {
+          "text": "lost",
+          "ipa": "lɒst",
+          "translation": "失去",
+          "suffix": ""
+        },
+        {
+          "text": "his",
+          "ipa": "hɪz",
+          "translation": "他的",
+          "suffix": ""
+        },
+        {
+          "text": "meat",
+          "ipa": "miːt",
+          "translation": "肉",
+          "suffix": ""
+        },
+        {
+          "text": "by",
+          "ipa": "baɪ",
+          "translation": "凭借；用",
+          "suffix": ""
+        },
+        {
+          "text": "chasing",
+          "ipa": "ˈtʃeɪsɪŋ",
+          "translation": "追逐",
+          "suffix": ""
+        },
+        {
+          "text": "his",
+          "ipa": "hɪz",
+          "translation": "他的",
+          "suffix": ""
+        },
+        {
+          "text": "own",
+          "ipa": "aʊn",
+          "translation": "自己的",
+          "suffix": ""
+        },
+        {
+          "text": "shadow",
+          "ipa": "ˈʃædəʊ",
+          "translation": "影子",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-stump-hare",
+      "category": "中国寓言",
+      "source": "《韩非子 · 五蠹》守株待兔 · 英译练习",
+      "sourceUrl": "",
+      "translation": "他守在树桩旁，再没等到撞来的兔子。",
+      "words": [
+        {
+          "text": "He",
+          "ipa": "hiː",
+          "translation": "他",
+          "suffix": ""
+        },
+        {
+          "text": "waits",
+          "ipa": "weɪts",
+          "translation": "等待",
+          "suffix": ""
+        },
+        {
+          "text": "by",
+          "ipa": "baɪ",
+          "translation": "在……旁边",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "stump",
+          "ipa": "stʌmp",
+          "translation": "树桩",
+          "suffix": ","
+        },
+        {
+          "text": "but",
+          "ipa": "bʌt",
+          "translation": "但是",
+          "suffix": ""
+        },
+        {
+          "text": "no",
+          "ipa": "nəʊ",
+          "translation": "没有",
+          "suffix": ""
+        },
+        {
+          "text": "hare",
+          "ipa": "heə",
+          "translation": "野兔",
+          "suffix": ""
+        },
+        {
+          "text": "comes",
+          "ipa": "kʌmz",
+          "translation": "来",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-marked-boat",
+      "category": "中国寓言",
+      "source": "《吕氏春秋 · 察今》刻舟求剑 · 英译练习",
+      "sourceUrl": "",
+      "translation": "他在船边上刻下记号，可剑早已沉入水底。",
+      "words": [
+        {
+          "text": "He",
+          "ipa": "hiː",
+          "translation": "他",
+          "suffix": ""
+        },
+        {
+          "text": "marked",
+          "ipa": "mɑːkt",
+          "translation": "刻记号",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "boat",
+          "ipa": "bəʊt",
+          "translation": "船",
+          "suffix": ","
+        },
+        {
+          "text": "but",
+          "ipa": "bʌt",
+          "translation": "但是",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "sword",
+          "ipa": "sɔːd",
+          "translation": "剑",
+          "suffix": ""
+        },
+        {
+          "text": "had",
+          "ipa": "hæd",
+          "translation": "已经（完成时助动词）",
+          "suffix": ""
+        },
+        {
+          "text": "sunk",
+          "ipa": "sʌŋk",
+          "translation": "沉没",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-covered-ears",
+      "category": "中国寓言",
+      "source": "《吕氏春秋 · 自知》掩耳盗铃 · 英译练习",
+      "sourceUrl": "",
+      "translation": "他捺住自己的耳朵，以为谁都听不见。",
+      "words": [
+        {
+          "text": "He",
+          "ipa": "hiː",
+          "translation": "他",
+          "suffix": ""
+        },
+        {
+          "text": "covers",
+          "ipa": "ˈkʌvəz",
+          "translation": "捺住",
+          "suffix": ""
+        },
+        {
+          "text": "his",
+          "ipa": "hɪz",
+          "translation": "他的",
+          "suffix": ""
+        },
+        {
+          "text": "own",
+          "ipa": "aʊn",
+          "translation": "自己的",
+          "suffix": ""
+        },
+        {
+          "text": "ears",
+          "ipa": "ɪəz",
+          "translation": "耳朵",
+          "suffix": ""
+        },
+        {
+          "text": "and",
+          "ipa": "ænd",
+          "translation": "和",
+          "suffix": ""
+        },
+        {
+          "text": "thinks",
+          "ipa": "θɪŋks",
+          "translation": "以为",
+          "suffix": ""
+        },
+        {
+          "text": "nobody",
+          "ipa": "ˈnəʊbədi",
+          "translation": "没有人",
+          "suffix": ""
+        },
+        {
+          "text": "hears",
+          "ipa": "hɪəz",
+          "translation": "听见",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-mending-fold",
+      "category": "中国寓言",
+      "source": "《战国策 · 楚策》亡羊补牢 · 英译练习",
+      "sourceUrl": "",
+      "translation": "羊丢了再修羊圈，永远不算太迟。",
+      "words": [
+        {
+          "text": "It",
+          "ipa": "ɪt",
+          "translation": "它",
+          "suffix": ""
+        },
+        {
+          "text": "is",
+          "ipa": "ɪz",
+          "translation": "是",
+          "suffix": ""
+        },
+        {
+          "text": "never",
+          "ipa": "ˈnevə",
+          "translation": "从不",
+          "suffix": ""
+        },
+        {
+          "text": "too",
+          "ipa": "tuː",
+          "translation": "太",
+          "suffix": ""
+        },
+        {
+          "text": "late",
+          "ipa": "leɪt",
+          "translation": "迟",
+          "suffix": ""
+        },
+        {
+          "text": "to",
+          "ipa": "tə",
+          "translation": "向；与",
+          "suffix": ""
+        },
+        {
+          "text": "mend",
+          "ipa": "mend",
+          "translation": "修补",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "fold",
+          "ipa": "fəʊld",
+          "translation": "羊圈",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-snake-feet",
+      "category": "中国寓言",
+      "source": "《战国策 · 齐策》画蛇添足 · 英译练习",
+      "sourceUrl": "",
+      "translation": "他给蛇添上脚，反而输掉了那杯酒。",
+      "words": [
+        {
+          "text": "He",
+          "ipa": "hiː",
+          "translation": "他",
+          "suffix": ""
+        },
+        {
+          "text": "drew",
+          "ipa": "druː",
+          "translation": "画（过去式）",
+          "suffix": ""
+        },
+        {
+          "text": "feet",
+          "ipa": "fiːt",
+          "translation": "脚",
+          "suffix": ""
+        },
+        {
+          "text": "on",
+          "ipa": "ɒn",
+          "translation": "在……上",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "snake",
+          "ipa": "sneɪk",
+          "translation": "蛇",
+          "suffix": ""
+        },
+        {
+          "text": "and",
+          "ipa": "ænd",
+          "translation": "和",
+          "suffix": ""
+        },
+        {
+          "text": "lost",
+          "ipa": "lɒst",
+          "translation": "失去",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "wine",
+          "ipa": "waɪn",
+          "translation": "酒",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-fox-tiger",
+      "category": "中国寓言",
+      "source": "《战国策 · 楚策》狐假虎威 · 英译练习",
+      "sourceUrl": "",
+      "translation": "狐狸走在前面，借的是老虎的威风。",
+      "words": [
+        {
+          "text": "The",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "fox",
+          "ipa": "fɒks",
+          "translation": "狐狸",
+          "suffix": ""
+        },
+        {
+          "text": "walks",
+          "ipa": "wɔːks",
+          "translation": "行走",
+          "suffix": ""
+        },
+        {
+          "text": "ahead",
+          "ipa": "əˈhed",
+          "translation": "在前面",
+          "suffix": ","
+        },
+        {
+          "text": "borrowing",
+          "ipa": "ˈbɒrəʊɪŋ",
+          "translation": "借用",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "tiger's",
+          "ipa": "ˈtaɪɡəz",
+          "translation": "老虎的",
+          "suffix": ""
+        },
+        {
+          "text": "strength",
+          "ipa": "streŋθ",
+          "translation": "力气；威风",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-frog-well",
+      "category": "中国寓言",
+      "source": "《庄子 · 秋水》井底之蛙 · 英译练习",
+      "sourceUrl": "",
+      "translation": "井底的蛙不知道大海有多辽阔。",
+      "words": [
+        {
+          "text": "A",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "frog",
+          "ipa": "frɒɡ",
+          "translation": "青蛙",
+          "suffix": ""
+        },
+        {
+          "text": "in",
+          "ipa": "ɪn",
+          "translation": "在……内",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "well",
+          "ipa": "wel",
+          "translation": "井",
+          "suffix": ""
+        },
+        {
+          "text": "knows",
+          "ipa": "nəʊz",
+          "translation": "知道",
+          "suffix": ""
+        },
+        {
+          "text": "nothing",
+          "ipa": "ˈnʌθɪŋ",
+          "translation": "没有什么",
+          "suffix": ""
+        },
+        {
+          "text": "of",
+          "ipa": "əv",
+          "translation": "……的",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "great",
+          "ipa": "ɡreɪt",
+          "translation": "大的",
+          "suffix": ""
+        },
+        {
+          "text": "sea",
+          "ipa": "siː",
+          "translation": "大海",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-foolish-digger",
+      "category": "中国寓言",
+      "source": "《列子 · 汤问》愚公移山 · 英译练习",
+      "sourceUrl": "",
+      "translation": "我死了还有儿子，挖山不会停下。",
+      "words": [
+        {
+          "text": "When",
+          "ipa": "wen",
+          "translation": "当……时",
+          "suffix": ""
+        },
+        {
+          "text": "I",
+          "ipa": "aɪ",
+          "translation": "我",
+          "suffix": ""
+        },
+        {
+          "text": "die",
+          "ipa": "daɪ",
+          "translation": "死",
+          "suffix": ","
+        },
+        {
+          "text": "my",
+          "ipa": "maɪ",
+          "translation": "我的",
+          "suffix": ""
+        },
+        {
+          "text": "sons",
+          "ipa": "sʌnz",
+          "translation": "儿子们",
+          "suffix": ""
+        },
+        {
+          "text": "will",
+          "ipa": "wɪl",
+          "translation": "将会",
+          "suffix": ""
+        },
+        {
+          "text": "go",
+          "ipa": "ɡəʊ",
+          "translation": "走；继续",
+          "suffix": ""
+        },
+        {
+          "text": "on",
+          "ipa": "ɒn",
+          "translation": "继续",
+          "suffix": ""
+        },
+        {
+          "text": "digging",
+          "ipa": "ˈdɪɡɪŋ",
+          "translation": "挖掘",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-pulled-seedlings",
+      "category": "中国寓言",
+      "source": "《孟子 · 公孙丑》揠苗助长 · 英译练习",
+      "sourceUrl": "",
+      "translation": "他把禾苗往上拔，想让它们长得更快。",
+      "words": [
+        {
+          "text": "He",
+          "ipa": "hiː",
+          "translation": "他",
+          "suffix": ""
+        },
+        {
+          "text": "pulled",
+          "ipa": "pʊld",
+          "translation": "拉（过去式）",
+          "suffix": ""
+        },
+        {
+          "text": "up",
+          "ipa": "ʌp",
+          "translation": "向上",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "seedlings",
+          "ipa": "ˈsiːdlɪŋz",
+          "translation": "幼苗",
+          "suffix": ""
+        },
+        {
+          "text": "to",
+          "ipa": "tə",
+          "translation": "向；与",
+          "suffix": ""
+        },
+        {
+          "text": "make",
+          "ipa": "meɪk",
+          "translation": "使成为",
+          "suffix": ""
+        },
+        {
+          "text": "them",
+          "ipa": "ðem",
+          "translation": "它们（宾格）",
+          "suffix": ""
+        },
+        {
+          "text": "grow",
+          "ipa": "ɡrəʊ",
+          "translation": "生长",
+          "suffix": ""
+        },
+        {
+          "text": "faster",
+          "ipa": "ˈfɑːstə",
+          "translation": "更快",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-hare-slept",
+      "category": "伊索寓言",
+      "source": "Aesop · The Tortoise and the Hare · 英文练习改写",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Aesop%27s_Fables",
+      "translation": "兔子自信速度快，在路上睡着了，乌龟爬了过去。",
+      "words": [
+        {
+          "text": "The",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "hare",
+          "ipa": "heə",
+          "translation": "野兔",
+          "suffix": ""
+        },
+        {
+          "text": "slept",
+          "ipa": "slept",
+          "translation": "睡觉（过去式）",
+          "suffix": ""
+        },
+        {
+          "text": "by",
+          "ipa": "baɪ",
+          "translation": "在……旁边",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "road",
+          "ipa": "rəʊd",
+          "translation": "路",
+          "suffix": ","
+        },
+        {
+          "text": "sure",
+          "ipa": "ʃɔː",
+          "translation": "确信的",
+          "suffix": ""
+        },
+        {
+          "text": "of",
+          "ipa": "əv",
+          "translation": "……的",
+          "suffix": ""
+        },
+        {
+          "text": "his",
+          "ipa": "hɪz",
+          "translation": "他的",
+          "suffix": ""
+        },
+        {
+          "text": "speed",
+          "ipa": "spiːd",
+          "translation": "速度",
+          "suffix": ","
+        },
+        {
+          "text": "and",
+          "ipa": "ænd",
+          "translation": "和",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "tortoise",
+          "ipa": "ˈtɔːtaɪs",
+          "translation": "乌龟",
+          "suffix": ""
+        },
+        {
+          "text": "walked",
+          "ipa": "wɔːkt",
+          "translation": "行走（过去式）",
+          "suffix": ""
+        },
+        {
+          "text": "past",
+          "ipa": "pɑːst",
+          "translation": "经过",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-ant-stored",
+      "category": "伊索寓言",
+      "source": "Aesop · The Ant and the Grasshopper · 英文练习改写",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Aesop%27s_Fables",
+      "translation": "蚂蚁整个夏天储藏谷物，蚱蜢却把日子唱掉了。",
+      "words": [
+        {
+          "text": "The",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "ant",
+          "ipa": "ænt",
+          "translation": "蚂蚁",
+          "suffix": ""
+        },
+        {
+          "text": "stored",
+          "ipa": "stɔːd",
+          "translation": "储存（过去式）",
+          "suffix": ""
+        },
+        {
+          "text": "corn",
+          "ipa": "kɔːn",
+          "translation": "谷物",
+          "suffix": ""
+        },
+        {
+          "text": "all",
+          "ipa": "ɔːl",
+          "translation": "全部",
+          "suffix": ""
+        },
+        {
+          "text": "summer",
+          "ipa": "ˈsʌmə",
+          "translation": "夏天",
+          "suffix": ","
+        },
+        {
+          "text": "while",
+          "ipa": "waɪl",
+          "translation": "当……时",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "grasshopper",
+          "ipa": "ˈɡrɑːshɒpə",
+          "translation": "蚱蜢",
+          "suffix": ""
+        },
+        {
+          "text": "sang",
+          "ipa": "sæŋ",
+          "translation": "唱歌（过去式）",
+          "suffix": ""
+        },
+        {
+          "text": "away",
+          "ipa": "əˈweɪ",
+          "translation": "逝去",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "days",
+          "ipa": "deɪz",
+          "translation": "日子",
+          "suffix": "."
+        }
+      ]
+    },
+    {
+      "id": "fable-waited-second",
+      "category": "中国寓言",
+      "source": "《韩非子 · 五蠹》守株待兔 · 英文练习改写",
+      "sourceUrl": "",
+      "translation": "他在树桩旁坐下，等着第二只兔子撞上来。",
+      "words": [
+        {
+          "text": "He",
+          "ipa": "hiː",
+          "translation": "他",
+          "suffix": ""
+        },
+        {
+          "text": "sat",
+          "ipa": "sæt",
+          "translation": "坐（过去式）",
+          "suffix": ""
+        },
+        {
+          "text": "down",
+          "ipa": "daʊn",
+          "translation": "向下",
+          "suffix": ""
+        },
+        {
+          "text": "by",
+          "ipa": "baɪ",
+          "translation": "在……旁边",
+          "suffix": ""
+        },
+        {
+          "text": "the",
+          "ipa": "ðə",
+          "translation": "这；定冠词",
+          "suffix": ""
+        },
+        {
+          "text": "stump",
+          "ipa": "stʌmp",
+          "translation": "树桩",
+          "suffix": ""
+        },
+        {
+          "text": "and",
+          "ipa": "ænd",
+          "translation": "和",
+          "suffix": ""
+        },
+        {
+          "text": "waited",
+          "ipa": "ˈweɪtɪd",
+          "translation": "等待（过去式）",
+          "suffix": ""
+        },
+        {
+          "text": "for",
+          "ipa": "fɔː",
+          "translation": "为了",
+          "suffix": ""
+        },
+        {
+          "text": "a",
+          "ipa": "ə",
+          "translation": "一个",
+          "suffix": ""
+        },
+        {
+          "text": "second",
+          "ipa": "ˈsekənd",
+          "translation": "第二",
+          "suffix": ""
+        },
+        {
+          "text": "hare",
+          "ipa": "heə",
+          "translation": "野兔",
+          "suffix": "."
+        }
+      ]
+    }
+  ]
+}

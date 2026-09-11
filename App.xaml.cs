@@ -54,7 +54,14 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ILogBufferService>(logBuffer);
 
         // 注册其他应用服务
+        services.AddSingleton<PracticeViewModel>(sp => { var vm = PracticeViewModel.CreateDefault(); vm.ConnectKeyboard(sp.GetRequiredService<IKeyboardHookService>()); return vm; });
+        services.AddSingleton<WordFrequencyViewModel>(sp => {
+            _ = sp.GetRequiredService<IKeyDatabaseService>();
+            var folder = AppDataPathHelper.GetAppDataFolder();
+            return new WordFrequencyViewModel(new WordFrequencyStore(System.IO.Path.Combine(folder, "key_data.db"), System.IO.Path.Combine(folder, "word_frequency.db"), System.IO.Path.Combine(folder, "word_marks.db")));
+        });
         services.AddSingleton<DashboardViewModel>();
+        services.AddSingleton<InputEventDispatcher>();
         services.AddSingleton<IMouseClickHookService, MouseClickHookService>();
         services.AddSingleton<IClickDatabaseService, ClickDatabaseService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -224,7 +231,20 @@ public partial class App : System.Windows.Application
         // 防止重复保存（如果已经通过 SessionEnding 或 ShutdownApplication 保存过）
         SaveDataAndStopTracker();
 
+        Services.GetRequiredService<IKeyboardHookService>().Stop();
+
+        Services.GetRequiredService<InputEventDispatcher>().Dispose();
+        Services.GetRequiredService<KeyCounterViewModel>().Dispose();
+        Services.GetRequiredService<KeyAnimationViewModel>().Dispose();
+        Services.GetRequiredService<ClickCounterViewModel>().Dispose();
+        Services.GetRequiredService<IMouseClickHookService>().Stop();
+        try { (Services.GetRequiredService<IKeyDatabaseService>() as IDisposable)?.Dispose(); }
+        catch (Exception error) { _appLogger?.LogError(error, "Keyboard database flush failed"); }
+        try { (Services.GetRequiredService<IClickDatabaseService>() as IDisposable)?.Dispose(); }
+        catch (Exception error) { _appLogger?.LogError(error, "Mouse database flush failed"); }
         Services.GetRequiredService<MainWindowViewModel>().Dispose();
+        Services.GetRequiredService<WordFrequencyViewModel>().Dispose();
+        Services.GetRequiredService<PracticeViewModel>().Dispose();
         _globalHotkey?.Dispose();
         _notifyIcon?.Dispose();
         // 移除事件订阅，避免内存泄漏

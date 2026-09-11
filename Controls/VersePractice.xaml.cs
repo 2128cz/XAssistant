@@ -1,0 +1,1 @@
+namespace XAssistant.Controls; public partial class VersePractice : System.Windows.Controls.UserControl { public VersePractice() => InitializeComponent(); }

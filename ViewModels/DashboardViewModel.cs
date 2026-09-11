@@ -49,6 +49,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     public UsageViewModel Usage { get; }
     public AppUsageViewModel Apps { get; }
     public SettingsViewModel Settings { get; }
+    public PracticeViewModel Practice { get; }
+    public WordFrequencyViewModel? WordFrequency { get; }
 
     /// <summary>
     /// 滚动窗口选项。标签与小时数在同一处定义：“N 小时”的时长不再需要从文案里反向解析，
@@ -267,20 +269,21 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         : $"{Apps.TrackedProcessCount} 个应用并行各自计时，合计可超过自然日时长；"
             + "进行中的行按最后落盘时刻补算（追踪器每 5 秒落盘一次，补算上限 90 秒）。";
 
-    public string WordFrequencyStatus => "暂无词频数据 · 当前仅记录按键名称，不采集输入文本";
 
     public DashboardViewModel(
         ClickCounterViewModel mouse,
         KeyCounterViewModel keyboard,
         UsageViewModel usage,
         AppUsageViewModel apps,
-        SettingsViewModel settings)
+        SettingsViewModel settings, PracticeViewModel practice, WordFrequencyViewModel? wordFrequency = null)
     {
         Mouse = mouse;
         Keyboard = keyboard;
         Usage = usage;
         Apps = apps;
         Settings = settings;
+        Practice = practice;
+        WordFrequency = wordFrequency;
 
         Mouse.PropertyChanged += OnMousePropertyChanged;
         Keyboard.PropertyChanged += OnKeyboardPropertyChanged;

@@ -5,9 +5,19 @@ using XAssistant.Services.Interfaces;
 
 namespace XAssistant.Services;
 
-public class ClickDatabaseService : IClickDatabaseService
+public class ClickDatabaseService : IClickDatabaseService, IDisposable
 {
-    private static readonly string ConnectionString = InitializeConnectionString();
+    private readonly BackgroundBatchWriter<Action<SqliteConnection, SqliteTransaction>> _writer;
+    private void PersistActions(IReadOnlyList<Action<SqliteConnection, SqliteTransaction>> actions)
+    {
+        using var connection = new SqliteConnection(ConnectionString);
+        connection.Open();
+        using var transaction = connection.BeginTransaction();
+        foreach (var action in actions) action(connection, transaction);
+        transaction.Commit();
+    }
+    public void Dispose() => _writer.Dispose();
+    private readonly string ConnectionString;
 
     private static string InitializeConnectionString()
     {
@@ -19,8 +29,9 @@ public class ClickDatabaseService : IClickDatabaseService
         return $"Data Source={dbPath}";
     }
 
-    public ClickDatabaseService()
+    public ClickDatabaseService(string? databasePath = null)
     {
+        ConnectionString = databasePath == null ? InitializeConnectionString() : new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString();
         using var connection = new SqliteConnection(ConnectionString);
         connection.Open();
         var command = connection.CreateCommand();
@@ -43,13 +54,14 @@ public class ClickDatabaseService : IClickDatabaseService
             );
         ";
         command.ExecuteNonQuery();
+        _writer = new BackgroundBatchWriter<Action<SqliteConnection, SqliteTransaction>>(PersistActions);
     }
 
-    public void SaveClick(MouseClickRecord record)
+    public void SaveClick(MouseClickRecord record) => _writer.Enqueue((connection, transaction) => PersistClick(record, connection, transaction));
+    private static void PersistClick(MouseClickRecord record, SqliteConnection connection, SqliteTransaction transaction)
     {
-        using var connection = new SqliteConnection(ConnectionString);
-        connection.Open();
-        var command = connection.CreateCommand();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "INSERT INTO ClickRecords (Button, ClickTime) VALUES (@b, @t)";
         command.Parameters.AddWithValue("@b", record.Button);
         command.Parameters.AddWithValue("@t", record.ClickTime.ToString("o")); // ISO 8601
@@ -126,13 +138,13 @@ public class ClickDatabaseService : IClickDatabaseService
         return counts;
     }
 
-    public void AddMovementPixels(DateTime date, double pixels)
+    public void AddMovementPixels(DateTime date, double pixels) => _writer.Enqueue((connection, transaction) => PersistMovementPixels(date,pixels,connection,transaction));
+    private static void PersistMovementPixels(DateTime date, double pixels, SqliteConnection connection, SqliteTransaction transaction)
     {
         if (pixels <= 0)
             return;
-        using var connection = new SqliteConnection(ConnectionString);
-        connection.Open();
         using var cmd = connection.CreateCommand();
+        cmd.Transaction = transaction;
         cmd.CommandText =
             @"
             INSERT INTO MouseMovementDays (Date, Pixels) VALUES (@d, @p)

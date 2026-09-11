@@ -10,7 +10,7 @@ namespace XAssistant.ViewModels;
 /// - 鼠标点击（含坐标）来自全局鼠标钩子；指针位置由定时器轮询（归一化到 0-1）
 /// - 所有事件都在 UI 线程触发，由视图转发给 WebView2
 /// </summary>
-public partial class KeyAnimationViewModel : ViewModelBase
+public partial class KeyAnimationViewModel : ViewModelBase, IDisposable
 {
     private readonly IKeyboardHookService _hookService;
     private readonly IMouseClickHookService _mouseHook;
@@ -46,6 +46,7 @@ public partial class KeyAnimationViewModel : ViewModelBase
 
     }
 
+    public void Dispose() { _hookService.KeyPressed -= OnKeyPressed; _mouseHook.MouseClickedAt -= OnMouseClicked; }
     private void OnKeyPressed(string key)
     {
         _counts.TryGetValue(key, out var previous);

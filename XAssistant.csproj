@@ -38,4 +38,5 @@
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
     <PackageReference Include="System.Management" Version="9.0.0" />
   </ItemGroup>
+<ItemGroup><Content Include="Assets\Practice\**"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory></Content></ItemGroup>
 </Project>

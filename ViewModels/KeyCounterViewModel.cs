@@ -7,7 +7,7 @@ using WpfApplication = System.Windows.Application;
 
 namespace XAssistant.ViewModels;
 
-public partial class KeyCounterViewModel : ViewModelBase
+public partial class KeyCounterViewModel : ViewModelBase, IDisposable
 {
     private readonly IKeyboardHookService _hookService;
     private readonly IKeyDatabaseService _dbService;
@@ -306,6 +306,7 @@ public partial class KeyCounterViewModel : ViewModelBase
         ResetCadence();
     }
 
+    public void Dispose() { _rateTimer?.Stop(); _hookService.KeyPressed -= OnKeyPressed; }
     [RelayCommand]
     private void RefreshData()
     {
