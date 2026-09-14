@@ -96,4 +96,10 @@ public static class PracticeText
     public static string[] Tokens(string text) => Regex.Matches(Normalize(text), @"[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)*")
         .Select(match => match.Value.ToLowerInvariant()).ToArray();
     public static bool Equal(string left, string right) => string.Equals(Normalize(left), Normalize(right), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>单字符折叠。逐键落子时不必为每个字符新建一个字符串。</summary>
+    public static char FoldChar(char c) => Fold(c);
+
+    /// <summary>逐位比对：折叠后只区分大小写，与 <see cref="Equal"/> 的口径一致。</summary>
+    public static bool EqualChar(char left, char right) => char.ToUpperInvariant(Fold(left)) == char.ToUpperInvariant(Fold(right));
 }

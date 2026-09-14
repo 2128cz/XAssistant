@@ -22,7 +22,7 @@
    </ItemsControl>
    <DockPanel Margin="0,0,0,10"><TextBlock Text="{Binding ProgressText}" DockPanel.Dock="Right" FontFamily="Consolas" FontSize="19" Foreground="{DynamicResource TextSecondary}" Margin="16,0,0,0"/><TextBlock Text="{Binding Translation}" FontSize="13" Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap"/></DockPanel>
    <ProgressBar Value="{Binding VerseProgress}" Maximum="100" Height="3" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource ControlBorder}" BorderThickness="0" Margin="0,0,0,12"/>
-   <DockPanel Margin="0,10,0,0"><CheckBox Focusable="False" Content="完成自动换句" IsChecked="{Binding AutoAdvance}" DockPanel.Dock="Right" Margin="16,0,0,0"/></DockPanel>
+   <DockPanel Margin="0,10,0,0"><CheckBox Focusable="False" Content="完成自动换句" IsChecked="{Binding AutoAdvance}" DockPanel.Dock="Right" Margin="16,0,0,0"/><TextBlock Text="{Binding VerseStatus}" FontSize="12" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" VerticalAlignment="Center"/></DockPanel>
   </StackPanel>
  </Border>
 </UserControl>
