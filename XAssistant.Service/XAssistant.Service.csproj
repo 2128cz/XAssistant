@@ -4,7 +4,6 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>dotnet-XAssistant.Service-089b6876-27da-4e23-bc9b-130ab4ab7087</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
