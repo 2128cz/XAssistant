@@ -89,9 +89,14 @@ public partial class App : System.Windows.Application
         services.AddSingleton<GlobalHotkeyService>();
         services.AddSingleton<QuickNoteCaptureService>();
 
-        // 配置 Serilog Logger
+        // 配置 Serilog Logger：调试构建保留 Debug 级别便于排查，
+        // 正式版只到 Information，避免常驻时日志目录涨到几十 MB
         Log.Logger = new LoggerConfiguration()
+#if DEBUG
             .MinimumLevel.Debug()
+#else
+            .MinimumLevel.Information()
+#endif
             .WriteTo.File(
                 logPath,
                 rollingInterval: RollingInterval.Day,

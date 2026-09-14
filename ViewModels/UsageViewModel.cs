@@ -41,6 +41,9 @@ public partial class UsageViewModel : ViewModelBase
     /// <summary>上一次管道可用性；仅在状态跳变时记日志，不每 5 秒刷一条</summary>
     private bool? _pipeAvailable;
 
+    /// <summary>后台服务数据库是否存在；同样只在状态跳变时记日志</summary>
+    private bool? _serviceInstalled;
+
     [ObservableProperty]
     private ObservableCollection<SessionEvent> _sessionEvents = new();
 
@@ -148,6 +151,27 @@ public partial class UsageViewModel : ViewModelBase
             _logger.LogInformation("使用时长服务管道不可用，改用数据库值（服务是否已安装并启动？）");
     }
 
+    /// <summary>
+    /// 后台服务的库由服务自己创建，文件不存在意味着服务未安装/未启动过，
+    /// 这是功能关闭而不是异常，因此不开库、不记堆栈，只在状态跳变时记一条。
+    /// </summary>
+    private bool IsServiceInstalled()
+    {
+        var installed = File.Exists(DbPath);
+        if (_serviceInstalled != installed)
+        {
+            if (installed)
+                _logger.LogInformation("检测到后台服务数据库，电脑使用时长功能启用");
+            else
+                _logger.LogWarning(
+                    "未找到后台服务数据库 {DbPath}，电脑使用时长功能停用（安装并启动 XAssistant.Service 后自动恢复）",
+                    DbPath
+                );
+            _serviceInstalled = installed;
+        }
+        return installed;
+    }
+
     private void SetTodayUsageSeconds(long? seconds, bool isCorrected)
     {
         bool secondsChanged = _todayUsageSeconds != seconds;
@@ -163,6 +187,11 @@ public partial class UsageViewModel : ViewModelBase
     private async Task LoadHistoryAsync()
     {
         var list = new ObservableCollection<DailyUsage>();
+        if (!IsServiceInstalled())
+        {
+            History = list;
+            return;
+        }
         await Task.Run(() =>
         {
             try
@@ -325,6 +354,15 @@ public partial class UsageViewModel : ViewModelBase
         SessionEvent? activeStart = null;
         DateTime? activeStartTime = null;
         var dailyCorrectedSeconds = new Dictionary<string, long>();
+
+        if (!IsServiceInstalled())
+        {
+            SessionEvents = events;
+            _activeSessionStartEvent = null;
+            _activeSessionStartTime = null;
+            _todayCorrectedSeconds = 0;
+            return;
+        }
 
         await Task.Run(() =>
         {
