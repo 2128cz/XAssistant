@@ -14,9 +14,6 @@ public class UsageTrackingService : BackgroundService
     private DateTime _todayDate;
     private bool _isRunning;
     private readonly object _lock = new(); // 线程同步锁
-    private const string DbFolder = @"C:\ProgramData\XAssistant\UsageTracker";
-    private const string DbFile = "pc_usage.db";
-    private static readonly string DbPath = Path.Combine(DbFolder, DbFile);
     private static readonly TimeSpan SaveInterval = TimeSpan.FromSeconds(7); // 定时保存间隔
 
     public UsageTrackingService(ILogger<UsageTrackingService> logger)
@@ -31,8 +28,8 @@ public class UsageTrackingService : BackgroundService
 
     private void InitializeDatabase()
     {
-        Directory.CreateDirectory(DbFolder);
-        using var conn = new SqliteConnection($"Data Source={DbPath}");
+        Directory.CreateDirectory(UsagePaths.Folder);
+        using var conn = new SqliteConnection($"Data Source={UsagePaths.Database}");
         conn.Open();
         var cmd = conn.CreateCommand();
 
@@ -131,7 +128,7 @@ public class UsageTrackingService : BackgroundService
 
     private void SaveTodaySeconds(long seconds)
     {
-        using var conn = new SqliteConnection($"Data Source={DbPath}");
+        using var conn = new SqliteConnection($"Data Source={UsagePaths.Database}");
         conn.Open();
         var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -145,9 +142,9 @@ public class UsageTrackingService : BackgroundService
 
     private long LoadTodaySeconds()
     {
-        if (!File.Exists(DbPath))
+        if (!File.Exists(UsagePaths.Database))
             return 0;
-        using var conn = new SqliteConnection($"Data Source={DbPath}");
+        using var conn = new SqliteConnection($"Data Source={UsagePaths.Database}");
         conn.Open();
         var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT Seconds FROM DailyUsage WHERE Date = $date";
@@ -167,7 +164,7 @@ public class UsageTrackingService : BackgroundService
             var now = DateTime.Now;
             var totalSeconds = GetTodaySeconds(); // 线程安全调用
 
-            using var conn = new SqliteConnection($"Data Source={DbPath}");
+            using var conn = new SqliteConnection($"Data Source={UsagePaths.Database}");
             conn.Open();
             var cmd = conn.CreateCommand();
             cmd.CommandText = """

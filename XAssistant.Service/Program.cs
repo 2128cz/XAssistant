@@ -2,8 +2,8 @@ using Serilog;
 using Serilog.Events;
 using XAssistant.Service;
 
-// 定义日志目录
-var logDir = @"C:\ProgramData\XAssistant\UsageTracker\logs";
+// 日志目录跟数据库同住一处（见 UsagePaths），日志比库先要用，所以这里先建目录
+var logDir = UsagePaths.LogFolder;
 Directory.CreateDirectory(logDir);
 
 Log.Logger = new LoggerConfiguration()

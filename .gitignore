@@ -34,3 +34,21 @@ temp/
 
 ## 发布打包产物
 release/
+
+## 本地数据与凭据：这些文件只属于这台机器，而且可能带数据库连接串，一律不入库
+## （正式位置在数据目录 %APPDATA%\XAssistant 与 %ProgramData%\XAssistant，本来也不在仓库里；
+##   这里挡住的是「为了调试把 .env / appsettings.json / 库文件拷到工作区」的情况）
+.env
+*.env
+appsettings.json
+appsettings.*.json
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.log
+
+## 离屏夹具的快照与报告输出
+shots/

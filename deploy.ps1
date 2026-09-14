@@ -1,29 +1,40 @@
-<#
+﻿<#
 .SYNOPSIS
-    构建 XAssistant 并部署到 C:\XAssistant
+    构建 XAssistant 并部署到 <系统盘>\XAssistant（可用 -TargetDir 覆盖）
 .DESCRIPTION
-    1. 使用 Release 配置发布项目
+    1. 使用 Release 配置发布项目到 bin\deploy\publish
     2. 若目标应用正在运行，强制结束进程
-    3. 备份 C:\XAssistant 下的旧文件（如有）
-    4. 将发布输出复制到 C:\XAssistant
+    3. 备份目标目录下的旧文件（如有）
+    4. 将发布输出复制到目标目录
     5. 启动应用
 .NOTES
     脚本需在项目根目录（XAssistant.csproj 所在目录）以管理员身份运行，
-    因为 C:\XAssistant 可能需要管理员权限。
+    因为系统盘根目录下的部署目录可能需要管理员权限。
 #>
+
+param(
+    # 部署目标目录。默认跟着 SystemDrive 走，不写死盘符
+    [string]$TargetDir = (Join-Path $env:SystemDrive "XAssistant")
+)
 
 $ErrorActionPreference = "Stop"
 
 # ---------- 配置 ----------
 $scriptPath   = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectFile  = Join-Path $scriptPath "XAssistant.csproj"
-$targetDir    = "C:\XAssistant"
+$targetDir    = $TargetDir
 $processName  = "XAssistant"
-$publishDir   = Join-Path $scriptPath "bin\Release\net9.0-windows\win-x64\publish"
+# 发布输出直接指定目录，不再按 bin\Release\<目标框架>\win-x64\publish 去猜：
+# 目标框架从 net9 改回 net8 那次，猜出来的路径就不存在了，第 4 步复制直接失败
+$publishDir   = Join-Path $scriptPath "bin\deploy\publish"
 
 # ---------- 1. 构建发布 ----------
 Write-Host "[1/5] 正在发布项目 (Release)..." -ForegroundColor Cyan
-dotnet publish $projectFile -r win-x64 -c Release
+# 先清干净：第 4 步是把这个目录里的所有东西拷到部署目录，残留的旧文件会跟着过去
+if (Test-Path $publishDir) {
+    Remove-Item "$publishDir\*" -Recurse -Force -ErrorAction SilentlyContinue
+}
+dotnet publish $projectFile -r win-x64 -c Release -o $publishDir
 if ($LASTEXITCODE -ne 0) {
     throw "发布失败，请检查错误信息。"
 }
@@ -45,7 +56,7 @@ if ($runningProcess) {
 Write-Host "[3/5] 备份旧版本..." -ForegroundColor Cyan
 if (Test-Path $targetDir) {
     $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $backupDir = "C:\XAssistant_Backup_$timestamp"
+    $backupDir = "$($targetDir.TrimEnd('\','/'))_Backup_$timestamp"
     Write-Host "    正在备份到 $backupDir ..." -ForegroundColor Yellow
     Copy-Item -Path $targetDir -Destination $backupDir -Recurse -Force
     Write-Host "    备份完成。" -ForegroundColor Green

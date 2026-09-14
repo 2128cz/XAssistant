@@ -7,12 +7,20 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using XAssistant.Models;
+using XAssistant.Services;
 
 namespace XAssistant.ViewModels;
 
 public partial class UsageViewModel : ViewModelBase
 {
-    private const string DbPath = @"C:\ProgramData\XAssistant\UsageTracker\pc_usage.db";
+    /// <summary>
+    /// 后台服务写、本页面读的那一份使用时长库。目录是跨进程的约定，
+    /// 只由 <see cref="AppDataPathHelper.GetUsageTrackerFolder"/> 算，不在这里再写一遍绝对路径。
+    /// </summary>
+    private static string DbPath => Path.Combine(
+        AppDataPathHelper.GetUsageTrackerFolder(),
+        "pc_usage.db"
+    );
     private const string PipeName = "UsageTrackerPipe";
     private readonly DispatcherTimer _refreshTimer;
     private readonly ILogger<UsageViewModel> _logger;

@@ -15,7 +15,15 @@ public sealed class QuickNoteDatabaseService : IQuickNoteDatabaseService
     private const string InsertSql =
         "INSERT INTO quick_notes (content, source) VALUES (@content, @source)";
 
-    private const string DefaultEnvPath = @"C:\xapp-2026-06-30\.env";
+    /// <summary>
+    /// 未配置 DatabaseUrlEnvPath 时找的 .env 文件名，与 appsettings.json 同住数据目录
+    /// （<see cref="AppDataPathHelper.GetAppDataFolder"/>）。
+    /// 这里刻意不写任何本机绝对路径：仓库要推到公网，硬编码某台机器上的目录既换机即失效，
+    /// 也会把本机布局同步出去。要指向别处的 .env，就在数据目录的 appsettings.json 里配
+    /// DatabaseUrlEnvPath：相对路径按数据目录解析，只有跨盘时才需写绝对路径；
+    /// 那份配置本身在仓库外，不进版本控制。
+    /// </summary>
+    private const string DefaultEnvFileName = ".env";
 
     private readonly IConfigurationService _configurationService;
     private readonly ILogger<QuickNoteDatabaseService> _logger;
@@ -35,8 +43,9 @@ public sealed class QuickNoteDatabaseService : IQuickNoteDatabaseService
         if (string.IsNullOrWhiteSpace(raw))
         {
             _logger.LogError(
-                "未配置速记数据库连接串：请在 {ConfigPath} 的 QuickNote.ConnectionString 填入 xapp .env 的 DATABASE_URL，或放置 xapp .env 供自动读取",
-                Path.Combine(AppDataPathHelper.GetAppDataFolder(), "appsettings.json")
+                "未配置速记数据库连接串：请在 {ConfigPath} 的 QuickNote.ConnectionString 填入 DATABASE_URL，或把 .env 放到 {EnvPath}",
+                Path.Combine(AppDataPathHelper.GetAppDataFolder(), "appsettings.json"),
+                ResolveEnvPath(_configurationService.Settings.QuickNote.DatabaseUrlEnvPath)
             );
             return false;
         }
@@ -61,16 +70,31 @@ public sealed class QuickNoteDatabaseService : IQuickNoteDatabaseService
         }
     }
 
-    // 连接串解析：优先显式配置；未配置时回退读取 xapp .env 的 DATABASE_URL，让功能开箱即用
+    // 连接串解析：优先显式配置；未配置时回退读取 .env 的 DATABASE_URL，让功能开箱即用
     private string? ResolveConnectionString()
     {
         string? configured = _configurationService.Settings.QuickNote.ConnectionString;
         if (!string.IsNullOrWhiteSpace(configured))
             return configured;
 
-        string envPath =
-            _configurationService.Settings.QuickNote.DatabaseUrlEnvPath ?? DefaultEnvPath;
+        string envPath = ResolveEnvPath(
+            _configurationService.Settings.QuickNote.DatabaseUrlEnvPath
+        );
         return TryReadDatabaseUrlFromEnv(envPath);
+    }
+
+    /// <summary>
+    /// 把配置里的 .env 位置落成实际路径：留空取数据目录下的 .env；给相对路径则相对数据目录解析
+    /// （配置里可以不写盘符，换机器或改数据目录都跟着走）；给绝对路径则原样使用。
+    /// </summary>
+    private static string ResolveEnvPath(string? configured)
+    {
+        string dataFolder = AppDataPathHelper.GetAppDataFolder();
+        if (string.IsNullOrWhiteSpace(configured))
+            return Path.Combine(dataFolder, DefaultEnvFileName);
+        return Path.IsPathRooted(configured)
+            ? configured
+            : Path.GetFullPath(Path.Combine(dataFolder, configured));
     }
 
     private string? TryReadDatabaseUrlFromEnv(string envPath)

@@ -1,6 +1,6 @@
 # 速记（Quick Note）Context
 
-XAssistant 为 xapp「灵感速记」功能提供 OS 级入口与写库链路：注册全局热键、抓取前台窗口标题、弹原生速记窗、Npgsql 直插速记库。速记的列表管理、归档转 markdown（tRPC 接口、列表页）在 xapp 仓库，spec 见 `C:\xapp-2026-06-30\docs\specs\global-quick-note.md`，写入归属决策见 xapp `docs/adr/0010`，本仓库负责唤起与写库。
+XAssistant 为 xapp「灵感速记」功能提供 OS 级入口与写库链路：注册全局热键、抓取前台窗口标题、弹原生速记窗、Npgsql 直插速记库。速记的列表管理、归档转 markdown（tRPC 接口、列表页）在 xapp 仓库，spec 见 xapp 仓库的 `docs/specs/global-quick-note.md`，写入归属决策见 xapp `docs/adr/0010`，本仓库负责唤起与写库。
 
 ## Language
 
@@ -29,7 +29,7 @@ _Avoid_: 快捷键（泛指）、热键组合
 _Avoid_: 去重、复用窗口
 
 **连接串（Connection String）**:
-速记库 PostgreSQL 连接串，优先取 `appsettings.json` 的 `QuickNote.ConnectionString`（复制自 xapp `.env` 的 `DATABASE_URL`，支持直接粘贴 URI）；未配置时自动读取 `QuickNote.DatabaseUrlEnvPath`（默认 `C:\xapp-2026-06-30\.env`）中的 `DATABASE_URL`。Npgsql 直插 `quick_notes` 表。
+速记库 PostgreSQL 连接串，优先取 `appsettings.json` 的 `QuickNote.ConnectionString`（复制自 xapp `.env` 的 `DATABASE_URL`，支持直接粘贴 URI）；未配置时自动读取 `QuickNote.DatabaseUrlEnvPath` 指向的 `.env`（留空即数据目录下的 `.env`，写相对路径也按数据目录解析）中的 `DATABASE_URL`。Npgsql 直插 `quick_notes` 表。
 _Avoid_: 服务器地址、端口
 
 **基址（Base URL）**:

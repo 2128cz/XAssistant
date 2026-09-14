@@ -122,7 +122,7 @@
   - `word_frequency.db` 词频投影（可删可重建，删掉后重新统计只回灌最近 3 天）/ `word_marks.db` 词的赞踩标记
   - `practice-scores.json` 练习成绩
   - `appsettings.json` 配置
-- 后台服务数据：`C:\ProgramData\XAssistant\UsageTracker\pc_usage.db`（电脑使用时长）
+- 后台服务数据：`%ProgramData%\XAssistant\UsageTracker\pc_usage.db`（电脑使用时长，由 `XAssistant.Service` 写入）
 - 日志：`%APPDATA%\XAssistant\logs\`（按天滚动，保留 31 天）
 
 均为本地文件，不联网上传。
@@ -139,7 +139,7 @@
 }
 ```
 
-未配置时该功能禁用，不影响其它功能。也可以只填 `DatabaseUrlEnvPath` 指向一个 `.env`，程序会读取其中的 `DATABASE_URL`。
+未配置时该功能禁用，不影响其它功能。也可以只填 `DatabaseUrlEnvPath` 指向一个 `.env`，程序会读取其中的 `DATABASE_URL`：留空就读数据目录下的 `.env`，填相对路径也按数据目录解析，只有要指到别的盘时才需写绝对路径。`.env` 与 `appsettings.json` 都带凭据，不要提交进仓库。
 
 ## 构建
 
