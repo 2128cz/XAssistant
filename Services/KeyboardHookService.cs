@@ -39,12 +39,22 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
 
     public void Start()
     {
+        // 重复 Start 不能装出第二个钩子，否则两套钩子叠在系统输入链路上
         if (_hookId != IntPtr.Zero) return;
-        _pressedPhysical.Clear(); // 上一段监听里没等到 key-up 的记录不能带进来
+        // 上一段监听里没等到 key-up 的记录不能带进来，否则下次开录第一次按键会被当成连按丢计
+        _pressedPhysical.Clear();
+
         using var curProcess = Process.GetCurrentProcess();
         using var curModule = curProcess.MainModule!;
         _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(curModule.ModuleName), 0);
-        if (_hookId == IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+
+        if (_hookId == IntPtr.Zero)
+        {
+            // 装不上就记一条错误并停在未记录状态：Start 的调用点（记录按钮、开机自启）都没有 try，
+            // 在这里抛异常会让整个程序在启动时就崩掉
+            int error = Marshal.GetLastWin32Error();
+            _logger.LogError("键盘钩子安装失败，错误代码：{Error}", error);
+        }
     }
 
     public void Stop()

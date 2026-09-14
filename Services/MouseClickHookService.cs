@@ -1,6 +1,9 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Windows.Threading;
+using Microsoft.Extensions.Logging;
 using XAssistant.Models;
 using XAssistant.Services.Interfaces;
 
@@ -28,6 +31,13 @@ public class MouseClickHookService : IMouseClickHookService, IDisposable
     /// </summary>
     private const int TeleportPixels = 600;
 
+    /// <summary>探活轮询间隔：靠“指针动了但钩子没回调”判断钩子是否已被系统摘掉</summary>
+    private static readonly TimeSpan WatchdogInterval = TimeSpan.FromSeconds(2);
+
+    /// <summary>两次自动重装之间的冷静期，避免钩子一直恢复不了时刷屏</summary>
+    private static readonly TimeSpan RepairCooldown = TimeSpan.FromSeconds(30);
+
+    private readonly ILogger<MouseClickHookService> _logger;
     private LowLevelMouseProc _proc;
     private IntPtr _hookId = IntPtr.Zero;
 
@@ -43,8 +53,29 @@ public class MouseClickHookService : IMouseClickHookService, IDisposable
     private int _pendingWheelDelta;
     private DateTime _lastReadAt;
 
-    public MouseClickHookService(InputEventDispatcher? events = null)
+    // ===== 钩子探活 =====
+    // 低级钩子是系统“单向投递、不重试”的同步钩子：线程没在限时内返回，系统就直接跳过本条消息；
+    // 安装钩子的线程彻底不再泵消息时，系统会把这个钩子摘掉。两种情况都不会通知应用，
+    // 所以 _hookId 仍是个看似有效的旧句柄、IsRecording 依旧为 true，界面会继续假装在记录。
+    // 这里用“光标位置变了而回调计数没变”作为证据去探活：指针自己不会动，要动必然经过钩子。
+    // Timer 在隐式 using 下会与 System.Windows.Forms.Timer 歧义，这里固定用线程池定时器
+    private System.Threading.Timer? _watchdog;
+    private Dispatcher? _ownerDispatcher;
+    private long _callbackCount;
+    private long _watchdogLastCount;
+    private POINT _watchdogLastCursor;
+    private bool _watchdogHasCursor;
+    private int _watchdogBusy;
+    private DateTime _lastRepairAt = DateTime.MinValue;
+
+    /// <summary>自本次启动以来探活发现钩子失效并重装次数，仅用于诊断</summary>
+    public int RepairCount { get; private set; }
+
+    /// <param name="logger">探活与自动重装的日志来源</param>
+    /// <param name="events">共享输入分发器；为空（例如测试里直接 new）时降级为同线程直递</param>
+    public MouseClickHookService(ILogger<MouseClickHookService> logger, InputEventDispatcher? events = null)
     {
+        _logger = logger;
         _events = events;
         _proc = HookCallback;
         _lastReadAt = DateTime.UtcNow;
@@ -69,18 +100,110 @@ public class MouseClickHookService : IMouseClickHookService, IDisposable
             throw new InvalidOperationException($"SetWindowsHookEx 失败，错误代码：{error}");
         }
 
+        // 钩子回调与取样定时器都跑在安装钩子的线程上，记下它的 Dispatcher，探活重装时回到这里
+        _ownerDispatcher = Dispatcher.CurrentDispatcher;
+        StartWatchdog();
+
         // 钩子刚装上时还没有参考点，先丢弃上一段残留
         ResetMovementTracking();
     }
 
     public void Stop()
     {
+        StopWatchdog();
         if (_hookId != IntPtr.Zero)
         {
             UnhookWindowsHookEx(_hookId);
             _hookId = IntPtr.Zero;
         }
         ResetMovementTracking();
+    }
+
+    private void StartWatchdog()
+    {
+        _watchdogLastCount = Interlocked.Read(ref _callbackCount);
+        _watchdogHasCursor = false;
+        _watchdog ??= new System.Threading.Timer(
+            _ => OnWatchdogTick(),
+            null,
+            WatchdogInterval,
+            WatchdogInterval
+        );
+    }
+
+    private void StopWatchdog()
+    {
+        _watchdog?.Dispose();
+        _watchdog = null;
+    }
+
+    /// <summary>
+    /// 探活：上一轮到现在光标换了位置，钩子却没收到一条鼠标事件，说明它已经不工作了。
+    /// 跑在线程池上（钩子失效时安装它的线程往往正是卡住的那个，不能依赖它），
+    /// 常态路径只做读光标与比对计数，不分配；只有判定失效才会 BeginInvoke。
+    /// </summary>
+    private void OnWatchdogTick()
+    {
+        if (Interlocked.Exchange(ref _watchdogBusy, 1) == 1)
+            return; // 本轮读光标与系统卡死叠加时不重入；重装本身的频率由冷静期控制
+
+        try
+        {
+            if (!GetCursorPos(out var cursor))
+                return;
+
+            var count = Interlocked.Read(ref _callbackCount);
+            var moved =
+                _watchdogHasCursor
+                && (cursor.X != _watchdogLastCursor.X || cursor.Y != _watchdogLastCursor.Y);
+
+            _watchdogLastCursor = cursor;
+            _watchdogHasCursor = true;
+            var previousCount = _watchdogLastCount;
+            _watchdogLastCount = count;
+
+            // 指针没动 / 期间确实收到了回调 / 钩子未安装：都是正常状态
+            if (!moved || count != previousCount || _hookId == IntPtr.Zero)
+                return;
+
+            if (DateTime.Now - _lastRepairAt < RepairCooldown)
+                return;
+            _lastRepairAt = DateTime.Now;
+
+            // 重装必须在安装钩子的那个线程（有消息泵）上做，只能投回去；
+            // 那个线程若已彻底死锁，这里也救不了，但 B 之后钩子回调本身不再做耗时动作
+            _ownerDispatcher?.BeginInvoke(new Action(() => ReinstallHook(count)));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "鼠标钩子探活失败");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _watchdogBusy, 0);
+        }
+    }
+
+    /// <summary>在 UI 线程上重装钩子；投递期间若已收到新事件或被 Stop，就什么都不做</summary>
+    private void ReinstallHook(long staleCount)
+    {
+        if (_hookId == IntPtr.Zero)
+            return;
+        if (Interlocked.Read(ref _callbackCount) != staleCount)
+            return; // 已经自己恢复了，不要把活着的钩子拆了重装
+
+        try
+        {
+            UnhookWindowsHookEx(_hookId);
+            _hookId = IntPtr.Zero;
+            Start();
+            RepairCount++;
+            _logger.LogWarning("鼠标钩子已失效（光标在动却收不到回调），已自动重装，累计修复 {Count} 次", RepairCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "鼠标钩子自动重装失败");
+        }
     }
 
     /// <summary>
@@ -154,6 +277,8 @@ public class MouseClickHookService : IMouseClickHookService, IDisposable
     {
         if (nCode >= 0)
         {
+            // 探活用的计数：必须放在最前面，任何一条被系统投递过来的消息都算，包括位移为 0 的复合移动
+            Interlocked.Increment(ref _callbackCount);
             var mh = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
             switch ((int)wParam)
             {
@@ -234,5 +359,12 @@ public class MouseClickHookService : IMouseClickHookService, IDisposable
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern IntPtr GetModuleHandle(string lpModuleName);
 
-    public void Dispose() => Stop();
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetCursorPos(out POINT lpPoint);
+
+    public void Dispose()
+    {
+        StopWatchdog();
+        Stop();
+    }
 }
