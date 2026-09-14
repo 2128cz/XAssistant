@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "note": "英文句子抄写 · 注音是 IPA，只需照抄字母与标点",
+  "sentences": [
+    {
+      "id": "coffee-order",
+      "source": "日常英语 · 原创练习",
+      "sourceUrl": "",
+      "translation": "请给我一杯加奶的咖啡。",
+      "words": [
+        { "text": "Could", "annotation": "kʊd", "translation": "能；可以", "suffix": "" },
+        { "text": "I", "annotation": "aɪ", "translation": "我", "suffix": "" },
+        { "text": "have", "annotation": "hæv", "translation": "有；要", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "coffee", "annotation": "ˈkɒfi", "translation": "咖啡", "suffix": "" },
+        { "text": "with", "annotation": "wɪð", "translation": "以；和", "suffix": "" },
+        { "text": "milk", "annotation": "mɪlk", "translation": "牛奶", "suffix": "," },
+        { "text": "please", "annotation": "pliːz", "translation": "请", "suffix": "?" }
+      ]
+    },
+    {
+      "id": "repeat-slowly",
+      "source": "日常英语 · 原创练习",
+      "sourceUrl": "",
+      "translation": "请你再说一遍，说慢一点好吗？",
+      "words": [
+        { "text": "Could", "annotation": "kʊd", "translation": "能；可以", "suffix": "" },
+        { "text": "you", "annotation": "juː", "translation": "你", "suffix": "" },
+        { "text": "please", "annotation": "pliːz", "translation": "请", "suffix": "" },
+        { "text": "say", "annotation": "seɪ", "translation": "说", "suffix": "" },
+        { "text": "that", "annotation": "ðæt", "translation": "那", "suffix": "" },
+        { "text": "again", "annotation": "əˈɡen", "translation": "再次", "suffix": "" },
+        { "text": "more", "annotation": "mɔː", "translation": "更加", "suffix": "" },
+        { "text": "slowly", "annotation": "ˈsləʊli", "translation": "缓慢地", "suffix": "?" }
+      ]
+    },
+    {
+      "id": "nearest-station",
+      "source": "日常英语 · 原创练习",
+      "sourceUrl": "",
+      "translation": "打扰一下，最近的火车站在哪里？",
+      "words": [
+        { "text": "Excuse", "annotation": "ɪkˈskjuːz", "translation": "打扰", "suffix": "" },
+        { "text": "me", "annotation": "miː", "translation": "我（宾格）", "suffix": "," },
+        { "text": "where", "annotation": "weə", "translation": "在哪里", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "nearest", "annotation": "ˈnɪəstɪst", "translation": "最近的", "suffix": "" },
+        { "text": "train", "annotation": "treɪn", "translation": "火车", "suffix": "" },
+        { "text": "station", "annotation": "ˈsteɪʃn", "translation": "车站", "suffix": "?" }
+      ]
+    }
+  ]
+}

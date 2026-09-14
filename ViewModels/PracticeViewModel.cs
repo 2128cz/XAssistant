@@ -122,11 +122,14 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
     private readonly PracticeLedger _ledger;
     private readonly Queue<PracticeSentence> _bag = new();
     private readonly Stopwatch _verseClock = new();
-    private bool _verseAwarded, _canSave = true;
+    private bool _verseAwarded, _canSave = true, _switchingFilter;
     private int _verseMistakes;
     public ObservableCollection<PracticeWordState> Words { get; } = [];
     public ObservableCollection<PracticeResult> RecentResults { get; } = [];
-    public string[] Categories { get; }
+    // 筛选按题库目录的两级结构来：先选语言（一级目录），再选句式（文件名）。
+    public string[] Languages { get; private set; } = ["全部"];
+    public string[] Categories { get; private set; } = ["全部"];
+    [ObservableProperty] private string _selectedLanguage = "全部";
     [ObservableProperty] private string _selectedCategory = "全部";
     [ObservableProperty] private PracticeSentence? _currentSentence;
     [ObservableProperty] private string _verseInput = "";
@@ -139,12 +142,16 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
     public string ProgressText => $"{(int)Math.Round(VerseProgress * (CurrentSentence?.Text.Length ?? 0) / 100d)} / {CurrentSentence?.Text.Length ?? 0}";
     public long TotalScore => _ledger.TotalScore;
     public int CompletedRounds => _ledger.CompletedRounds;
-    public string SourceText => CurrentSentence == null ? "题库不可用" : $"{CurrentSentence.Category} · {CurrentSentence.Source}";
-    public string Translation => CurrentSentence?.Translation ?? "请检查 Assets/Practice/sentences.json";
+    public string SourceText => CurrentSentence == null ? "题库不可用"
+        : $"{CurrentSentence.Language} · {CurrentSentence.Category} · {CurrentSentence.Source}";
+    public string Translation => CurrentSentence?.Translation ?? "请检查 Assets/Practice/ 下的题库目录";
+    /// <summary>当前句式的拼写约定，悬停在筛选下拉上显示。</summary>
+    public string FilterNote => CurrentSentence?.Note ?? "";
 
     public static PracticeViewModel CreateDefault()
     {
-        var file = Path.Combine(AppContext.BaseDirectory, "Assets", "Practice", "sentences.json");
+        // 题库按「语言目录 / 句式文件」分档，加载器扫这个根目录下的全部 JSON。
+        var root = Path.Combine(AppContext.BaseDirectory, "Assets", "Practice");
         // Resolve the location without creating the directory until a score is saved.
         var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
 #if DEBUG
@@ -154,7 +161,7 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
 #endif
         );
         var store = new PracticeScoreStore(Path.Combine(folder, "practice-scores.json"));
-        try { return new PracticeViewModel(PracticeScoreStore.LoadCatalog(file), store); }
+        try { return new PracticeViewModel(PracticeScoreStore.LoadCatalogTree(root), store); }
         catch (Exception error) when (error is IOException or InvalidDataException or System.Text.Json.JsonException or UnauthorizedAccessException)
         { return new PracticeViewModel(new PracticeCatalog(), store) { VerseStatus = "题库加载失败：" + error.Message }; }
     }
@@ -163,14 +170,33 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
         _catalog = catalog;
         _store = store;
         if (catalog.Sentences.Count > 0) catalog.Validate();
-        Categories = new[] { "全部" }.Concat(catalog.Sentences.Select(s => s.Category).Distinct()).ToArray();
+        Languages = new[] { "全部" }.Concat(catalog.Sentences.Select(s => s.Language).Distinct(StringComparer.Ordinal)).ToArray();
+        RebuildCategories();
         try { _ledger = store.Load(); }
         catch (Exception error) when (error is IOException or InvalidDataException or System.Text.Json.JsonException or UnauthorizedAccessException)
         { _ledger = new(); _canSave = false; PersistenceStatus = "历史成绩读取失败，本次仅保留在内存：" + error.Message; }
         foreach (var result in _ledger.RecentResults.Take(20)) RecentResults.Add(result);
         NextSentence();
     }
-    partial void OnSelectedCategoryChanged(string value) { _bag.Clear(); NextSentence(); }
+    partial void OnSelectedCategoryChanged(string value) { if (_switchingFilter) return; _bag.Clear(); NextSentence(); }
+    partial void OnSelectedLanguageChanged(string value)
+    {
+        RebuildCategories();
+        _bag.Clear();
+        NextSentence();
+    }
+    /// <summary>句式候选跟着语言走：选了日语就不该再看见「伊索寓言」。</summary>
+    private void RebuildCategories()
+    {
+        var options = new[] { "全部" }.Concat(_catalog.Sentences
+            .Where(s => SelectedLanguage == "全部" || s.Language == SelectedLanguage)
+            .Select(s => s.Category).Distinct(StringComparer.Ordinal)).ToArray();
+        Categories = options;
+        _switchingFilter = true;
+        if (!options.Contains(SelectedCategory)) SelectedCategory = "全部";
+        _switchingFilter = false;
+        OnPropertyChanged(nameof(Categories));
+    }
     private void UpdateVerse(bool markErrors)
     {
         var text = PracticeText.Normalize(CurrentSentence?.Text ?? "");
@@ -239,7 +265,7 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
         VerseComplete = true;
         _verseClock.Stop();
         int score = Math.Max(10, CurrentSentence.Text.Length * 2 + 100 - _verseMistakes * 10);
-        Award("诗句抄写", score, _verseMistakes, _verseClock.Elapsed.TotalSeconds);
+        Award($"{CurrentSentence.Language}{(CurrentSentence.Mask ? "默写" : "抄写")}", score, _verseMistakes, _verseClock.Elapsed.TotalSeconds);
         VerseStatus = $"完成！+{score} 分 · 按回车进入下一句";
         if (AutoAdvance) NextSentence();
     }
@@ -249,7 +275,8 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
         if (!HasContent) return;
         if (_bag.Count == 0)
         {
-            var eligible = _catalog.Sentences.Where(s => SelectedCategory == "全部" || s.Category == SelectedCategory).OrderBy(_ => Random.Shared.Next()).ToList();
+            var eligible = _catalog.Sentences.Where(s => (SelectedLanguage == "全部" || s.Language == SelectedLanguage)
+                && (SelectedCategory == "全部" || s.Category == SelectedCategory)).OrderBy(_ => Random.Shared.Next()).ToList();
             if (eligible.Count > 1 && eligible[0].Id == CurrentSentence?.Id) (eligible[0], eligible[1]) = (eligible[1], eligible[0]);
             foreach (var sentence in eligible) _bag.Enqueue(sentence);
         }
@@ -263,9 +290,9 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
         _verseMistakes = 0;
         _verseClock.Reset();
         Words.Clear();
-        foreach (var word in CurrentSentence.Words) Words.Add(new PracticeWordState(word));
+        foreach (var word in CurrentSentence.Words) Words.Add(new PracticeWordState(word, CurrentSentence.Mask));
         VerseStatus = IdleHint;
-        foreach (var name in new[] { nameof(SourceText), nameof(Translation), nameof(ProgressText) }) OnPropertyChanged(name);
+        foreach (var name in new[] { nameof(SourceText), nameof(Translation), nameof(ProgressText), nameof(FilterNote) }) OnPropertyChanged(name);
     }
     private void Award(string mode, int score, int mistakes, double seconds)
     {
@@ -290,22 +317,27 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
     }
 }
 
-public partial class PracticeCharacter(string text) : ObservableObject
+public partial class PracticeCharacter(string text, bool mask) : ObservableObject
 {
     public string Text { get; } = text;
     [ObservableProperty] private bool _isCorrect;
     [ObservableProperty] private bool _isWrong;
+    /// <summary>闭卷句式里没敲对的字母一律给占位符，否则答案写在脸上就不是默写而是抄袭。</summary>
+    public string Display => mask && !IsCorrect && Text.Length > 0 && char.IsLetter(Text[0]) ? "_" : Text;
+    partial void OnIsCorrectChanged(bool value) => OnPropertyChanged(nameof(Display));
 }
 public partial class PracticeWordState : ObservableObject
 {
-    public string Ipa { get; }
+    public string Annotation { get; }
     public string Translation { get; }
     public ObservableCollection<PracticeCharacter> Characters { get; }
     [ObservableProperty] private bool _hasError;
-    public PracticeWordState(PracticeWord word)
+    public PracticeWordState(PracticeWord word, bool mask)
     {
-        Ipa = "/" + word.Ipa.Trim('/') + "/";
-        Translation = word.Text + " = " + word.Translation;
-        Characters = new((word.Text + word.Suffix).Select(c => new PracticeCharacter(c.ToString())));
+        // 拉丁字符是音标，得包在 /…/ 里；假名与汉字本身就是要读的正文，再加斜杠反而认不出来
+        Annotation = word.Annotation.All(char.IsAscii) ? "/" + word.Annotation.Trim('/') + "/" : word.Annotation;
+        // 悬停提示不能泄露答案：闭卷时左边给假名，不写罗马音
+        Translation = (mask ? word.Annotation : word.Text) + " = " + word.Translation;
+        Characters = new((word.Text + word.Suffix).Select(c => new PracticeCharacter(c.ToString(), mask)));
     }
 }

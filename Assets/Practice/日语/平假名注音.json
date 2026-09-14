@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "note": "平假名注音 · 罗马音照着敲。长音双写元音（おはよう→ohayoo、ケーキ→keeki），っ 双写后一个子音（きっと→kitto），ん 接 a/i/u/e/o 或 ya/yu/yo 时写成 n'。助词按读音转写：は→wa、へ→e、を→o。",
+  "sentences": [
+    {
+      "id": "ja-hira-weather",
+      "source": "日语 · 日常会话原创",
+      "sourceUrl": "",
+      "translation": "早上好，今天天气真好呢。",
+      "words": [
+        { "text": "ohayoo", "annotation": "おはよう", "translation": "早上好", "suffix": "," },
+        { "text": "kyoowa", "annotation": "きょうは", "translation": "今天是", "suffix": "" },
+        { "text": "ii", "annotation": "いい", "translation": "好", "suffix": "" },
+        { "text": "tenki", "annotation": "てんき", "translation": "天气", "suffix": "" },
+        { "text": "desune", "annotation": "ですね", "translation": "是这样呢", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-hira-thanks",
+      "source": "日语 · 日常会话原创",
+      "sourceUrl": "",
+      "translation": "真是非常感谢。",
+      "words": [
+        { "text": "kanari", "annotation": "かなり", "translation": "相当、非常", "suffix": "" },
+        { "text": "arigatoo", "annotation": "ありがとう", "translation": "谢谢", "suffix": "" },
+        { "text": "gozaimasu", "annotation": "ございます", "translation": "（敬语补助动词）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-hira-first-meeting",
+      "source": "日语 · 日常会话原创",
+      "sourceUrl": "",
+      "translation": "初次见面，今后请多关照。",
+      "words": [
+        { "text": "hajimemashite", "annotation": "はじめまして", "translation": "初次见面", "suffix": "," },
+        { "text": "yoroshiku", "annotation": "よろしく", "translation": "好好地、请", "suffix": "" },
+        { "text": "onegaishimasu", "annotation": "おねがいします", "translation": "拜托了", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-hira-station",
+      "source": "日语 · 日常会话原创",
+      "sourceUrl": "",
+      "translation": "不好意思，车站是在哪里呢？",
+      "words": [
+        { "text": "sumimasen", "annotation": "すみません", "translation": "不好意思", "suffix": "," },
+        { "text": "eki", "annotation": "えき", "translation": "车站", "suffix": "" },
+        { "text": "wa", "annotation": "は", "translation": "（主题助词）", "suffix": "" },
+        { "text": "doko", "annotation": "どこ", "translation": "哪里", "suffix": "" },
+        { "text": "desuka", "annotation": "ですか", "translation": "是吗", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-hira-cake",
+      "source": "日语 · 日常会话原创",
+      "sourceUrl": "",
+      "translation": "这块蛋糕非常好吃。",
+      "words": [
+        { "text": "kono", "annotation": "この", "translation": "这个", "suffix": "" },
+        { "text": "keeki", "annotation": "ケーキ", "translation": "蛋糕", "suffix": "" },
+        { "text": "wa", "annotation": "は", "translation": "（主题助词）", "suffix": "" },
+        { "text": "totemo", "annotation": "とても", "translation": "非常", "suffix": "" },
+        { "text": "oishii", "annotation": "おいしい", "translation": "好吃的", "suffix": "" },
+        { "text": "desu", "annotation": "です", "translation": "是", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-hira-movie",
+      "source": "日语 · 日常会话原创",
+      "sourceUrl": "",
+      "translation": "今天和朋友一起看电影。",
+      "words": [
+        { "text": "kyoo", "annotation": "きょう", "translation": "今天", "suffix": "" },
+        { "text": "wa", "annotation": "は", "translation": "（主题助词）", "suffix": "" },
+        { "text": "tomodachito", "annotation": "ともだちと", "translation": "和朋友", "suffix": "" },
+        { "text": "eiga", "annotation": "えいが", "translation": "电影", "suffix": "" },
+        { "text": "o", "annotation": "を", "translation": "（宾格助词）", "suffix": "" },
+        { "text": "mimasu", "annotation": "みます", "translation": "看", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-hira-kitten",
+      "source": "日语 · 日常会话原创",
+      "sourceUrl": "",
+      "translation": "那只小猫在桌子下面睡着。",
+      "words": [
+        { "text": "ano", "annotation": "あの", "translation": "那个", "suffix": "" },
+        { "text": "koneko", "annotation": "こねこ", "translation": "小猫", "suffix": "" },
+        { "text": "wa", "annotation": "は", "translation": "（主题助词）", "suffix": "" },
+        { "text": "teeburu", "annotation": "テーブル", "translation": "桌子", "suffix": "" },
+        { "text": "no", "annotation": "の", "translation": "（所属助词）", "suffix": "" },
+        { "text": "shita", "annotation": "した", "translation": "下面", "suffix": "" },
+        { "text": "de", "annotation": "で", "translation": "（场所助词）", "suffix": "" },
+        { "text": "neteimasu", "annotation": "ねています", "translation": "正睡着", "suffix": "." }
+      ]
+    }
+  ]
+}

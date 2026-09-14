@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "note": "英文句子抄写 · 注音是 IPA，只需照抄字母与标点",
+  "sentences": [
+    {
+      "id": "do-not-others",
+      "source": "《论语 · 颜渊》英译 · 练习用简译",
+      "sourceUrl": "",
+      "translation": "自己不愿意的，不要施加给别人。",
+      "words": [
+        { "text": "Do", "annotation": "duː", "translation": "做", "suffix": "" },
+        { "text": "not", "annotation": "nɒt", "translation": "不", "suffix": "" },
+        { "text": "do", "annotation": "duː", "translation": "做", "suffix": "" },
+        { "text": "to", "annotation": "tə", "translation": "向；与", "suffix": "" },
+        { "text": "others", "annotation": "ˈʌðəz", "translation": "其他人", "suffix": "" },
+        { "text": "what", "annotation": "wɒt", "translation": "什么", "suffix": "" },
+        { "text": "you", "annotation": "juː", "translation": "你", "suffix": "" },
+        { "text": "do", "annotation": "duː", "translation": "做", "suffix": "" },
+        { "text": "not", "annotation": "nɒt", "translation": "不", "suffix": "" },
+        { "text": "want", "annotation": "wɒnt", "translation": "想要", "suffix": "" },
+        { "text": "done", "annotation": "dʌn", "translation": "被做", "suffix": "" },
+        { "text": "to", "annotation": "tə", "translation": "向；与", "suffix": "" },
+        { "text": "yourself", "annotation": "jɔːˈself", "translation": "你自己", "suffix": "." }
+      ]
+    },
+    {
+      "id": "three-walk",
+      "source": "《论语 · 述而》英译 · 练习用简译",
+      "sourceUrl": "",
+      "translation": "三个人同行，其中必有我的老师。",
+      "words": [
+        { "text": "When", "annotation": "wen", "translation": "当……时", "suffix": "" },
+        { "text": "three", "annotation": "θriː", "translation": "三；三个人", "suffix": "" },
+        { "text": "walk", "annotation": "wɔːk", "translation": "行走", "suffix": "" },
+        { "text": "together", "annotation": "təˈɡeðə", "translation": "一起", "suffix": "," },
+        { "text": "one", "annotation": "wʌn", "translation": "一个；其中一人", "suffix": "" },
+        { "text": "can", "annotation": "kæn", "translation": "能够", "suffix": "" },
+        { "text": "teach", "annotation": "tiːtʃ", "translation": "教导", "suffix": "" },
+        { "text": "me", "annotation": "miː", "translation": "我（宾格）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "knowing-wisdom",
+      "source": "《道德经》英译 · 练习用简译",
+      "sourceUrl": "",
+      "translation": "了解别人是智慧，认识自己才是开明。",
+      "words": [
+        { "text": "Knowing", "annotation": "ˈnəʊɪŋ", "translation": "了解", "suffix": "" },
+        { "text": "others", "annotation": "ˈʌðəz", "translation": "其他人", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "wisdom", "annotation": "ˈwɪzdəm", "translation": "智慧", "suffix": ";" },
+        { "text": "knowing", "annotation": "ˈnəʊɪŋ", "translation": "了解", "suffix": "" },
+        { "text": "yourself", "annotation": "jɔːˈself", "translation": "你自己", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "enlightenment", "annotation": "ɪnˌlaɪtənˈment", "translation": "开明；觉悟", "suffix": "." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "note": "英文句子抄写 · 注音是 IPA，只需照抄字母与标点",
+  "sentences": [
+    {
+      "id": "count",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "从一数到十。",
+      "words": [
+        { "text": "Count", "annotation": "kaʊnt", "translation": "数数", "suffix": "" },
+        { "text": "from", "annotation": "frɒm", "translation": "从", "suffix": "" },
+        { "text": "1", "annotation": "wʌn", "translation": "一", "suffix": "" },
+        { "text": "to", "annotation": "tə", "translation": "向；与", "suffix": "" },
+        { "text": "10", "annotation": "ten", "translation": "十", "suffix": "." }
+      ]
+    },
+    {
+      "id": "answer",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "答案是四十二。",
+      "words": [
+        { "text": "The", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "answer", "annotation": "ˈɑːnsə", "translation": "答案", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "42", "annotation": "ˌfɔːti ˈtuː", "translation": "四十二", "suffix": "." }
+      ]
+    },
+    {
+      "id": "books",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "在七天内读三本书。",
+      "words": [
+        { "text": "Read", "annotation": "riːd", "translation": "阅读", "suffix": "" },
+        { "text": "3", "annotation": "θriː", "translation": "三", "suffix": "" },
+        { "text": "books", "annotation": "bʊks", "translation": "书籍", "suffix": "" },
+        { "text": "in", "annotation": "ɪn", "translation": "在……内", "suffix": "" },
+        { "text": "7", "annotation": "ˈsevən", "translation": "七", "suffix": "" },
+        { "text": "days", "annotation": "deɪz", "translation": "天", "suffix": "." }
+      ]
+    },
+    {
+      "id": "coins",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "在三十天内攒下一百枚硬币。",
+      "words": [
+        { "text": "Save", "annotation": "seɪv", "translation": "积攒", "suffix": "" },
+        { "text": "100", "annotation": "wʌn ˈhʌndrəd", "translation": "一百", "suffix": "" },
+        { "text": "coins", "annotation": "kɔɪnz", "translation": "硬币", "suffix": "" },
+        { "text": "in", "annotation": "ɪn", "translation": "在……内", "suffix": "" },
+        { "text": "30", "annotation": "ˈθɜːti", "translation": "三十", "suffix": "" },
+        { "text": "days", "annotation": "deɪz", "translation": "天", "suffix": "." }
+      ]
+    },
+    {
+      "id": "week-year",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "一周有七天，一年有十二个月。",
+      "words": [
+        { "text": "There", "annotation": "ðeə", "translation": "那里；存在", "suffix": "" },
+        { "text": "are", "annotation": "ɑː", "translation": "是", "suffix": "" },
+        { "text": "7", "annotation": "ˈsevən", "translation": "七", "suffix": "" },
+        { "text": "days", "annotation": "deɪz", "translation": "天", "suffix": "" },
+        { "text": "in", "annotation": "ɪn", "translation": "在……内", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "week", "annotation": "wiːk", "translation": "周", "suffix": "" },
+        { "text": "and", "annotation": "ænd", "translation": "和", "suffix": "" },
+        { "text": "12", "annotation": "twelv", "translation": "十二", "suffix": "" },
+        { "text": "months", "annotation": "mʌnθs", "translation": "月", "suffix": "" },
+        { "text": "in", "annotation": "ɪn", "translation": "在……内", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "year", "annotation": "jɪə", "translation": "年", "suffix": "." }
+      ]
+    },
+    {
+      "id": "times-equals",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "三乘以四等于十二。",
+      "words": [
+        { "text": "3", "annotation": "θriː", "translation": "三", "suffix": "" },
+        { "text": "times", "annotation": "taɪmz", "translation": "乘以", "suffix": "" },
+        { "text": "4", "annotation": "fɔː", "translation": "四", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "12", "annotation": "twelv", "translation": "十二", "suffix": "." }
+      ]
+    },
+    {
+      "id": "clock-meeting",
+      "source": "数字与英文 · 原创练习",
+      "sourceUrl": "",
+      "translation": "我们下午三点见面。",
+      "words": [
+        { "text": "We", "annotation": "wiː", "translation": "我们", "suffix": "" },
+        { "text": "meet", "annotation": "miːt", "translation": "会面", "suffix": "" },
+        { "text": "at", "annotation": "æt", "translation": "在（时刻）", "suffix": "" },
+        { "text": "3", "annotation": "θriː", "translation": "三", "suffix": "" },
+        { "text": "o'clock", "annotation": "əˈklɒk", "translation": "点钟", "suffix": "" },
+        { "text": "in", "annotation": "ɪn", "translation": "在……内", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "afternoon", "annotation": "ˌɑːftəˈnuːn", "translation": "下午", "suffix": "." }
+      ]
+    }
+  ]
+}

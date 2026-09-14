@@ -33,10 +33,35 @@ public sealed class PracticeScoreStore(string filePath) : IPracticeScoreStore
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
-    public static PracticeCatalog LoadCatalog(string path)
+    /// <summary>
+    /// 按「语言目录 / 句式文件」两级结构加载题库：扫根目录下所有 JSON，
+    /// 一级目录名就是语言，文件名（或文件里的 name）就是句式。分类只认目录结构，
+    /// JSON 里重复写的 category 一律不算，避免两边各说一套。
+    /// </summary>
+    public static PracticeCatalog LoadCatalogTree(string root)
     {
-        var catalog = JsonSerializer.Deserialize<PracticeCatalog>(File.ReadAllText(path), JsonOptions)
-            ?? throw new InvalidDataException("题库为空。");
+        if (!Directory.Exists(root)) throw new DirectoryNotFoundException($"找不到题库目录 {root}。");
+        var catalog = new PracticeCatalog();
+        foreach (var file in Directory.EnumerateFiles(root, "*.json", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
+        {
+            var relative = Path.GetRelativePath(root, file);
+            // 直接躺在根下的文件没有语言目录，归进「通用」，不因为缺分类就整个题库加载不了
+            var language = relative.Contains(Path.DirectorySeparatorChar) || relative.Contains(Path.AltDirectorySeparatorChar)
+                ? relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)[0] : "通用";
+            var parsed = JsonSerializer.Deserialize<PracticeCatalogFile>(File.ReadAllText(file), JsonOptions)
+                ?? throw new InvalidDataException($"题库文件 {relative} 是空的。");
+            if (parsed.Version != 1) throw new InvalidDataException($"题库文件 {relative} 的版本不支持。");
+            if (parsed.Sentences.Count == 0) throw new InvalidDataException($"题库文件 {relative} 没有题目。");
+            var name = string.IsNullOrWhiteSpace(parsed.Name) ? Path.GetFileNameWithoutExtension(file) : parsed.Name.Trim();
+            foreach (var sentence in parsed.Sentences)
+            {
+                sentence.Language = language;
+                sentence.Category = name;
+                sentence.Note = parsed.Note?.Trim() ?? "";
+                sentence.Mask = parsed.Mask;
+                catalog.Sentences.Add(sentence);
+            }
+        }
         catalog.Validate();
         return catalog;
     }

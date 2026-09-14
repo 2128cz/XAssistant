@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "mask": true,
+  "note": "看片假名默写罗马音 · 字母被遮住，敲对才显形。长音 ー 双写前一个元音（コーヒー→koohii、テーブル→teeburu），ッ 双写后一个子音（とっても→totte）。",
+  "sentences": [
+    {
+      "id": "ja-kata-cafe",
+      "source": "日语 · 片假名外来语原创",
+      "sourceUrl": "",
+      "translation": "我要咖啡和蛋糕。",
+      "words": [
+        { "text": "koohii", "annotation": "コーヒー", "translation": "咖啡", "suffix": "" },
+        { "text": "to", "annotation": "と", "translation": "和", "suffix": "" },
+        { "text": "keeki", "annotation": "ケーキ", "translation": "蛋糕", "suffix": "" },
+        { "text": "o", "annotation": "を", "translation": "（宾格助词）", "suffix": "" },
+        { "text": "tabemasu", "annotation": "たべます", "translation": "吃", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-kata-bus",
+      "source": "日语 · 片假名外来语原创",
+      "sourceUrl": "",
+      "translation": "我坐巴士去学校。",
+      "words": [
+        { "text": "basu", "annotation": "バス", "translation": "巴士", "suffix": "" },
+        { "text": "de", "annotation": "で", "translation": "（手段助词）", "suffix": "" },
+        { "text": "gakkoo", "annotation": "がっこう", "translation": "学校", "suffix": "" },
+        { "text": "e", "annotation": "へ", "translation": "（方向助词）", "suffix": "" },
+        { "text": "ikimasu", "annotation": "いきます", "translation": "去", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-kata-hotel",
+      "source": "日语 · 片假名外来语原创",
+      "sourceUrl": "",
+      "translation": "不好意思，酒店的浴室在哪里？",
+      "words": [
+        { "text": "sumimasen", "annotation": "すみません", "translation": "不好意思", "suffix": "," },
+        { "text": "hoteru", "annotation": "ホテル", "translation": "酒店", "suffix": "" },
+        { "text": "no", "annotation": "の", "translation": "（所属助词）", "suffix": "" },
+        { "text": "furo", "annotation": "ふろ", "translation": "浴室", "suffix": "" },
+        { "text": "wa", "annotation": "は", "translation": "（主题助词）", "suffix": "" },
+        { "text": "doko", "annotation": "どこ", "translation": "哪里", "suffix": "" },
+        { "text": "desuka", "annotation": "ですか", "translation": "是吗", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-kata-ice",
+      "source": "日语 · 片假名外来语原创",
+      "sourceUrl": "",
+      "translation": "冰淇淋非常好吃。",
+      "words": [
+        { "text": "aisukuriimu", "annotation": "アイスクリーム", "translation": "冰淇淋", "suffix": "" },
+        { "text": "wa", "annotation": "は", "translation": "（主题助词）", "suffix": "" },
+        { "text": "totemo", "annotation": "とても", "translation": "非常", "suffix": "" },
+        { "text": "oishii", "annotation": "おいしい", "translation": "好吃的", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-kata-camera",
+      "source": "日语 · 片假名外来语原创",
+      "sourceUrl": "",
+      "translation": "请用相机拍照。",
+      "words": [
+        { "text": "kamera", "annotation": "カメラ", "translation": "相机", "suffix": "" },
+        { "text": "de", "annotation": "で", "translation": "（手段助词）", "suffix": "" },
+        { "text": "shashin", "annotation": "しゃしん", "translation": "照片", "suffix": "" },
+        { "text": "o", "annotation": "を", "translation": "（宾格助词）", "suffix": "" },
+        { "text": "torimasu", "annotation": "とります", "translation": "拍、取", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-kata-cat",
+      "source": "日语 · 片假名外来语原创",
+      "sourceUrl": "",
+      "translation": "猫在桌子上面。",
+      "words": [
+        { "text": "neko", "annotation": "ネコ", "translation": "猫", "suffix": "" },
+        { "text": "ga", "annotation": "が", "translation": "（主格助词）", "suffix": "" },
+        { "text": "teeburu", "annotation": "テーブル", "translation": "桌子", "suffix": "" },
+        { "text": "no", "annotation": "の", "translation": "（所属助词）", "suffix": "" },
+        { "text": "ue", "annotation": "うえ", "translation": "上面", "suffix": "" },
+        { "text": "ni", "annotation": "に", "translation": "（存在地点助词）", "suffix": "" },
+        { "text": "imasu", "annotation": "います", "translation": "（有生命存在）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-kata-memo",
+      "source": "日语 · 片假名外来语原创",
+      "sourceUrl": "",
+      "translation": "麻烦请把这个记下来。",
+      "words": [
+        { "text": "kore", "annotation": "これ", "translation": "这个", "suffix": "" },
+        { "text": "o", "annotation": "を", "translation": "（宾格助词）", "suffix": "" },
+        { "text": "memo", "annotation": "メモ", "translation": "笔记", "suffix": "" },
+        { "text": "ni", "annotation": "に", "translation": "（结果助词）", "suffix": "" },
+        { "text": "totte", "annotation": "とって", "translation": "取、记下", "suffix": "" },
+        { "text": "kudasai", "annotation": "ください", "translation": "请", "suffix": "." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "note": "英文句子抄写 · 注音是 IPA，只需照抄字母与标点",
+  "sentences": [
+    {
+      "id": "practice",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "熟能生巧。",
+      "words": [
+        { "text": "Practice", "annotation": "ˈpræktɪs", "translation": "练习", "suffix": "" },
+        { "text": "makes", "annotation": "meɪks", "translation": "使成为", "suffix": "" },
+        { "text": "perfect", "annotation": "ˈpɜːfɪkt", "translation": "完美；熟练", "suffix": "." }
+      ]
+    },
+    {
+      "id": "time",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "岁月不待人。",
+      "words": [
+        { "text": "Time", "annotation": "taɪm", "translation": "时间", "suffix": "" },
+        { "text": "and", "annotation": "ænd", "translation": "和", "suffix": "" },
+        { "text": "tide", "annotation": "taɪd", "translation": "潮汐", "suffix": "" },
+        { "text": "wait", "annotation": "weɪt", "translation": "等待", "suffix": "" },
+        { "text": "for", "annotation": "fɔː", "translation": "为了；等待对象", "suffix": "" },
+        { "text": "no", "annotation": "nəʊ", "translation": "没有", "suffix": "" },
+        { "text": "man", "annotation": "mæn", "translation": "人", "suffix": "." }
+      ]
+    },
+    {
+      "id": "will",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "有志者事竟成。",
+      "words": [
+        { "text": "Where", "annotation": "weə", "translation": "在……的地方", "suffix": "" },
+        { "text": "there", "annotation": "ðeə", "translation": "那里；存在", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "will", "annotation": "wɪl", "translation": "意志", "suffix": "," },
+        { "text": "there", "annotation": "ðeə", "translation": "那里；存在", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "way", "annotation": "weɪ", "translation": "道路；办法", "suffix": "." }
+      ]
+    },
+    {
+      "id": "journey",
+      "source": "传统格言 · 英文练习改写",
+      "sourceUrl": "",
+      "translation": "千里之行，始于足下。",
+      "words": [
+        { "text": "A", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "journey", "annotation": "ˈdʒɜːni", "translation": "旅程", "suffix": "" },
+        { "text": "of", "annotation": "əv", "translation": "……的", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "thousand", "annotation": "ˈθaʊzənd", "translation": "一千", "suffix": "" },
+        { "text": "miles", "annotation": "maɪlz", "translation": "英里", "suffix": "" },
+        { "text": "begins", "annotation": "bɪˈɡɪnz", "translation": "开始", "suffix": "" },
+        { "text": "with", "annotation": "wɪð", "translation": "以；和", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "single", "annotation": "ˈsɪŋɡəl", "translation": "单独的", "suffix": "" },
+        { "text": "step", "annotation": "step", "translation": "一步", "suffix": "." }
+      ]
+    },
+    {
+      "id": "actions-speak",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "行动胜于空谈。",
+      "words": [
+        { "text": "Actions", "annotation": "ˈækʃənz", "translation": "行动", "suffix": "" },
+        { "text": "speak", "annotation": "spiːk", "translation": "说话", "suffix": "" },
+        { "text": "louder", "annotation": "ˈlaʊdə", "translation": "更响亮", "suffix": "" },
+        { "text": "than", "annotation": "ðæn", "translation": "比", "suffix": "" },
+        { "text": "words", "annotation": "wɜːdz", "translation": "话语", "suffix": "." }
+      ]
+    },
+    {
+      "id": "apple-day",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "一天一苹果，医生远离我。",
+      "words": [
+        { "text": "An", "annotation": "ən", "translation": "一个", "suffix": "" },
+        { "text": "apple", "annotation": "ˈæpl", "translation": "苹果", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "day", "annotation": "deɪ", "translation": "一天", "suffix": "" },
+        { "text": "keeps", "annotation": "kiːps", "translation": "使保持", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "doctor", "annotation": "ˈdɒktə", "translation": "医生", "suffix": "" },
+        { "text": "away", "annotation": "əˈweɪ", "translation": "远离", "suffix": "." }
+      ]
+    },
+    {
+      "id": "friend-need",
+      "source": "传统英语谚语",
+      "sourceUrl": "",
+      "translation": "患难之际的朋友才是真朋友。",
+      "words": [
+        { "text": "A", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "friend", "annotation": "frend", "translation": "朋友", "suffix": "" },
+        { "text": "in", "annotation": "ɪn", "translation": "在……内", "suffix": "" },
+        { "text": "need", "annotation": "niːd", "translation": "需要；困难", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "friend", "annotation": "frend", "translation": "朋友", "suffix": "" },
+        { "text": "indeed", "annotation": "ɪnˈdiːd", "translation": "确实", "suffix": "." }
+      ]
+    }
+  ]
+}

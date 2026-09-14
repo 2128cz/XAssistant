@@ -6,7 +6,7 @@
  <Border BorderBrush="#66DCC99D" BorderThickness="0,1" Background="{DynamicResource CardBackground}" Padding="18,16" IsEnabled="{Binding HasContent}">
   <StackPanel>
    <DockPanel LastChildFill="True">
-    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><ComboBox Width="108" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" Margin="0,0,8,0"/><Button Focusable="False" Content="清空" Command="{Binding ClearInputCommand}" Margin="0,0,8,0"/><Button Focusable="False" Content="换一句 ↗" Command="{Binding NextSentenceCommand}"/></StackPanel>
+    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" ToolTip="{Binding FilterNote}"><ComboBox Width="92" ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}" Margin="0,0,8,0"/><ComboBox Width="128" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" Margin="0,0,8,0"/><Button Focusable="False" Content="清空" Command="{Binding ClearInputCommand}" Margin="0,0,8,0"/><Button Focusable="False" Content="换一句 ↗" Command="{Binding NextSentenceCommand}"/></StackPanel>
     <StackPanel><TextBlock Text="VERSE / 随机练习" FontFamily="Consolas" Foreground="{DynamicResource TextSecondary}" FontSize="11"/><TextBlock Text="{Binding SourceText}" FontSize="11" Foreground="{DynamicResource TextHint}" Margin="0,5,8,0" TextWrapping="Wrap"/></StackPanel>
    </DockPanel>
    <ItemsControl ItemsSource="{Binding Words}" Margin="0,18,0,12">
@@ -14,8 +14,8 @@
     <ItemsControl.ItemTemplate><DataTemplate>
      <Border Margin="0,0,14,12" Padding="0,2" BorderThickness="0,0,0,1" ToolTip="{Binding Translation}">
       <Border.Style><Style TargetType="Border"><Setter Property="BorderBrush" Value="Transparent"/><Style.Triggers><DataTrigger Binding="{Binding HasError}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}"/><Setter Property="Background" Value="#22FF6B6B"/></DataTrigger></Style.Triggers></Style></Border.Style>
-      <StackPanel><TextBlock Text="{Binding Ipa}" FontFamily="Segoe UI" HorizontalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextHint}" Margin="0,0,0,5"/>
-       <ItemsControl ItemsSource="{Binding Characters}" HorizontalAlignment="Center"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding Text}" Style="{StaticResource Letter}"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+      <StackPanel><TextBlock Text="{Binding Annotation}" FontFamily="Segoe UI,Yu Gothic UI,MS Gothic" HorizontalAlignment="Center" FontSize="13" Foreground="{DynamicResource TextHint}" Margin="0,0,0,5"/>
+       <ItemsControl ItemsSource="{Binding Characters}" HorizontalAlignment="Center"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding Display}" Style="{StaticResource Letter}"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
       </StackPanel>
      </Border>
     </DataTemplate></ItemsControl.ItemTemplate>

@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "mask": true,
+  "note": "汉字注音 · 括号里是读音，看日文默打罗马音。促音 っ 双写后一个子音（しゅっしん→shusshin），长音双写元音（ありがとう→arigatoo），拨音 ん 一律写 n，只在会与后面的元音连读时加撇（さんい→san'i）。",
+  "sentences": [
+    {
+      "id": "ja-daily-name",
+      "source": "日语 · 日常寒暄原创",
+      "sourceUrl": "",
+      "translation": "请问您叫什么名字？",
+      "words": [
+        { "text": "onamae", "annotation": "お名前（おなまえ）", "translation": "姓名（敬称）", "suffix": "" },
+        { "text": "wa", "annotation": "は", "translation": "（主题助词）", "suffix": "" },
+        { "text": "nani", "annotation": "何（なに）", "translation": "什么", "suffix": "" },
+        { "text": "desuka", "annotation": "ですか", "translation": "是吗", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-daily-age",
+      "source": "日语 · 日常寒暄原创",
+      "sourceUrl": "",
+      "translation": "恕我冒昧，请问您几岁？",
+      "words": [
+        { "text": "shitsurei", "annotation": "失礼（しつれい）", "translation": "失礼", "suffix": "" },
+        { "text": "desu", "annotation": "です", "translation": "是", "suffix": "" },
+        { "text": "ga", "annotation": "が", "translation": "（主格助词）", "suffix": "," },
+        { "text": "nansai", "annotation": "何歳（なんさい）", "translation": "几岁", "suffix": "" },
+        { "text": "desuka", "annotation": "ですか", "translation": "是吗", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-daily-price",
+      "source": "日语 · 日常寒暄原创",
+      "sourceUrl": "",
+      "translation": "这个多少钱？",
+      "words": [
+        { "text": "kore", "annotation": "これ", "translation": "这个", "suffix": "" },
+        { "text": "wa", "annotation": "は", "translation": "（主题助词）", "suffix": "" },
+        { "text": "ikura", "annotation": "いくら", "translation": "多少", "suffix": "" },
+        { "text": "desuka", "annotation": "ですか", "translation": "是吗", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-daily-water",
+      "source": "日语 · 日常寒暄原创",
+      "sourceUrl": "",
+      "translation": "不好意思，请给我一杯水。",
+      "words": [
+        { "text": "sumimasen", "annotation": "すみません", "translation": "不好意思", "suffix": "," },
+        { "text": "omizu", "annotation": "お水（おみず）", "translation": "水（敬称）", "suffix": "" },
+        { "text": "o", "annotation": "を", "translation": "（宾格助词）", "suffix": "" },
+        { "text": "kudasai", "annotation": "ください", "translation": "请给我", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-daily-thanks-help",
+      "source": "日语 · 日常寒暄原创",
+      "sourceUrl": "",
+      "translation": "谢谢，真是帮了大忙。",
+      "words": [
+        { "text": "arigatoo", "annotation": "ありがとう", "translation": "谢谢", "suffix": "," },
+        { "text": "tasukarimashita", "annotation": "助かりました（たすかりました）", "translation": "帮了大忙", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-daily-origin",
+      "source": "日语 · 日常寒暄原创",
+      "sourceUrl": "",
+      "translation": "您的出身是哪里？",
+      "words": [
+        { "text": "shusshin", "annotation": "出身（しゅっしん）", "translation": "出身", "suffix": "" },
+        { "text": "wa", "annotation": "は", "translation": "（主题助词）", "suffix": "" },
+        { "text": "doko", "annotation": "どこ", "translation": "哪里", "suffix": "" },
+        { "text": "desuka", "annotation": "ですか", "translation": "是吗", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-daily-time",
+      "source": "日语 · 日常寒暄原创",
+      "sourceUrl": "",
+      "translation": "现在几点了？",
+      "words": [
+        { "text": "ima", "annotation": "今（いま）", "translation": "现在", "suffix": "," },
+        { "text": "nanji", "annotation": "何時（なんじ）", "translation": "几点", "suffix": "" },
+        { "text": "desuka", "annotation": "ですか", "translation": "是吗", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-daily-hungry",
+      "source": "日语 · 日常寒暄原创",
+      "sourceUrl": "",
+      "translation": "我回来了，肚子饿了。",
+      "words": [
+        { "text": "tadaima", "annotation": "ただいま", "translation": "我回来了", "suffix": "," },
+        { "text": "onaka", "annotation": "お腹（おなか）", "translation": "肚子", "suffix": "" },
+        { "text": "ga", "annotation": "が", "translation": "（主格助词）", "suffix": "" },
+        { "text": "sukimashita", "annotation": "すきました", "translation": "饿了", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ja-daily-sewa",
+      "source": "日语 · 日常寒暄原创",
+      "sourceUrl": "",
+      "translation": "一直以来承蒙您关照。",
+      "words": [
+        { "text": "itsumo", "annotation": "いつも", "translation": "总是", "suffix": "" },
+        { "text": "osewa", "annotation": "お世話（おせわ）", "translation": "照顾", "suffix": "" },
+        { "text": "ni", "annotation": "に", "translation": "（状态助词）", "suffix": "" },
+        { "text": "natte", "annotation": "なって", "translation": "成为（て形）", "suffix": "" },
+        { "text": "imasu", "annotation": "います", "translation": "（持续状态）", "suffix": "." }
+      ]
+    }
+  ]
+}

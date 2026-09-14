@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "note": "英文句子抄写 · 注音是 IPA，只需照抄字母与标点",
+  "sentences": [
+    {
+      "id": "sonnet18",
+      "source": "William Shakespeare · Sonnet 18",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/shakespeares-sonnets/read/18/",
+      "translation": "我能否将你比作夏日？",
+      "words": [
+        { "text": "Shall", "annotation": "ʃæl", "translation": "将会；是否", "suffix": "" },
+        { "text": "I", "annotation": "aɪ", "translation": "我", "suffix": "" },
+        { "text": "compare", "annotation": "kəmˈpeə", "translation": "比较；比作", "suffix": "" },
+        { "text": "thee", "annotation": "ðiː", "translation": "你（古语宾格）", "suffix": "" },
+        { "text": "to", "annotation": "tə", "translation": "向；与", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "summer's", "annotation": "ˈsʌməz", "translation": "夏日的", "suffix": "" },
+        { "text": "day", "annotation": "deɪ", "translation": "一天", "suffix": "?" }
+      ]
+    },
+    {
+      "id": "hamlet-being",
+      "source": "William Shakespeare · Hamlet（标点适配）",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/Hamlet/read/",
+      "translation": "生存还是毁灭，这是个问题。",
+      "words": [
+        { "text": "To", "annotation": "tə", "translation": "去；不定式标记", "suffix": "" },
+        { "text": "be", "annotation": "biː", "translation": "存在；是", "suffix": "" },
+        { "text": "or", "annotation": "ɔː", "translation": "或者", "suffix": "" },
+        { "text": "not", "annotation": "nɒt", "translation": "不", "suffix": "" },
+        { "text": "to", "annotation": "tə", "translation": "向；与", "suffix": "" },
+        { "text": "be", "annotation": "biː", "translation": "存在；是", "suffix": "," },
+        { "text": "that", "annotation": "ðæt", "translation": "那", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "question", "annotation": "ˈkwestʃən", "translation": "问题", "suffix": "." }
+      ]
+    },
+    {
+      "id": "world-stage",
+      "source": "William Shakespeare · As You Like It",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/as-you-like-it/read/",
+      "translation": "整个世界就是一座舞台。",
+      "words": [
+        { "text": "All", "annotation": "ɔːl", "translation": "全部", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "world's", "annotation": "wɜːldz", "translation": "世界的", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "stage", "annotation": "steɪdʒ", "translation": "舞台", "suffix": "." }
+      ]
+    },
+    {
+      "id": "brevity",
+      "source": "William Shakespeare · Hamlet",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/Hamlet/read/",
+      "translation": "简洁是智慧的精髓。",
+      "words": [
+        { "text": "Brevity", "annotation": "ˈbrevəti", "translation": "简洁", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "soul", "annotation": "səʊl", "translation": "灵魂；精髓", "suffix": "" },
+        { "text": "of", "annotation": "əv", "translation": "……的", "suffix": "" },
+        { "text": "wit", "annotation": "wɪt", "translation": "智慧；机智", "suffix": "." }
+      ]
+    },
+    {
+      "id": "thine-own-self",
+      "source": "William Shakespeare · Hamlet（节选）",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/Hamlet/read/",
+      "translation": "务必对你自己真诚。",
+      "words": [
+        { "text": "To", "annotation": "tə", "translation": "向；与", "suffix": "" },
+        { "text": "thine", "annotation": "ðaɪn", "translation": "你的（古语）", "suffix": "" },
+        { "text": "own", "annotation": "aʊn", "translation": "自己的", "suffix": "" },
+        { "text": "self", "annotation": "self", "translation": "自我", "suffix": "" },
+        { "text": "be", "annotation": "biː", "translation": "存在；是", "suffix": "" },
+        { "text": "true", "annotation": "truː", "translation": "真实的", "suffix": "." }
+      ]
+    },
+    {
+      "id": "glisters-gold",
+      "source": "William Shakespeare · The Merchant of Venice",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/the-merchant-of-venice/read/",
+      "translation": "发光的未必都是金子。",
+      "words": [
+        { "text": "All", "annotation": "ɔːl", "translation": "全部", "suffix": "" },
+        { "text": "that", "annotation": "ðæt", "translation": "那", "suffix": "" },
+        { "text": "glisters", "annotation": "ˈɡlɪstəz", "translation": "闪光", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "not", "annotation": "nɒt", "translation": "不", "suffix": "" },
+        { "text": "gold", "annotation": "ɡəʊld", "translation": "金子", "suffix": "." }
+      ]
+    },
+    {
+      "id": "rose-name",
+      "source": "William Shakespeare · Romeo and Juliet（节选）",
+      "sourceUrl": "https://www.folger.edu/explore/shakespeares-works/romeo-and-juliet/read/",
+      "translation": "我们称作玫瑰的花，换个名字一样芬芳。",
+      "words": [
+        { "text": "That", "annotation": "ðæt", "translation": "那", "suffix": "" },
+        { "text": "which", "annotation": "wɪtʃ", "translation": "哪一个", "suffix": "" },
+        { "text": "we", "annotation": "wiː", "translation": "我们", "suffix": "" },
+        { "text": "call", "annotation": "kɔːl", "translation": "称作", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "rose", "annotation": "rəʊz", "translation": "玫瑰", "suffix": "" },
+        { "text": "by", "annotation": "baɪ", "translation": "凭借；用", "suffix": "" },
+        { "text": "any", "annotation": "ˈeni", "translation": "任何", "suffix": "" },
+        { "text": "other", "annotation": "ˈʌðə", "translation": "其他的", "suffix": "" },
+        { "text": "name", "annotation": "neɪm", "translation": "名字", "suffix": "" },
+        { "text": "would", "annotation": "wʊd", "translation": "将会", "suffix": "" },
+        { "text": "smell", "annotation": "smel", "translation": "闻起来", "suffix": "" },
+        { "text": "as", "annotation": "æz", "translation": "如同", "suffix": "" },
+        { "text": "sweet", "annotation": "swiːt", "translation": "甜美的", "suffix": "." }
+      ]
+    }
+  ]
+}

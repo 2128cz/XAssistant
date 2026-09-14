@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "note": "英文句子抄写 · 注音是 IPA，只需照抄字母与标点",
+  "sentences": [
+    {
+      "id": "show-me-code",
+      "source": "Linus Torvalds · 邮件列表发言",
+      "sourceUrl": "",
+      "translation": "空谈不值钱，把代码给我看。",
+      "words": [
+        { "text": "Talk", "annotation": "tɔːk", "translation": "空谈", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "cheap", "annotation": "tʃiːp", "translation": "廉价的", "suffix": "." },
+        { "text": "Show", "annotation": "ʃəʊ", "translation": "展示", "suffix": "" },
+        { "text": "me", "annotation": "miː", "translation": "我（宾格）", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "code", "annotation": "kəʊd", "translation": "代码", "suffix": "." }
+      ]
+    },
+    {
+      "id": "premature-optimization",
+      "source": "Donald Knuth · 结构式编程论文",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Premature_optimization",
+      "translation": "过早优化是万恶之源。",
+      "words": [
+        { "text": "Premature", "annotation": "ˈpriːmətʃə", "translation": "过早的", "suffix": "" },
+        { "text": "optimization", "annotation": "ˌɒptɪmaɪˈzeɪʃn", "translation": "优化", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "root", "annotation": "ruːt", "translation": "根源", "suffix": "" },
+        { "text": "of", "annotation": "əv", "translation": "……的", "suffix": "" },
+        { "text": "all", "annotation": "ɔːl", "translation": "全部", "suffix": "" },
+        { "text": "evil", "annotation": "ˈiːvl", "translation": "邪恶", "suffix": "." }
+      ]
+    },
+    {
+      "id": "advanced-magic",
+      "source": "Arthur C. Clarke · Profiles of the Future（第三定律）",
+      "sourceUrl": "https://en.wikipedia.org/wiki/Clarke%27s_three_laws",
+      "translation": "任何足够先进的科技，都与魔法无异。",
+      "words": [
+        { "text": "Any", "annotation": "ˈeni", "translation": "任何", "suffix": "" },
+        { "text": "sufficiently", "annotation": "səˈfɪʃntli", "translation": "充分地", "suffix": "" },
+        { "text": "advanced", "annotation": "ədˈvɑːnst", "translation": "先进的", "suffix": "" },
+        { "text": "technology", "annotation": "tekˈnɒlədʒi", "translation": "技术", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "indistinguishable", "annotation": "ˌɪndɪˈstɪŋɡwɪʃəbl", "translation": "无法区分的", "suffix": "" },
+        { "text": "from", "annotation": "frɒm", "translation": "从；自", "suffix": "" },
+        { "text": "magic", "annotation": "ˈmædʒɪk", "translation": "魔法", "suffix": "." }
+      ]
+    }
+  ]
+}

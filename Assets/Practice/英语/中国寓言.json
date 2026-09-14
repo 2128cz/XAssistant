@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "note": "英文句子抄写 · 注音是 IPA，只需照抄字母与标点",
+  "sentences": [
+    {
+      "id": "fable-stump-hare",
+      "source": "《韩非子 · 五蠹》守株待兔 · 英译练习",
+      "sourceUrl": "",
+      "translation": "他守在树桩旁，再没等到撞来的兔子。",
+      "words": [
+        { "text": "He", "annotation": "hiː", "translation": "他", "suffix": "" },
+        { "text": "waits", "annotation": "weɪts", "translation": "等待", "suffix": "" },
+        { "text": "by", "annotation": "baɪ", "translation": "在……旁边", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "stump", "annotation": "stʌmp", "translation": "树桩", "suffix": "," },
+        { "text": "but", "annotation": "bʌt", "translation": "但是", "suffix": "" },
+        { "text": "no", "annotation": "nəʊ", "translation": "没有", "suffix": "" },
+        { "text": "hare", "annotation": "heə", "translation": "野兔", "suffix": "" },
+        { "text": "comes", "annotation": "kʌmz", "translation": "来", "suffix": "." }
+      ]
+    },
+    {
+      "id": "fable-marked-boat",
+      "source": "《吕氏春秋 · 察今》刻舟求剑 · 英译练习",
+      "sourceUrl": "",
+      "translation": "他在船边上刻下记号，可剑早已沉入水底。",
+      "words": [
+        { "text": "He", "annotation": "hiː", "translation": "他", "suffix": "" },
+        { "text": "marked", "annotation": "mɑːkt", "translation": "刻记号", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "boat", "annotation": "bəʊt", "translation": "船", "suffix": "," },
+        { "text": "but", "annotation": "bʌt", "translation": "但是", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "sword", "annotation": "sɔːd", "translation": "剑", "suffix": "" },
+        { "text": "had", "annotation": "hæd", "translation": "已经（完成时助动词）", "suffix": "" },
+        { "text": "sunk", "annotation": "sʌŋk", "translation": "沉没", "suffix": "." }
+      ]
+    },
+    {
+      "id": "fable-covered-ears",
+      "source": "《吕氏春秋 · 自知》掩耳盗铃 · 英译练习",
+      "sourceUrl": "",
+      "translation": "他捺住自己的耳朵，以为谁都听不见。",
+      "words": [
+        { "text": "He", "annotation": "hiː", "translation": "他", "suffix": "" },
+        { "text": "covers", "annotation": "ˈkʌvəz", "translation": "捺住", "suffix": "" },
+        { "text": "his", "annotation": "hɪz", "translation": "他的", "suffix": "" },
+        { "text": "own", "annotation": "aʊn", "translation": "自己的", "suffix": "" },
+        { "text": "ears", "annotation": "ɪəz", "translation": "耳朵", "suffix": "" },
+        { "text": "and", "annotation": "ænd", "translation": "和", "suffix": "" },
+        { "text": "thinks", "annotation": "θɪŋks", "translation": "以为", "suffix": "" },
+        { "text": "nobody", "annotation": "ˈnəʊbədi", "translation": "没有人", "suffix": "" },
+        { "text": "hears", "annotation": "hɪəz", "translation": "听见", "suffix": "." }
+      ]
+    },
+    {
+      "id": "fable-mending-fold",
+      "source": "《战国策 · 楚策》亡羊补牢 · 英译练习",
+      "sourceUrl": "",
+      "translation": "羊丢了再修羊圈，永远不算太迟。",
+      "words": [
+        { "text": "It", "annotation": "ɪt", "translation": "它", "suffix": "" },
+        { "text": "is", "annotation": "ɪz", "translation": "是", "suffix": "" },
+        { "text": "never", "annotation": "ˈnevə", "translation": "从不", "suffix": "" },
+        { "text": "too", "annotation": "tuː", "translation": "太", "suffix": "" },
+        { "text": "late", "annotation": "leɪt", "translation": "迟", "suffix": "" },
+        { "text": "to", "annotation": "tə", "translation": "向；与", "suffix": "" },
+        { "text": "mend", "annotation": "mend", "translation": "修补", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "fold", "annotation": "fəʊld", "translation": "羊圈", "suffix": "." }
+      ]
+    },
+    {
+      "id": "fable-snake-feet",
+      "source": "《战国策 · 齐策》画蛇添足 · 英译练习",
+      "sourceUrl": "",
+      "translation": "他给蛇添上脚，反而输掉了那杯酒。",
+      "words": [
+        { "text": "He", "annotation": "hiː", "translation": "他", "suffix": "" },
+        { "text": "drew", "annotation": "druː", "translation": "画（过去式）", "suffix": "" },
+        { "text": "feet", "annotation": "fiːt", "translation": "脚", "suffix": "" },
+        { "text": "on", "annotation": "ɒn", "translation": "在……上", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "snake", "annotation": "sneɪk", "translation": "蛇", "suffix": "" },
+        { "text": "and", "annotation": "ænd", "translation": "和", "suffix": "" },
+        { "text": "lost", "annotation": "lɒst", "translation": "失去", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "wine", "annotation": "waɪn", "translation": "酒", "suffix": "." }
+      ]
+    },
+    {
+      "id": "fable-fox-tiger",
+      "source": "《战国策 · 楚策》狐假虎威 · 英译练习",
+      "sourceUrl": "",
+      "translation": "狐狸走在前面，借的是老虎的威风。",
+      "words": [
+        { "text": "The", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "fox", "annotation": "fɒks", "translation": "狐狸", "suffix": "" },
+        { "text": "walks", "annotation": "wɔːks", "translation": "行走", "suffix": "" },
+        { "text": "ahead", "annotation": "əˈhed", "translation": "在前面", "suffix": "," },
+        { "text": "borrowing", "annotation": "ˈbɒrəʊɪŋ", "translation": "借用", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "tiger's", "annotation": "ˈtaɪɡəz", "translation": "老虎的", "suffix": "" },
+        { "text": "strength", "annotation": "streŋθ", "translation": "力气；威风", "suffix": "." }
+      ]
+    },
+    {
+      "id": "fable-frog-well",
+      "source": "《庄子 · 秋水》井底之蛙 · 英译练习",
+      "sourceUrl": "",
+      "translation": "井底的蛙不知道大海有多辽阔。",
+      "words": [
+        { "text": "A", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "frog", "annotation": "frɒɡ", "translation": "青蛙", "suffix": "" },
+        { "text": "in", "annotation": "ɪn", "translation": "在……内", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "well", "annotation": "wel", "translation": "井", "suffix": "" },
+        { "text": "knows", "annotation": "nəʊz", "translation": "知道", "suffix": "" },
+        { "text": "nothing", "annotation": "ˈnʌθɪŋ", "translation": "没有什么", "suffix": "" },
+        { "text": "of", "annotation": "əv", "translation": "……的", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "great", "annotation": "ɡreɪt", "translation": "大的", "suffix": "" },
+        { "text": "sea", "annotation": "siː", "translation": "大海", "suffix": "." }
+      ]
+    },
+    {
+      "id": "fable-foolish-digger",
+      "source": "《列子 · 汤问》愚公移山 · 英译练习",
+      "sourceUrl": "",
+      "translation": "我死了还有儿子，挖山不会停下。",
+      "words": [
+        { "text": "When", "annotation": "wen", "translation": "当……时", "suffix": "" },
+        { "text": "I", "annotation": "aɪ", "translation": "我", "suffix": "" },
+        { "text": "die", "annotation": "daɪ", "translation": "死", "suffix": "," },
+        { "text": "my", "annotation": "maɪ", "translation": "我的", "suffix": "" },
+        { "text": "sons", "annotation": "sʌnz", "translation": "儿子们", "suffix": "" },
+        { "text": "will", "annotation": "wɪl", "translation": "将会", "suffix": "" },
+        { "text": "go", "annotation": "ɡəʊ", "translation": "走；继续", "suffix": "" },
+        { "text": "on", "annotation": "ɒn", "translation": "继续", "suffix": "" },
+        { "text": "digging", "annotation": "ˈdɪɡɪŋ", "translation": "挖掘", "suffix": "." }
+      ]
+    },
+    {
+      "id": "fable-pulled-seedlings",
+      "source": "《孟子 · 公孙丑》揠苗助长 · 英译练习",
+      "sourceUrl": "",
+      "translation": "他把禾苗往上拔，想让它们长得更快。",
+      "words": [
+        { "text": "He", "annotation": "hiː", "translation": "他", "suffix": "" },
+        { "text": "pulled", "annotation": "pʊld", "translation": "拉（过去式）", "suffix": "" },
+        { "text": "up", "annotation": "ʌp", "translation": "向上", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "seedlings", "annotation": "ˈsiːdlɪŋz", "translation": "幼苗", "suffix": "" },
+        { "text": "to", "annotation": "tə", "translation": "向；与", "suffix": "" },
+        { "text": "make", "annotation": "meɪk", "translation": "使成为", "suffix": "" },
+        { "text": "them", "annotation": "ðem", "translation": "它们（宾格）", "suffix": "" },
+        { "text": "grow", "annotation": "ɡrəʊ", "translation": "生长", "suffix": "" },
+        { "text": "faster", "annotation": "ˈfɑːstə", "translation": "更快", "suffix": "." }
+      ]
+    },
+    {
+      "id": "fable-waited-second",
+      "source": "《韩非子 · 五蠹》守株待兔 · 英文练习改写",
+      "sourceUrl": "",
+      "translation": "他在树桩旁坐下，等着第二只兔子撞上来。",
+      "words": [
+        { "text": "He", "annotation": "hiː", "translation": "他", "suffix": "" },
+        { "text": "sat", "annotation": "sæt", "translation": "坐（过去式）", "suffix": "" },
+        { "text": "down", "annotation": "daʊn", "translation": "向下", "suffix": "" },
+        { "text": "by", "annotation": "baɪ", "translation": "在……旁边", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "stump", "annotation": "stʌmp", "translation": "树桩", "suffix": "" },
+        { "text": "and", "annotation": "ænd", "translation": "和", "suffix": "" },
+        { "text": "waited", "annotation": "ˈweɪtɪd", "translation": "等待（过去式）", "suffix": "" },
+        { "text": "for", "annotation": "fɔː", "translation": "为了", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "second", "annotation": "ˈsekənd", "translation": "第二", "suffix": "" },
+        { "text": "hare", "annotation": "heə", "translation": "野兔", "suffix": "." }
+      ]
+    }
+  ]
+}

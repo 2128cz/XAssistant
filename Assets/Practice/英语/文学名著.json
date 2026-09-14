@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "note": "英文句子抄写 · 注音是 IPA，只需照抄字母与标点",
+  "sentences": [
+    {
+      "id": "best-worst-times",
+      "source": "Charles Dickens · A Tale of Two Cities（首段节选）",
+      "sourceUrl": "https://www.gutenberg.org/ebooks/98",
+      "translation": "那是最好的时代，也是最坏的时代。",
+      "words": [
+        { "text": "It", "annotation": "ɪt", "translation": "它", "suffix": "" },
+        { "text": "was", "annotation": "wɒz", "translation": "是（过去）", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "best", "annotation": "best", "translation": "最好的", "suffix": "" },
+        { "text": "of", "annotation": "əv", "translation": "……的", "suffix": "" },
+        { "text": "times", "annotation": "taɪmz", "translation": "时代", "suffix": "," },
+        { "text": "it", "annotation": "ɪt", "translation": "它", "suffix": "" },
+        { "text": "was", "annotation": "wɒz", "translation": "是（过去）", "suffix": "" },
+        { "text": "the", "annotation": "ðə", "translation": "这；定冠词", "suffix": "" },
+        { "text": "worst", "annotation": "wɜːst", "translation": "最坏的", "suffix": "" },
+        { "text": "of", "annotation": "əv", "translation": "……的", "suffix": "" },
+        { "text": "times", "annotation": "taɪmz", "translation": "时代", "suffix": "." }
+      ]
+    },
+    {
+      "id": "single-man-fortune",
+      "source": "Jane Austen · Pride and Prejudice（首句节选）",
+      "sourceUrl": "https://www.gutenberg.org/ebooks/1342",
+      "translation": "有钱的单身汉必定想娶个妻子。",
+      "words": [
+        { "text": "A", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "single", "annotation": "ˈsɪŋɡl", "translation": "单身的", "suffix": "" },
+        { "text": "man", "annotation": "mæn", "translation": "男人", "suffix": "" },
+        { "text": "in", "annotation": "ɪn", "translation": "在……内", "suffix": "" },
+        { "text": "possession", "annotation": "pəˈzeʃn", "translation": "持有", "suffix": "" },
+        { "text": "of", "annotation": "əv", "translation": "……的", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "good", "annotation": "ɡʊd", "translation": "好的", "suffix": "" },
+        { "text": "fortune", "annotation": "ˈfɔːtʃən", "translation": "财产；运气", "suffix": "," },
+        { "text": "must", "annotation": "mʌst", "translation": "必定", "suffix": "" },
+        { "text": "be", "annotation": "biː", "translation": "存在；是", "suffix": "" },
+        { "text": "in", "annotation": "ɪn", "translation": "在……内", "suffix": "" },
+        { "text": "want", "annotation": "wɒnt", "translation": "需要", "suffix": "" },
+        { "text": "of", "annotation": "əv", "translation": "……的", "suffix": "" },
+        { "text": "a", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "wife", "annotation": "waɪf", "translation": "妻子", "suffix": "." }
+      ]
+    },
+    {
+      "id": "man-not-defeated",
+      "source": "Ernest Hemingway · The Old Man and the Sea",
+      "sourceUrl": "https://en.wikipedia.org/wiki/The_Old_Man_and_the_Sea",
+      "translation": "人可以被毁灭，但不能被打败。",
+      "words": [
+        { "text": "A", "annotation": "ə", "translation": "一个", "suffix": "" },
+        { "text": "man", "annotation": "mæn", "translation": "人", "suffix": "" },
+        { "text": "can", "annotation": "kæn", "translation": "能够", "suffix": "" },
+        { "text": "be", "annotation": "biː", "translation": "被（系动词）", "suffix": "" },
+        { "text": "destroyed", "annotation": "dɪˈstrɔɪd", "translation": "被毁灭", "suffix": "" },
+        { "text": "but", "annotation": "bʌt", "translation": "但是", "suffix": "" },
+        { "text": "not", "annotation": "nɒt", "translation": "不", "suffix": "" },
+        { "text": "defeated", "annotation": "dɪˈfiːtɪd", "translation": "被打败", "suffix": "." }
+      ]
+    }
+  ]
+}
