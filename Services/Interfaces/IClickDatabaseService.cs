@@ -9,10 +9,17 @@ namespace XAssistant.Services.Interfaces;
 public interface IClickDatabaseService
 {
     /// <summary>
-    /// 保存一条点击记录。
+    /// 登记一条点击记录。实现方只入队，真正落库在后台线程完成，
+    /// 以免把 SQLite 的耗时压在低级钩子的同步回调里。
     /// </summary>
     /// <param name="record">包含按键类型和时间的记录</param>
     void SaveClick(MouseClickRecord record);
+
+    /// <summary>
+    /// 等已登记的记录全部写完。要在读库做全量统计之前、以及程序退出前调用，
+    /// 否则最近几十毫秒的记录还排在队列里，读出来会偏少。
+    /// </summary>
+    void Flush();
 
     /// <summary>
     /// 获取各鼠标按键的累计点击次数。

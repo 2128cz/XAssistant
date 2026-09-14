@@ -7,17 +7,25 @@ namespace XAssistant.Services;
 
 public class ClickDatabaseService : IClickDatabaseService, IDisposable
 {
+    // 点击记录不再在钩子回调里同步写库，改由后台线程攒批提交；
+    // 点击与移动量两类写入共用一条队列，它们就不会自己跟自己抢锁
     private readonly BackgroundBatchWriter<Action<SqliteConnection, SqliteTransaction>> _writer;
+    private readonly string ConnectionString;
+
     private void PersistActions(IReadOnlyList<Action<SqliteConnection, SqliteTransaction>> actions)
     {
         using var connection = new SqliteConnection(ConnectionString);
         connection.Open();
+        using var busy = connection.CreateCommand();
+        busy.CommandText = "PRAGMA busy_timeout=5000;";
+        busy.ExecuteNonQuery();
+
         using var transaction = connection.BeginTransaction();
         foreach (var action in actions) action(connection, transaction);
         transaction.Commit();
     }
+
     public void Dispose() => _writer.Dispose();
-    private readonly string ConnectionString;
 
     private static string InitializeConnectionString()
     {
@@ -54,7 +62,13 @@ public class ClickDatabaseService : IClickDatabaseService, IDisposable
             );
         ";
         command.ExecuteNonQuery();
-        _writer = new BackgroundBatchWriter<Action<SqliteConnection, SqliteTransaction>>(PersistActions);
+
+        // 落库改到后台线程后，写与读会真正并发（统计面板每分钟都在查），
+        // 不开 WAL 的话两边抢锁会撞出 database is locked
+        command.CommandText = "PRAGMA journal_mode=WAL;";
+        command.ExecuteNonQuery();
+
+        _writer = new BackgroundBatchWriter<Action<SqliteConnection, SqliteTransaction>>(PersistActions, name: "点击");
     }
 
     public void SaveClick(MouseClickRecord record) => _writer.Enqueue((connection, transaction) => PersistClick(record, connection, transaction));
@@ -67,6 +81,8 @@ public class ClickDatabaseService : IClickDatabaseService, IDisposable
         command.Parameters.AddWithValue("@t", record.ClickTime.ToString("o")); // ISO 8601
         command.ExecuteNonQuery();
     }
+
+    public void Flush() => _writer.Flush();
 
     public Dictionary<string, int> GetClickCountsByDate(DateTime date)
     {

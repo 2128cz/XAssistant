@@ -251,6 +251,9 @@ public partial class KeyCounterViewModel : ViewModelBase, IDisposable
 
     private void LoadAllCounts()
     {
+        // 落库是后台攒批的，先把队列排空，否则刚按下的键还没进库，这次全量统计会少算
+        _dbService.Flush();
+
         WpfApplication.Current.Dispatcher.Invoke(() =>
         {
             // 总计

@@ -9,6 +9,7 @@ namespace XAssistant.Services;
 
 public class KeyDatabaseService : IKeyDatabaseService, IDisposable
 {
+    // 按键记录不再在钩子回调里同步写库，改由后台线程攒批提交
     private readonly BackgroundBatchWriter<KeyPressRecord> _writer;
     private readonly string ConnectionString;
 
@@ -41,23 +42,47 @@ public class KeyDatabaseService : IKeyDatabaseService, IDisposable
             @"CREATE INDEX IF NOT EXISTS IX_KeyPressRecords_PressTime_Key
               ON KeyPressRecords(PressTime, Key);";
         cmd.ExecuteNonQuery();
-        _writer = new BackgroundBatchWriter<KeyPressRecord>(PersistBatch);
+
+        // 落库改到后台线程后，写与读会真正并发；词频功能还会另开一个只读连接扫这张表，
+        // 不开 WAL 的话两边抢锁会撞出 database is locked
+        cmd.CommandText = "PRAGMA journal_mode=WAL;";
+        cmd.ExecuteNonQuery();
+
+        _writer = new BackgroundBatchWriter<KeyPressRecord>(PersistBatch, name: "按键");
     }
 
     public void SaveKeyPress(KeyPressRecord record) => _writer.Enqueue(new KeyPressRecord { Key = record.Key, PressTime = record.PressTime });
+
+    /// <summary>一批记录共用一个连接与一个事务，在后台线程执行</summary>
     private void PersistBatch(IReadOnlyList<KeyPressRecord> records)
     {
         using var connection = new SqliteConnection(ConnectionString);
         connection.Open();
+        using var busy = connection.CreateCommand();
+        busy.CommandText = "PRAGMA busy_timeout=5000;";
+        busy.ExecuteNonQuery();
+
         using var transaction = connection.BeginTransaction();
         using var cmd = connection.CreateCommand();
         cmd.Transaction = transaction;
-        cmd.CommandText = "INSERT INTO KeyPressRecords (Key,PressTime) VALUES (@k,@t)";
-        var key = cmd.Parameters.Add("@k", SqliteType.Text); var time = cmd.Parameters.Add("@t", SqliteType.Text);
-        foreach (var record in records) { key.Value = record.Key; time.Value = record.PressTime.ToString("o"); cmd.ExecuteNonQuery(); }
+        cmd.CommandText = "INSERT INTO KeyPressRecords (Key, PressTime) VALUES (@k, @t)";
+        // 参数只加一次，循环里改值；AddWithValue 每次都追加一个同名参数
+        var key = cmd.Parameters.Add("@k", SqliteType.Text);
+        var time = cmd.Parameters.Add("@t", SqliteType.Text);
+        foreach (var record in records)
+        {
+            key.Value = record.Key;
+            time.Value = record.PressTime.ToString("o");
+            cmd.ExecuteNonQuery();
+        }
         transaction.Commit();
     }
+
+    /// <summary>把队列里的记录写完并等在途事务提交，重新做全量统计前与退出前调用</summary>
+    public void Flush() => _writer.Flush();
+
     public void Dispose() => _writer.Dispose();
+
     public Dictionary<string, int> GetKeyCounts()
     {
         return GetKeyCounts(null, null);

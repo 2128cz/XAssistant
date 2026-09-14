@@ -243,6 +243,9 @@ public partial class ClickCounterViewModel : ViewModelBase, IDisposable
 
     public void RefreshDailyCounts()
     {
+        // 落库是后台攒批的，先把队列排空，否则刚发生的点击还没进库
+        _dbService.Flush();
+
         var today = _dbService.GetClickCountsByDate(DateTime.Today);
         LeftClickToday = today["Left"];
         MiddleClickToday = today["Middle"];

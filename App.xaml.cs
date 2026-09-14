@@ -228,6 +228,17 @@ public partial class App : System.Windows.Application
             _appLogger?.LogError(ex, "停止进程追踪器失败");
         }
 
+        // 按键/点击是在后台线程攒批落库的，退出前把队列排空，否则最后几十毫秒的记录会丢
+        try
+        {
+            Services.GetRequiredService<IKeyDatabaseService>().Flush();
+            Services.GetRequiredService<IClickDatabaseService>().Flush();
+        }
+        catch (Exception ex)
+        {
+            _appLogger?.LogError(ex, "排空落库队列失败");
+        }
+
         Log.CloseAndFlush();
     }
 
