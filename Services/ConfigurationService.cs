@@ -102,4 +102,12 @@ public class ConfigurationService : IConfigurationService
         _appSettings.General.Theme = theme;
         Save();
     }
+
+    public string GetLayoutMode() => _appSettings.General.LayoutMode;
+
+    public void SetLayoutMode(string mode)
+    {
+        _appSettings.General.LayoutMode = mode;
+        Save();
+    }
 }

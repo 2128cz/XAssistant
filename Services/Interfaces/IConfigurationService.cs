@@ -49,4 +49,11 @@ public interface IConfigurationService
 
     /// <summary>设置界面主题并持久化</summary>
     void SetTheme(string theme);
+
+    // ---------- 界面布局 ----------
+    /// <summary>获取分区排布（"Auto" / "Wide" / "Tall"）；Auto 表示由屏幕分辨率比例决定</summary>
+    string GetLayoutMode();
+
+    /// <summary>设置分区排布并持久化</summary>
+    void SetLayoutMode(string mode);
 }

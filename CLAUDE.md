@@ -46,6 +46,14 @@ UI 采用基于 CommunityToolkit.Mvvm 的 WPF MVVM 架构。项目没有自动�
 - View→ViewModel 的映射通过 `App.xaml` 中的 `DataTemplate`（每个 VM 一个）完成。`MainWindow` 显示一个绑定到 `MainWindowViewModel.CurrentViewModel` 的 `ContentControl`；左侧菜单通过 `Navigate` 中继命令切换页面。`MainWindowViewModel` 还负责底部日志面板、日志过滤和窗口大小持久化。
 - `HomeViewModel` 聚合四个模块的 ViewModel，并将其 `PropertyChanged` 事件转发到自身同名的属性。所有模块 ViewModel 都是单例，因此无论当前显示哪个页面，实时数据（钩子、定时器）都会持续流动。
 
+### 工作台三分区与横竖屏
+`DashboardView` 是一页到底的工作台，内容按标题聚成三部分：PART 1 概览（统计卡，恒为通栏）、PART 2 输入（节奏曲线 / 热力图 / 排行 / 词频 / 练习）、PART 3 记录（会话表 / 原始记录 / 设置）。横屏时 2 与 3 左右并排（`3*` / 20 px 沟 / `2*`，通栏块用 `ColumnSpan=3` 跨过沟列），竖屏时三者垂直单栏。
+
+- 判据分两级：`DashboardViewModel.IsWideLayout` 只看主显示器分辨率比例（`SystemParameters.StaticPropertyChanged` 监听分辨率 / 缩放 / 转屏后重算），可被 `AppSettings.General.LayoutMode`（`Auto` / `Wide` / `Tall`）覆盖；`DashboardView` 再用 `ActualWidth` 兜底（两栏 1360、四卡一排 1000），两个常量在 VM 与 View 各留一份，改一处要同步另一处。
+- 排布切换全部由 `DashboardView.xaml` 里的布局 `Style`（`PartOverview` / `PartInput` / `PartRecord` / `OverviewCards` / `RhythmChart` / `RhythmTiles` / `RankingCell` / `RecentCell` / `SessionTiles`）的 `DataTrigger` 改 `Grid.Row` / `Grid.Column` / `Grid.ColumnSpan` / `Columns` 完成。**同一棵树只有一份内容**——这些控件都带状态，复制两套布局就会变成双份订阅与双份焦点。
+- 因此受 `Style` 控制的属性（`Grid.Row`、`Grid.Column`、`Grid.ColumnSpan`、`UniformGrid.Columns`、`Margin`）**绝不能再写本地值**：WPF 里本地值优先级高于 `Style` 触发器，写了触发器会静默失效。
+- 竖屏下窗口 `MinWidth` 降到 640（`MainWindowViewModel.WindowMinWidth` 跟着 `IsWideLayout` 走），否则 1080 宽的竖屏显示器放不下默认 1100 的窗口。
+
 ### 四个模块
 每个模块 = 钩子服务 + SQLite 仓库 + ViewModel + View：
 1. **鼠标点击** —— `MouseClickHookService`（WH_MOUSE_LL）→ `ClickDatabaseService` → `ClickCounterViewModel`

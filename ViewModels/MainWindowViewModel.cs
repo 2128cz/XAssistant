@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
 using System.Windows.Data;
@@ -55,6 +56,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<LogEntry> AllLogs => _logBuffer.LogEntries;
     public string StartupDescription => IsStartWithWindowsEnabled ? "已开启 · 登录系统后在后台记录" : "已关闭 · 手动启动工作台";
 
+    /// <summary>
+    /// 窗口最小宽度跟着排布档位走。竖屏显示器常只有 1080 宽，
+    /// 写死 1100 会让窗口永远放不下、单栏布局也就无从生效。
+    /// </summary>
+    public double WindowMinWidth => Dashboard.IsWideLayout ? 1100 : 640;
+
     public MainWindowViewModel(IStartupService startupService, ILogBufferService logBuffer,
         IConfigurationService configService, DashboardViewModel dashboard)
     {
@@ -67,6 +74,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _windowHeight = Math.Max(700, configService.GetWindowHeight());
         _isLogExpanded = configService.GetIsLogExpanded();
         _isStartWithWindowsEnabled = startupService.IsStartWithWindowsEnabled();
+        Dashboard.PropertyChanged += OnDashboardPropertyChanged;
         AllLogs.CollectionChanged += LogsChanged;
 
         // 日志去抖：每来一条只置脏标记，由定时器统一刷一次，避免逐条重建列表
@@ -99,6 +107,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>集合变更只置脏标记，O(1)；真正的快照由 _logRefreshTimer 合并处理</summary>
     private void LogsChanged(object? sender, NotifyCollectionChangedEventArgs e) => _logsDirty = true;
+
+    private void OnDashboardPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DashboardViewModel.IsWideLayout))
+            OnPropertyChanged(nameof(WindowMinWidth));
+    }
 
     private void RefreshLogView()
     {
@@ -200,6 +214,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         _logRefreshTimer.Stop();
         AllLogs.CollectionChanged -= LogsChanged;
+        Dashboard.PropertyChanged -= OnDashboardPropertyChanged;
         Dashboard.Dispose();
     }
 }

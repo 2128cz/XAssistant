@@ -1,148 +1,210 @@
 <UserControl x:Class="XAssistant.Views.DashboardView"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- xmlns:c="clr-namespace:XAssistant.Converters" xmlns:controls="clr-namespace:XAssistant.Controls" xmlns:scm="clr-namespace:System.ComponentModel;assembly=WindowsBase">
+ xmlns:c="clr-namespace:XAssistant.Converters" xmlns:controls="clr-namespace:XAssistant.Controls" xmlns:scm="clr-namespace:System.ComponentModel;assembly=WindowsBase"
+ SizeChanged="OnLayoutSizeChanged">
  <UserControl.Resources><ResourceDictionary>
   <ResourceDictionary.MergedDictionaries><ResourceDictionary Source="../Themes/DashboardStyles.xaml"/></ResourceDictionary.MergedDictionaries>
   <CollectionViewSource x:Key="RecentDescending" Source="{Binding RecentKeys}"><CollectionViewSource.SortDescriptions><scm:SortDescription PropertyName="Timestamp" Direction="Descending"/></CollectionViewSource.SortDescriptions></CollectionViewSource>
-  <Style x:Key="StatCard" TargetType="Border"><Setter Property="Background" Value="{DynamicResource CardBackground}"/><Setter Property="BorderBrush" Value="{DynamicResource ControlBorder}"/><Setter Property="BorderThickness" Value="0,1,0,1"/><Setter Property="Padding" Value="14,12"/><Setter Property="Margin" Value="0,0,12,0"/></Style>
-  <Style x:Key="RateTile" TargetType="Border"><Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="0,8"/><Setter Property="Margin" Value="0,0,12,0"/></Style>
+  <Style x:Key="StatCard" TargetType="Border"><Setter Property="Background" Value="{DynamicResource CardBackground}"/><Setter Property="BorderBrush" Value="{DynamicResource ControlBorder}"/><Setter Property="BorderThickness" Value="0,1,0,1"/><Setter Property="Padding" Value="14,12"/><Setter Property="Margin" Value="0,0,12,12"/></Style>
+  <Style x:Key="RateTile" TargetType="Border"><Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="0,8"/><Setter Property="Margin" Value="0,0,12,12"/></Style>
   <!-- 累计值会长到百万位，只这两块大字号数字用缩写；表格里读的仍是准确数 -->
   <c:CompactCountConverter x:Key="CompactCount"/>
+  <!-- 分区标题条：三部分的边界靠它读出来，不靠肉眼猜缩进 -->
+  <Style x:Key="PartHeading" TargetType="TextBlock"><Setter Property="FontFamily" Value="Consolas"/><Setter Property="FontSize" Value="11"/><Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Margin" Value="0,0,12,0"/></Style>
+  <Style x:Key="PartRule" TargetType="Border"><Setter Property="Height" Value="1"/><Setter Property="Background" Value="{DynamicResource CardBorderBrush}"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+
+  <!--
+   ===== 三分法的排布开关 =====
+   屏幕横屏且窗口够宽时，PART 2「输入」与 PART 3「记录」左右两栏；竖屏或窗口拖窄后各自拉成通栏依次往下。
+   位置一律用 Grid.Row / Grid.Column / Grid.ColumnSpan 的 Style 触发器切换：默认值就是单栏，触发器给两栏。
+   不复制第二份内容——热力图、练习输入框这些控件都带状态，复制一份就是两份订阅、两份焦点。
+   信号（IsTwoColumnLayout / IsOverviewInRow）由 DashboardView 代码按 VM 的屏幕比例结论加实际宽度算出。
+  -->
+  <Style x:Key="PartOverview" TargetType="StackPanel"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/></Style>
+  <Style x:Key="PartInput" TargetType="StackPanel">
+   <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+   <Style.Triggers><DataTrigger Binding="{Binding IsTwoColumnLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.ColumnSpan" Value="1"/></DataTrigger></Style.Triggers>
+  </Style>
+  <Style x:Key="PartRecord" TargetType="StackPanel">
+   <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+   <Style.Triggers><DataTrigger Binding="{Binding IsTwoColumnLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/></DataTrigger></Style.Triggers>
+  </Style>
+  <!-- 顶部四张统计卡：单栏够宽排一排，窗口只有七八百像素时改两列两张，否则 58 号的缩写会被挤到裁字 -->
+  <Style x:Key="OverviewCards" TargetType="UniformGrid">
+   <Setter Property="Columns" Value="2"/>
+   <Style.Triggers><DataTrigger Binding="{Binding IsOverviewInRow, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Columns" Value="4"/></DataTrigger></Style.Triggers>
+  </Style>
+  <!-- 输入节奏面板：曲线与六格速率。两栏时左右并排，单栏时曲线在上、速率在下 -->
+  <Style x:Key="RhythmChart" TargetType="Grid">
+   <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+   <Style.Triggers><DataTrigger Binding="{Binding IsTwoColumnLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.ColumnSpan" Value="1"/></DataTrigger></Style.Triggers>
+  </Style>
+  <Style x:Key="RhythmTiles" TargetType="UniformGrid">
+   <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/><Setter Property="Columns" Value="3"/><Setter Property="Margin" Value="0,12,0,0"/>
+   <Style.Triggers><DataTrigger Binding="{Binding IsTwoColumnLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Columns" Value="2"/><Setter Property="Margin" Value="0"/></DataTrigger></Style.Triggers>
+  </Style>
+  <!-- 敲击排行与最近按键：两栏时并排，单栏时上下摞。两块都是窄列表，谁都不怕被挤 -->
+  <Style x:Key="RankingCell" TargetType="Border">
+   <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/><Setter Property="Margin" Value="0,0,0,20"/>
+   <Style.Triggers><DataTrigger Binding="{Binding IsTwoColumnLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Margin" Value="0"/></DataTrigger></Style.Triggers>
+  </Style>
+  <Style x:Key="RecentCell" TargetType="Border">
+   <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+   <Style.Triggers><DataTrigger Binding="{Binding IsTwoColumnLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/></DataTrigger></Style.Triggers>
+  </Style>
+  <!-- 会话读数：两栏时「记录」栏只有一半宽，五格并排会把 23 号的时长挤断，改成三格两行 -->
+  <Style x:Key="SessionTiles" TargetType="UniformGrid">
+   <Setter Property="Columns" Value="5"/>
+   <Style.Triggers><DataTrigger Binding="{Binding IsTwoColumnLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Columns" Value="3"/></DataTrigger></Style.Triggers>
+  </Style>
  </ResourceDictionary></UserControl.Resources>
- <StackPanel>
-  <!-- All content below belongs to the same scroll surface. -->
-  <Grid x:Name="OverviewSection" Height="66" Margin="0,0,0,24">
-   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <TextBlock Text="{Binding ClockText}" FontFamily="Consolas" FontSize="64" Foreground="{DynamicResource DashboardWatermark}" HorizontalAlignment="Right" Margin="0,-9,24,0"/>
-   <StackPanel VerticalAlignment="Center"><TextBlock Text="每一次输入，都有迹可循。" FontSize="28" FontWeight="SemiBold"/><TextBlock Margin="0,10,0,0" Style="{StaticResource QuietText}"><Run Text="实时了解你的键盘与鼠标习惯 · 今天，"/><Run Text="{Binding DateText, Mode=OneWay}"/></TextBlock></StackPanel>
-   <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><ComboBox Width="100" Margin="0,0,12,0" ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}" ToolTip="键盘热力图与排行的统计范围"/><Button Command="{Binding ToggleRecordingCommand}" Style="{StaticResource PrimaryButton}"><Button.Content><TextBlock><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Text" Value="▶  开始记录"/><Style.Triggers><DataTrigger Binding="{Binding IsRecording}" Value="True"><Setter Property="Text" Value="Ⅱ  暂停记录"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Button.Content></Button></StackPanel>
-  </Grid>
-  <UniformGrid Columns="4" Height="160" Margin="0,0,-12,24">
-   <Border Style="{StaticResource StatCard}"><Grid><TextBlock Text="KBD" Style="{StaticResource StatWatermark}"/><StackPanel><TextBlock Text="键盘敲击 · 累计" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Keyboard.KeyTotalPresses, Converter={StaticResource CompactCount}}" Style="{StaticResource StatValue}" ToolTip="{Binding Keyboard.KeyTotalPresses, StringFormat=N0}"/><TextBlock Style="{StaticResource QuietText}" FontSize="10"><Run Text="今日 "/><Run Text="{Binding TodayKeyCount, Mode=OneWay, StringFormat=N0}"/><Run Text=" 次 · "/><Run Text="{Binding KeyboardChangeText, Mode=OneWay}"/></TextBlock><TextBlock Text="{Binding YesterdayKeyCount, StringFormat='昨日 {0:N0} 次'}" Style="{StaticResource QuietText}" FontSize="10" Margin="0,5,0,0"/></StackPanel></Grid></Border>
-   <Border Style="{StaticResource StatCard}"><Grid><TextBlock Text="MSE" Style="{StaticResource StatWatermark}"/><StackPanel><TextBlock Text="鼠标点击 · 累计" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Mouse.MouseTotalClicks, Converter={StaticResource CompactCount}}" Style="{StaticResource StatValue}" ToolTip="{Binding Mouse.MouseTotalClicks, StringFormat=N0}"/><TextBlock Text="{Binding MouseDailyDetail}" Style="{StaticResource QuietText}" FontSize="10"/><TextBlock Text="{Binding MouseTotalDetail}" Style="{StaticResource QuietText}" FontSize="10" Margin="0,5,0,0"/></StackPanel></Grid></Border>
-   <Border Style="{StaticResource StatCard}"><Grid><TextBlock Text="CPS" Style="{StaticResource StatWatermark}"/><StackPanel><TextBlock Text="实时速率 · 近 60 秒" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding CurrentCps, StringFormat=F1}" Style="{StaticResource StatValue}"/><TextBlock Text="{Binding AverageCps, StringFormat='今日平均 {0:F1} 次/s'}" Style="{StaticResource QuietText}" FontSize="10"/><TextBlock Text="速率不包含鼠标点击" Style="{StaticResource QuietText}" FontSize="10" Margin="0,5,0,0"/></StackPanel></Grid></Border>
-   <Border Style="{StaticResource StatCard}"><Grid><TextBlock Text="DUR" Style="{StaticResource StatWatermark}"/><StackPanel><TextBlock Style="{StaticResource MetricLabel}"><Run Text="有效记录时长 · "/><Run Text="{Binding TotalUsageScopeText, Mode=OneWay}"/></TextBlock><TextBlock Text="{Binding TotalUsageText}" Style="{StaticResource StatValue}" FontSize="44" Margin="0,21,0,8"/><TextBlock Text="{Binding TodayCorrectedUsageText, StringFormat='今日使用 {0}'}" Style="{StaticResource QuietText}" FontSize="10"/><TextBlock Text="{Binding YesterdayUsageText, StringFormat='昨日使用 {0}'}" Style="{StaticResource QuietText}" FontSize="10" Margin="0,5,0,0"/></StackPanel></Grid></Border>
-  </UniformGrid>
-  <Border Style="{StaticResource DashboardPanel}" Height="388" Margin="0,0,0,24" Padding="40,18,24,18">
-   <Grid>
-    <Grid.RowDefinitions><RowDefinition Height="38"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-    <DockPanel><TextBlock DockPanel.Dock="Right" Text="{Binding PeakCps, StringFormat='本次峰值 {0:F1} 次 / s'}" Style="{StaticResource QuietText}"/><TextBlock Style="{StaticResource MonoText}" Foreground="{DynamicResource AccentBrush}"><Run Text="● LIVE  /  "/><Run Text="{Binding RecordingStatus, Mode=OneWay}"/><Run Text="   最近输入 "/><Run Text="{Binding LastKeyText, Mode=OneWay}"/></TextBlock></DockPanel>
-    <Grid Grid.Row="1">
-     <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <Grid><Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-      <DockPanel><TextBlock Text="最近输入 →" Style="{StaticResource QuietText}" DockPanel.Dock="Left" Margin="0,0,18,0"/>
-       <!--  倒序集合 + RightToLeft 面板：最新一项从右侧起排，装不下时向左溢出并由自身裁剪，不会伸到右侧速率卡片上被遮住  -->
-       <ItemsControl ItemsSource="{Binding RecentKeyChips}" FlowDirection="RightToLeft" ClipToBounds="True" VerticalAlignment="Center"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" FlowDirection="LeftToRight" FontFamily="Consolas" Foreground="{DynamicResource TextSecondary}" FontSize="15" Margin="8,0"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></DockPanel>
-      <Grid Grid.Row="1" ClipToBounds="True"><Viewbox Stretch="Fill"><Canvas Width="900" Height="220"><Path Stroke="{DynamicResource CardBorderBrush}" StrokeThickness="1" Data="M0,30 L900,30 M0,90 L900,90 M0,150 L900,150 M0,219 L900,219 M1,0 L1,220 M150,0 L150,220 M300,0 L300,220 M450,0 L450,220 M600,0 L600,220 M750,0 L750,220 M899,0 L899,220"/><Polyline Points="{Binding RatePoints}" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2.3" StrokeLineJoin="Round"/></Canvas></Viewbox>
-       <!--  峰值示意线：高度由 DashboardView 代码按 PeakLineRatio 定位；标注留在 Viewbox 之外，否则会被非等比拉伸压扁  -->
-       <Canvas x:Name="PeakSurface" IsHitTestVisible="False" SizeChanged="OnPeakSurfaceSizeChanged">
-        <Grid x:Name="PeakRuleHost" Canvas.Left="0" Height="26" Width="{Binding ActualWidth, ElementName=PeakSurface}">
-         <Line X1="0" Y1="13" X2="{Binding ActualWidth, ElementName=PeakRuleHost}" Y2="13" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1" StrokeDashArray="5 4" Opacity="0.7"/>
-         <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,0" Padding="6,1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0">
-          <StackPanel Orientation="Horizontal">
-           <TextBlock Text="峰值" Style="{StaticResource QuietText}" FontSize="10"/>
-           <TextBlock Text="{Binding PeakCps, StringFormat={}{0:F1}}" Style="{StaticResource MonoText}" FontSize="12" Foreground="{DynamicResource AccentBrush}" Margin="4,0,0,0"/>
-           <TextBlock Text="次 / s" Style="{StaticResource QuietText}" FontSize="10" Margin="3,0,0,0"/>
-           <TextBlock Text="{Binding PeakAtText}" Style="{StaticResource MonoText}" FontSize="10" Margin="8,0,0,0"/>
-          </StackPanel>
-         </Border>
-         <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1,0" Padding="6,1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,10,0">
-          <StackPanel Orientation="Horizontal">
-           <TextBlock Text="{Binding CadenceSummary}" Style="{StaticResource QuietText}" FontSize="9"/>
-           <TextBlock Text="{Binding AxisCps, StringFormat={}轴上限 {0:0.#} 次/s}" Style="{StaticResource MonoText}" FontSize="9" Margin="8,0,0,0"/>
-          </StackPanel>
-         </Border>
-        </Grid>
-       </Canvas>
-      </Grid>
-      <StackPanel Grid.Row="2"><DockPanel  Margin="0,10,0,0"><TextBlock DockPanel.Dock="Right" Text="现在" Style="{StaticResource QuietText}"/><TextBlock DockPanel.Dock="Left" Text="−60 s" Style="{StaticResource QuietText}"/><TextBlock Text="每秒敲击 · 近 1 秒滚动窗口 / 连续滚动的 60 秒" HorizontalAlignment="Center" Style="{StaticResource QuietText}"/></DockPanel></StackPanel>
-     </Grid>
-     <UniformGrid Grid.Column="2" Columns="2" Rows="3">
-      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="实时速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding CurrentCps, StringFormat=F1}" Style="{StaticResource MetricText}"/><TextBlock Text="近 60 秒 · 次 / s" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
-      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="距上次按下" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Keyboard.LastKeyIntervalMs}" Style="{StaticResource MetricText}"/><TextBlock Text="{Binding LastIntervalHint}" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
-      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="平均间隔" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Keyboard.AverageKeyIntervalMs, StringFormat=F0}" Style="{StaticResource MetricText}"/><TextBlock Text="{Binding AverageIntervalHint}" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
-      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="今日平均速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding AverageCps, StringFormat=F1}" Style="{StaticResource MetricText}"/><TextBlock Text="键盘记录 · 次 / s" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
-      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="最快速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding PeakCps, StringFormat=F1}" Style="{StaticResource MetricText}"/><TextBlock Text="工作台峰值 / 1 秒" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
-      <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="间隔速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding IntervalRateText}" Style="{StaticResource MetricText}"/><TextBlock Text="相邻间隔倒数推算 · 次 / s" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
-     </UniformGrid>
-    </Grid>
-    <TextBlock Text="输 入 节 奏" Foreground="{DynamicResource DashboardNumber}" FontSize="15" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-29,0,0,40" Grid.RowSpan="2"><TextBlock.LayoutTransform><RotateTransform Angle="-90"/></TextBlock.LayoutTransform></TextBlock>
+ <!--
+  三部分的容器：0 概览（恒通栏）、1 输入、2 记录。
+  列 3*/20/2* —— 中间那 20 是两栏的沟，单栏时被 ColumnSpan 盖住，不必再切换。
+  输入栏拿 3 份是因为热力图按 1120 设计稿等比缩放，栏宽一旦低于约 770 键帽字号就掉到 7 像素以下。
+ -->
+ <Grid>
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid.ColumnDefinitions><ColumnDefinition Width="3*"/><ColumnDefinition Width="20"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
+  <!-- ================= PART 1 · 概览：标题与四张累计卡，恒占满整行 ================= -->
+  <StackPanel x:Name="OverviewPart" Style="{StaticResource PartOverview}" Margin="0,0,0,26">
+   <DockPanel Margin="0,0,0,16"><TextBlock Text="PART 1 / OVERVIEW · 概览" Style="{StaticResource PartHeading}"/><Border Style="{StaticResource PartRule}"/></DockPanel>
+   <Grid x:Name="OverviewSection" MinHeight="66" Margin="0,0,0,20">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+    <TextBlock Text="{Binding ClockText}" FontFamily="Consolas" FontSize="64" Foreground="{DynamicResource DashboardWatermark}" HorizontalAlignment="Right" Margin="0,-9,24,0"/>
+    <StackPanel VerticalAlignment="Center"><TextBlock Text="每一次输入，都有迹可循。" FontSize="28" FontWeight="SemiBold"/><TextBlock Margin="0,10,0,0" Style="{StaticResource QuietText}"><Run Text="实时了解你的键盘与鼠标习惯 · 今天，"/><Run Text="{Binding DateText, Mode=OneWay}"/></TextBlock></StackPanel>
+    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><ComboBox Width="100" Margin="0,0,12,0" ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}" ToolTip="键盘热力图与排行的统计范围"/><Button Command="{Binding ToggleRecordingCommand}" Style="{StaticResource PrimaryButton}"><Button.Content><TextBlock><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Text" Value="▶  开始记录"/><Style.Triggers><DataTrigger Binding="{Binding IsRecording}" Value="True"><Setter Property="Text" Value="Ⅱ  暂停记录"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Button.Content></Button></StackPanel>
    </Grid>
-  </Border>
-  <Grid>
-   <Grid.ColumnDefinitions><ColumnDefinition Width="1160*"/><ColumnDefinition Width="20"/><ColumnDefinition Width="356*"/></Grid.ColumnDefinitions>
-   <StackPanel>
-    <Border Style="{StaticResource DashboardPanel}" MinHeight="561" Padding="20" Margin="0,0,0,18">
-     <Grid><TextBlock Text="144" FontFamily="Consolas" FontSize="106" Foreground="{DynamicResource DashboardWatermark}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-25,164,0"/><StackPanel>
-      <DockPanel Margin="0,0,0,24"><ComboBox DockPanel.Dock="Right" Width="120" ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}" ToolTip="{Binding PeriodRangeHint}"/><TextBlock Text="键盘热力图" Style="{StaticResource SectionHeading}" VerticalAlignment="Center"/></DockPanel>
-      <!-- 色阶条与最少/最多次数由 KeyboardHeatmap 自己渲染，与按键着色同源；位移图标只收归一化偏移，像素换算在控件里 -->
-      <controls:KeyboardHeatmap ShowHeader="False" IsRecording="{Binding Keyboard.IsRecording}" ItemsSource="{Binding DisplayKeyCounts}" RecentKey="{Binding LastKeyText}"
-                                LeftClickCount="{Binding Mouse.LeftClickToday}" MiddleClickCount="{Binding Mouse.MiddleClickToday}" RightClickCount="{Binding Mouse.RightClickToday}"
-                                MouseMovementText="{Binding Mouse.MouseMovementText}" MouseDeltaText="{Binding Mouse.MouseDeltaText}"
-                                MouseDistanceText="{Binding Mouse.MouseDistanceText}" MouseWheelText="{Binding Mouse.MouseWheelText}"
-                                MouseOffsetX="{Binding Mouse.MouseOffsetX}" MouseOffsetY="{Binding Mouse.MouseOffsetY}"
-                                MouseButton="{Binding Mouse.MouseButton}" MouseClickPulse="{Binding Mouse.MouseClickPulse}"
-                                MouseTrailXPoints="{Binding Mouse.MouseTrailXPoints}" MouseTrailYPoints="{Binding Mouse.MouseTrailYPoints}"
-                                MouseTrailWheelPoints="{Binding Mouse.MouseTrailWheelPoints}"/>
-     </StackPanel></Grid>
-    </Border>
-    <controls:VersePractice DataContext="{Binding Practice}" Margin="0,0,0,18"/>
-    <!--  时段锚点由 PeriodRangeHint 给出：滚动窗口跟着当前时刻跑，不标起算点就读不出这些数字覆盖哪一段时间  -->
-    <DockPanel Margin="0,0,0,22"><TextBlock DockPanel.Dock="Right" Text="刷新 1 s" Style="{StaticResource QuietText}"/><TextBlock Style="{StaticResource QuietText}"><Run Text="◇  "/><Run Text="{Binding PeriodRangeHint, Mode=OneWay}"/><Run Text=" · 热力图与排行共享该时段"/></TextBlock></DockPanel>
-    <Expander x:Name="KeyDetails" Header="完整按键记录 / 鼠标历史" Margin="0,0,0,24">
-     <StackPanel Margin="0,12,0,0"><DockPanel Margin="0,0,0,12"><Button Content="刷新按键数据" Command="{Binding Keyboard.RefreshDataCommand}" DockPanel.Dock="Right"/><TextBlock Text="{Binding PeriodTotalCount, StringFormat='当前时段累计 {0:N0} 次'}" VerticalAlignment="Center"/></DockPanel>
-      <DataGrid Height="240" ItemsSource="{Binding DisplayKeyCounts}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"><DataGrid.Columns><DataGridTextColumn Header="按键" Binding="{Binding Key}" Width="*"/><DataGridTextColumn Header="次数" Binding="{Binding Count, StringFormat=N0}" Width="*"/></DataGrid.Columns></DataGrid>
-      <TextBlock Text="最近 30 条输入 · 观察时间" Style="{StaticResource QuietText}" Margin="0,16,0,8"/>
-<DataGrid Height="180" ItemsSource="{Binding Source={StaticResource RecentDescending}}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"><DataGrid.Columns><DataGridTextColumn Header="按键" Binding="{Binding Key}" Width="*"/><DataGridTextColumn Header="时间" Binding="{Binding Timestamp, StringFormat=yyyy-MM-dd HH:mm:ss.fff}" Width="2*"/></DataGrid.Columns></DataGrid><WrapPanel Margin="0,16,0,0"><TextBlock Text="鼠标历史日期" Margin="0,0,12,0" VerticalAlignment="Center"/><DatePicker SelectedDate="{Binding Mouse.SelectedDate}" Width="148" Margin="0,0,20,0"/><TextBlock Text="{Binding Mouse.SelectedDateLeftCount, StringFormat='左键 {0:N0}'}" VerticalAlignment="Center" Margin="0,0,16,0"/><TextBlock Text="{Binding Mouse.SelectedDateMiddleCount, StringFormat='中键 {0:N0}'}" VerticalAlignment="Center" Margin="0,0,16,0"/><TextBlock Text="{Binding Mouse.SelectedDateRightCount, StringFormat='右键 {0:N0}'}" VerticalAlignment="Center"/></WrapPanel>
-     </StackPanel>
-    </Expander>
-   </StackPanel>
-   <StackPanel Grid.Column="2">
-    <!--  MinHeight 而不是固定高：时段标签条占两行后内容变高，固定高度会把底部排名裁掉  -->
-    <Border Style="{StaticResource DashboardPanel}" MinHeight="398" Padding="24,18" Margin="0,0,0,20">
-     <Grid><TextBlock Text="{Binding KeyRankingPeriodMark}" Foreground="{DynamicResource DashboardWatermark}" FontFamily="Consolas" FontSize="32" HorizontalAlignment="Left" VerticalAlignment="Bottom"><TextBlock.LayoutTransform><RotateTransform Angle="90"/></TextBlock.LayoutTransform></TextBlock><StackPanel>
+   <UniformGrid Style="{StaticResource OverviewCards}" Margin="0,0,-12,0">
+    <Border Style="{StaticResource StatCard}"><Grid><TextBlock Text="KBD" Style="{StaticResource StatWatermark}"/><StackPanel><TextBlock Text="键盘敲击 · 累计" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Keyboard.KeyTotalPresses, Converter={StaticResource CompactCount}}" Style="{StaticResource StatValue}" ToolTip="{Binding Keyboard.KeyTotalPresses, StringFormat=N0}"/><TextBlock Style="{StaticResource QuietText}" FontSize="10" TextTrimming="CharacterEllipsis"><Run Text="今日 "/><Run Text="{Binding TodayKeyCount, Mode=OneWay, StringFormat=N0}"/><Run Text=" 次 · "/><Run Text="{Binding KeyboardChangeText, Mode=OneWay}"/></TextBlock><TextBlock Text="{Binding YesterdayKeyCount, StringFormat='昨日 {0:N0} 次'}" Style="{StaticResource QuietText}" FontSize="10" Margin="0,5,0,0"/></StackPanel></Grid></Border>
+    <Border Style="{StaticResource StatCard}"><Grid><TextBlock Text="MSE" Style="{StaticResource StatWatermark}"/><StackPanel><TextBlock Text="鼠标点击 · 累计" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Mouse.MouseTotalClicks, Converter={StaticResource CompactCount}}" Style="{StaticResource StatValue}" ToolTip="{Binding Mouse.MouseTotalClicks, StringFormat=N0}"/><TextBlock Text="{Binding MouseDailyDetail}" Style="{StaticResource QuietText}" FontSize="10" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding MouseTotalDetail}" Style="{StaticResource QuietText}" FontSize="10" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/></StackPanel></Grid></Border>
+    <Border Style="{StaticResource StatCard}"><Grid><TextBlock Text="CPS" Style="{StaticResource StatWatermark}"/><StackPanel><TextBlock Text="实时速率 · 近 60 秒" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding CurrentCps, StringFormat=F1}" Style="{StaticResource StatValue}"/><TextBlock Text="{Binding AverageCps, StringFormat='今日平均 {0:F1} 次/s'}" Style="{StaticResource QuietText}" FontSize="10"/><TextBlock Text="速率不包含鼠标点击" Style="{StaticResource QuietText}" FontSize="10" Margin="0,5,0,0"/></StackPanel></Grid></Border>
+    <Border Style="{StaticResource StatCard}"><Grid><TextBlock Text="DUR" Style="{StaticResource StatWatermark}"/><StackPanel><TextBlock Style="{StaticResource MetricLabel}" TextTrimming="CharacterEllipsis"><Run Text="有效记录时长 · "/><Run Text="{Binding TotalUsageScopeText, Mode=OneWay}"/></TextBlock><TextBlock Text="{Binding TotalUsageText}" Style="{StaticResource StatValue}" FontSize="44" Margin="0,21,0,8"/><TextBlock Text="{Binding TodayCorrectedUsageText, StringFormat='今日使用 {0}'}" Style="{StaticResource QuietText}" FontSize="10" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding YesterdayUsageText, StringFormat='昨日使用 {0}'}" Style="{StaticResource QuietText}" FontSize="10" Margin="0,5,0,0"/></StackPanel></Grid></Border>
+   </UniformGrid>
+  </StackPanel>
+  <!-- ================= PART 2 · 输入：节奏曲线、热力图、排行、最近按键、词频、随机练习 ================= -->
+  <StackPanel x:Name="InputPart" Style="{StaticResource PartInput}" Margin="0,0,0,26">
+   <DockPanel Margin="0,0,0,16"><TextBlock Text="PART 2 / INPUT · 输入" Style="{StaticResource PartHeading}"/><Border Style="{StaticResource PartRule}"/></DockPanel>
+   <Border Style="{StaticResource DashboardPanel}" Padding="40,18,24,18" Margin="0,0,0,20">
+    <Grid>
+     <Grid.RowDefinitions><RowDefinition Height="38"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <DockPanel><TextBlock DockPanel.Dock="Right" Text="{Binding PeakCps, StringFormat='本次峰值 {0:F1} 次 / s'}" Style="{StaticResource QuietText}"/><TextBlock Style="{StaticResource MonoText}" Foreground="{DynamicResource AccentBrush}"><Run Text="● LIVE  /  "/><Run Text="{Binding RecordingStatus, Mode=OneWay}"/><Run Text="   最近输入 "/><Run Text="{Binding LastKeyText, Mode=OneWay}"/></TextBlock></DockPanel>
+     <Grid Grid.Row="1">
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <Grid Style="{StaticResource RhythmChart}"><Grid.RowDefinitions><RowDefinition Height="36"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+       <DockPanel><TextBlock Text="最近输入 →" Style="{StaticResource QuietText}" DockPanel.Dock="Left" Margin="0,0,18,0"/>
+        <!--  倒序集合 + RightToLeft 面板：最新一项从右侧起排，装不下时向左溢出并由自身裁剪，不会伸到右侧速率卡片上被遮住  -->
+        <ItemsControl ItemsSource="{Binding RecentKeyChips}" FlowDirection="RightToLeft" ClipToBounds="True" VerticalAlignment="Center"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" FlowDirection="LeftToRight" FontFamily="Consolas" Foreground="{DynamicResource TextSecondary}" FontSize="15" Margin="8,0"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></DockPanel>
+       <!--  曲线区高度钉成 220（与 Canvas 设计稿同高）：外层面板已经是自适应高度，这里不给尺寸 Viewbox 会量到 0  -->
+       <Grid Grid.Row="1" Height="220" ClipToBounds="True"><Viewbox Stretch="Fill"><Canvas Width="900" Height="220"><Path Stroke="{DynamicResource CardBorderBrush}" StrokeThickness="1" Data="M0,30 L900,30 M0,90 L900,90 M0,150 L900,150 M0,219 L900,219 M1,0 L1,220 M150,0 L150,220 M300,0 L300,220 M450,0 L450,220 M600,0 L600,220 M750,0 L750,220 M899,0 L899,220"/><Polyline Points="{Binding RatePoints}" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2.3" StrokeLineJoin="Round"/></Canvas></Viewbox>
+        <!--  峰值示意线：高度由 DashboardView 代码按 PeakLineRatio 定位；标注留在 Viewbox 之外，否则会被非等比拉伸压扁  -->
+        <Canvas x:Name="PeakSurface" IsHitTestVisible="False" SizeChanged="OnPeakSurfaceSizeChanged">
+         <Grid x:Name="PeakRuleHost" Canvas.Left="0" Height="26" Width="{Binding ActualWidth, ElementName=PeakSurface}">
+          <Line X1="0" Y1="13" X2="{Binding ActualWidth, ElementName=PeakRuleHost}" Y2="13" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1" StrokeDashArray="5 4" Opacity="0.7"/>
+          <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,0" Padding="6,1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0">
+           <StackPanel Orientation="Horizontal">
+            <TextBlock Text="峰值" Style="{StaticResource QuietText}" FontSize="10"/>
+            <TextBlock Text="{Binding PeakCps, StringFormat={}{0:F1}}" Style="{StaticResource MonoText}" FontSize="12" Foreground="{DynamicResource AccentBrush}" Margin="4,0,0,0"/>
+            <TextBlock Text="次 / s" Style="{StaticResource QuietText}" FontSize="10" Margin="3,0,0,0"/>
+            <TextBlock Text="{Binding PeakAtText}" Style="{StaticResource MonoText}" FontSize="10" Margin="8,0,0,0"/>
+           </StackPanel>
+          </Border>
+          <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1,0" Padding="6,1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,10,0">
+           <StackPanel Orientation="Horizontal">
+            <TextBlock Text="{Binding CadenceSummary}" Style="{StaticResource QuietText}" FontSize="9"/>
+            <TextBlock Text="{Binding AxisCps, StringFormat={}轴上限 {0:0.#} 次/s}" Style="{StaticResource MonoText}" FontSize="9" Margin="8,0,0,0"/>
+           </StackPanel>
+          </Border>
+         </Grid>
+        </Canvas>
+       </Grid>
+       <StackPanel Grid.Row="2"><DockPanel  Margin="0,10,0,0"><TextBlock DockPanel.Dock="Right" Text="现在" Style="{StaticResource QuietText}"/><TextBlock DockPanel.Dock="Left" Text="−60 s" Style="{StaticResource QuietText}"/><TextBlock Text="每秒敲击 · 近 1 秒滚动窗口 / 连续滚动的 60 秒" HorizontalAlignment="Center" Style="{StaticResource QuietText}"/></DockPanel></StackPanel>
+      </Grid>
+      <UniformGrid Style="{StaticResource RhythmTiles}">
+       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="实时速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding CurrentCps, StringFormat=F1}" Style="{StaticResource MetricText}"/><TextBlock Text="近 60 秒 · 次 / s" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
+       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="距上次按下" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Keyboard.LastKeyIntervalMs}" Style="{StaticResource MetricText}"/><TextBlock Text="{Binding LastIntervalHint}" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
+       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="平均间隔" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding Keyboard.AverageKeyIntervalMs, StringFormat=F0}" Style="{StaticResource MetricText}"/><TextBlock Text="{Binding AverageIntervalHint}" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
+       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="今日平均速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding AverageCps, StringFormat=F1}" Style="{StaticResource MetricText}"/><TextBlock Text="键盘记录 · 次 / s" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
+       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="最快速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding PeakCps, StringFormat=F1}" Style="{StaticResource MetricText}"/><TextBlock Text="工作台峰值 / 1 秒" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
+       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="间隔速率" Style="{StaticResource MetricLabel}"/><TextBlock Text="{Binding IntervalRateText}" Style="{StaticResource MetricText}"/><TextBlock Text="相邻间隔倒数推算 · 次 / s" Style="{StaticResource QuietText}" FontSize="10"/></StackPanel></Border>
+      </UniformGrid>
+     </Grid>
+     <TextBlock Text="输 入 节 奏" Foreground="{DynamicResource DashboardNumber}" FontSize="15" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-29,0,0,40" Grid.RowSpan="2"><TextBlock.LayoutTransform><RotateTransform Angle="-90"/></TextBlock.LayoutTransform></TextBlock>
+    </Grid>
+   </Border>
+   <Border Style="{StaticResource DashboardPanel}" Padding="20" Margin="0,0,0,20">
+    <StackPanel>
+     <DockPanel Margin="0,0,0,24"><ComboBox DockPanel.Dock="Right" Width="120" ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}" ToolTip="{Binding PeriodRangeHint}"/><TextBlock Text="键盘热力图" Style="{StaticResource SectionHeading}" VerticalAlignment="Center"/></DockPanel>
+     <!-- 色阶条与最少/最多次数由 KeyboardHeatmap 自己渲染，与按键着色同源；位移图标只收归一化偏移，像素换算在控件里 -->
+     <controls:KeyboardHeatmap ShowHeader="False" IsRecording="{Binding Keyboard.IsRecording}" ItemsSource="{Binding DisplayKeyCounts}" RecentKey="{Binding LastKeyText}"
+                               LeftClickCount="{Binding Mouse.LeftClickToday}" MiddleClickCount="{Binding Mouse.MiddleClickToday}" RightClickCount="{Binding Mouse.RightClickToday}"
+                               MouseMovementText="{Binding Mouse.MouseMovementText}" MouseDeltaText="{Binding Mouse.MouseDeltaText}"
+                               MouseDistanceText="{Binding Mouse.MouseDistanceText}" MouseWheelText="{Binding Mouse.MouseWheelText}"
+                               MouseOffsetX="{Binding Mouse.MouseOffsetX}" MouseOffsetY="{Binding Mouse.MouseOffsetY}"
+                               MouseButton="{Binding Mouse.MouseButton}" MouseClickPulse="{Binding Mouse.MouseClickPulse}"
+                               MouseTrailXPoints="{Binding Mouse.MouseTrailXPoints}" MouseTrailYPoints="{Binding Mouse.MouseTrailYPoints}"
+                               MouseTrailWheelPoints="{Binding Mouse.MouseTrailWheelPoints}"/>
+    </StackPanel>
+   </Border>
+   <!--  时段锚点由 PeriodRangeHint 给出：滚动窗口跟着当前时刻跑，不标起算点就读不出这些数字覆盖哪一段时间  -->
+   <DockPanel Margin="0,0,0,20"><TextBlock DockPanel.Dock="Right" Text="刷新 1 s" Style="{StaticResource QuietText}"/><TextBlock Style="{StaticResource QuietText}"><Run Text="◇  "/><Run Text="{Binding PeriodRangeHint, Mode=OneWay}"/><Run Text=" · 热力图与排行共享该时段"/></TextBlock></DockPanel>
+   <Grid Margin="0,0,0,20">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+    <Border Style="{StaticResource RankingCell}">
+     <Grid><TextBlock Text="{Binding KeyRankingPeriodMark}" Foreground="{DynamicResource DashboardWatermark}" FontFamily="Consolas" FontSize="32" HorizontalAlignment="Left" VerticalAlignment="Bottom" IsHitTestVisible="False"><TextBlock.LayoutTransform><RotateTransform Angle="90"/></TextBlock.LayoutTransform></TextBlock><StackPanel>
       <ListBox ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}" Style="{StaticResource PeriodSelector}" Margin="0,0,0,14"/>
       <TextBlock Text="敲击次数" Foreground="{DynamicResource AccentBrush}" FontSize="12"/><TextBlock Text="从高到低排序" Style="{StaticResource QuietText}" FontSize="10" Margin="0,5,0,10"/>
       <ItemsControl ItemsSource="{Binding TopKeys}"><ItemsControl.ItemTemplate><DataTemplate><Grid Height="52"><TextBlock Foreground="{DynamicResource TextSecondary}" FontFamily="Consolas" Margin="0,6,0,0"><Run Text="{Binding Rank, Mode=OneWay, StringFormat=D2}"/><Run Text="  "/><Run Text="{Binding Key, Mode=OneWay}"/></TextBlock><TextBlock Text="{Binding Count, StringFormat=N0}" Style="{StaticResource MetricText}" FontSize="39" Margin="0,4,0,0"/><ProgressBar Value="{Binding BarWidth}" Maximum="100" Height="2" VerticalAlignment="Bottom" BorderThickness="0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource CardBorderBrush}"/></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
       <TextBlock Text="当前时段暂无记录" Margin="0,14"><TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource QuietText}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding TopKeys.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
      </StackPanel></Grid>
     </Border>
-    <Border Style="{StaticResource DashboardPanel}" Height="233" Padding="24,16">
+    <Border Style="{StaticResource RecentCell}">
      <StackPanel><TextBlock Text="最近按键记录 · 实时更新" Foreground="{DynamicResource AccentBrush}" FontSize="11" Margin="0,0,0,10"/>
       <ItemsControl ItemsSource="{Binding Source={StaticResource RecentDescending}}" Height="144" ClipToBounds="True"><ItemsControl.ItemTemplate><DataTemplate><DockPanel Height="36"><TextBlock DockPanel.Dock="Right" Text="{Binding Timestamp, StringFormat=HH:mm:ss.fff}" FontFamily="Consolas" FontSize="14" Foreground="{DynamicResource DashboardNumber}"/><Border BorderBrush="{DynamicResource ControlBorder}" BorderThickness="1" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center" MaxWidth="90"><TextBlock Text="{Binding Key}" TextTrimming="CharacterEllipsis" FontFamily="Consolas"/></Border></DockPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
       <Button Content="查看完整记录 ↗" Click="ShowKeyDetails" Style="{StaticResource TextButton}" HorizontalAlignment="Left"/>
      </StackPanel>
     </Border>
-   </StackPanel>
-  </Grid>
-  <Grid Margin="0,24,0,0">
-   <Grid.ColumnDefinitions><ColumnDefinition Width="1160*"/><ColumnDefinition Width="20"/><ColumnDefinition Width="356*"/></Grid.ColumnDefinitions>
-   <Border x:Name="SessionSection" Style="{StaticResource DashboardPanel}" MinHeight="385" Padding="24,22">
+   </Grid>
+   <Border Style="{StaticResource DashboardPanel}" Padding="24,20" Margin="0,0,0,20"><controls:WordFrequencyPanel DataContext="{Binding WordFrequency}"/></Border>
+   <controls:VersePractice DataContext="{Binding Practice}" Margin="0,0,0,20"/>
+   <controls:PracticeScoreboard DataContext="{Binding Practice}"/>
+  </StackPanel>
+  <!-- ================= PART 3 · 记录：应用会话、原始记录、设备与记录设置 ================= -->
+  <StackPanel x:Name="RecordPart" Style="{StaticResource PartRecord}">
+   <DockPanel Margin="0,0,0,16"><TextBlock Text="PART 3 / RECORD · 记录" Style="{StaticResource PartHeading}"/><Border Style="{StaticResource PartRule}"/></DockPanel>
+   <Border x:Name="SessionSection" Style="{StaticResource DashboardPanel}" Padding="24,22" Margin="0,0,0,16">
     <StackPanel>
      <DockPanel Margin="0,0,0,20"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><ComboBox Width="156" ItemsSource="{Binding SessionDateOptions}" SelectedItem="{Binding SelectedSessionDate}" Margin="0,0,12,0"/><Button Content="历史记录 ↗" Click="ShowHistory"/></StackPanel><TextBlock Text="SESSION / PROCESS" FontFamily="Consolas" FontSize="36" Foreground="{DynamicResource DashboardWatermark}"/></DockPanel>
-     <!--  这排读数是进程口径：落盘值是数据库里的快照，实时补算就是进行中会话那段还没写库的时间  -->
-     <UniformGrid Columns="5" Margin="0,0,-12,18">
+     <!--  这排读数都是进程口径：落盘值是数据库里的快照，实时补算就是进行中会话那段还没写库的时间  -->
+     <UniformGrid Style="{StaticResource SessionTiles}" Margin="0,0,-12,6">
       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="落盘累计" Style="{StaticResource QuietText}" FontSize="10"/><TextBlock Text="{Binding AppSessionRawText}" FontFamily="Consolas" FontSize="23" Foreground="{DynamicResource DashboardNumber}" Margin="0,12"/></StackPanel></Border>
       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="实时补算" Style="{StaticResource QuietText}" FontSize="10"/><TextBlock Text="{Binding AppSessionCorrectionText}" FontFamily="Consolas" FontSize="23" Foreground="{DynamicResource DashboardNumber}" Margin="0,12"/></StackPanel></Border>
       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="会话总时长" Style="{StaticResource QuietText}" FontSize="10"/><TextBlock Text="{Binding AppSessionTotalText}" FontFamily="Consolas" FontSize="23" Foreground="{DynamicResource DashboardNumber}" Margin="0,12"/></StackPanel></Border>
       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="进行中应用" Style="{StaticResource QuietText}" FontSize="10"/><TextBlock Text="{Binding AppSessionRunningText}" FontFamily="Consolas" FontSize="23" Foreground="{DynamicResource DashboardNumber}" Margin="0,12"/></StackPanel></Border>
       <Border Style="{StaticResource RateTile}"><StackPanel><TextBlock Text="当天应用数" Style="{StaticResource QuietText}" FontSize="10"/><TextBlock Text="{Binding AppSessionTrackedText}" FontFamily="Consolas" FontSize="23" Foreground="{DynamicResource DashboardNumber}" Margin="0,12"/></StackPanel></Border>
      </UniformGrid>
-     <DataGrid ItemsSource="{Binding Apps.SessionRows}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" MinHeight="180" MaxHeight="360" BorderThickness="0"><DataGrid.Columns><DataGridTextColumn Header="应用" Binding="{Binding DisplayName}" Width="2.2*"/><DataGridTextColumn Header="状态" Binding="{Binding StatusText}" Width="1.4*"><DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/><Style.Triggers><DataTrigger Binding="{Binding IsRunning}" Value="True"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></DataTrigger></Style.Triggers></Style></DataGridTextColumn.ElementStyle></DataGridTextColumn><DataGridTextColumn Header="首次启动" Binding="{Binding FormattedStartTime}" Width="*"/><DataGridTextColumn Header="最近活动" Binding="{Binding FormattedEndTime}" Width="*"/><DataGridTextColumn Header="落盘累计" Binding="{Binding FormattedRawUsage}" Width="1.1*"/><DataGridTextColumn Header="实时补算" Binding="{Binding FormattedCorrection}" Width="*"/><DataGridTextColumn Header="校正后时长" Binding="{Binding FormattedUsage}" Width="1.2*"/><DataGridTextColumn Header="占比" Binding="{Binding Share, StringFormat={}{0:0.0}%}" Width="0.9*"/></DataGrid.Columns></DataGrid>
+     <!--  两栏时这栏只有一半宽，八列读不满就横向滚动；列宽下限按表头最长文案取，别让它挤成竖排  -->
+     <DataGrid ItemsSource="{Binding Apps.SessionRows}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" MinHeight="180" MaxHeight="360" BorderThickness="0" HorizontalScrollBarVisibility="Auto"><DataGrid.Columns><DataGridTextColumn Header="应用" Binding="{Binding DisplayName}" Width="2.2*" MinWidth="140"/><DataGridTextColumn Header="状态" Binding="{Binding StatusText}" Width="1.4*" MinWidth="110"><DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/><Style.Triggers><DataTrigger Binding="{Binding IsRunning}" Value="True"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></DataTrigger></Style.Triggers></Style></DataGridTextColumn.ElementStyle></DataGridTextColumn><DataGridTextColumn Header="首次启动" Binding="{Binding FormattedStartTime}" Width="*" MinWidth="120"/><DataGridTextColumn Header="最近活动" Binding="{Binding FormattedEndTime}" Width="*" MinWidth="120"/><DataGridTextColumn Header="落盘累计" Binding="{Binding FormattedRawUsage}" Width="1.1*" MinWidth="100"/><DataGridTextColumn Header="实时补算" Binding="{Binding FormattedCorrection}" Width="*" MinWidth="100"/><DataGridTextColumn Header="校正后时长" Binding="{Binding FormattedUsage}" Width="1.2*" MinWidth="110"/><DataGridTextColumn Header="占比" Binding="{Binding Share, StringFormat={}{0:0.0}%}" Width="0.9*" MinWidth="70"/></DataGrid.Columns></DataGrid>
      <TextBlock Text="{Binding AppSessionNote}" TextWrapping="Wrap" Style="{StaticResource QuietText}" FontSize="11" Margin="0,14,0,0"/>
      <Expander x:Name="HistorySection" Header="每日使用历史 · 会话事件" Margin="0,16,0,0"><StackPanel Margin="0,10,0,0"><DataGrid Height="200" ItemsSource="{Binding Usage.History}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"><DataGrid.Columns><DataGridTextColumn Header="日期" Binding="{Binding Date}" Width="120"/><DataGridTextColumn Header="原始时长" Binding="{Binding FormattedTime}" Width="140"/><DataGridTextColumn Header="校正时长" Binding="{Binding FormattedCorrectedTime}" Width="140"><DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/><Style.Triggers><DataTrigger Binding="{Binding HasDiscrepancy}" Value="True"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}"/></DataTrigger></Style.Triggers></Style></DataGridTextColumn.ElementStyle></DataGridTextColumn><DataGridTextColumn Header="修正原因" Binding="{Binding CorrectionReason}" Width="*"/></DataGrid.Columns></DataGrid><TextBlock Text="{Binding SelectedCorrectionReason}" TextWrapping="Wrap" Style="{StaticResource QuietText}" FontSize="11" Margin="0,10,0,0"/><TextBlock Text="会话事件 · 服务起止与休眠唤醒，用来核对上面的校正差值从哪来" Style="{StaticResource QuietText}" FontSize="11" Margin="0,16,0,8"/><DataGrid Height="180" ItemsSource="{Binding FilteredSessionEvents}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" BorderThickness="0"><DataGrid.Columns><DataGridTextColumn Header="会话事件" Binding="{Binding EventType}" Width="*"/><DataGridTextColumn Header="时间" Binding="{Binding Timestamp}" Width="1.7*"/><DataGridTextColumn Header="与上次间隔" Binding="{Binding TimeSincePrevious}" Width="*"/><DataGridTextColumn Header="本次会话时长" Binding="{Binding FormattedCumulativeUsage}" Width="*"/></DataGrid.Columns></DataGrid></StackPanel></Expander>
     </StackPanel>
    </Border>
-   <Border Grid.Column="2" Style="{StaticResource DashboardPanel}" MinHeight="334" VerticalAlignment="Top" Padding="24,20">
-    <controls:WordFrequencyPanel DataContext="{Binding WordFrequency}"/>
-   </Border>
-  </Grid>
-  <controls:PracticeScoreboard DataContext="{Binding Practice}"/>
-  <Expander x:Name="SettingsSection" Header="设备与记录设置" Margin="0,16,0,0">
-   <Border Style="{StaticResource DashboardPanel}" Margin="0,12,0,0"><StackPanel>
-    <WrapPanel Margin="0,0,0,16"><TextBlock Text="键盘记录" VerticalAlignment="Center" Margin="0,0,16,0"/><Button Content="开始" Command="{Binding Keyboard.StartRecordingCommand}" Margin="0,0,8,0"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Style.Triggers><DataTrigger Binding="{Binding Keyboard.IsRecording}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style></Button.Style></Button><Button Content="暂停" Command="{Binding Keyboard.StopRecordingCommand}" IsEnabled="{Binding Keyboard.IsRecording}" Margin="0,0,24,0"/><TextBlock Text="鼠标记录" VerticalAlignment="Center" Margin="0,0,16,0"/><Button Content="开始" Command="{Binding Mouse.StartRecordingCommand}" Margin="0,0,8,0"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Style.Triggers><DataTrigger Binding="{Binding Mouse.IsRecording}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style></Button.Style></Button><Button Content="暂停" Command="{Binding Mouse.StopRecordingCommand}" IsEnabled="{Binding Mouse.IsRecording}"/></WrapPanel>
-    <WrapPanel><TextBlock Text="界面主题" VerticalAlignment="Center" Margin="0,0,16,0"/><Button Content="深色 · KeyScope" Command="{Binding Settings.ApplyDarkCommand}" Margin="0,0,8,0"/><Button Content="浅色 · 苔绿" Command="{Binding Settings.ApplyLightCommand}" Margin="0,0,24,0"/><Button Content="打开悬浮键盘动画 ↗" Command="{Binding Settings.OpenKeyAnimationWindowCommand}"/></WrapPanel>
-   </StackPanel></Border>
-  </Expander>
- </StackPanel>
+   <Expander x:Name="KeyDetails" Header="完整按键记录 / 鼠标历史" Margin="0,0,0,16">
+    <StackPanel Margin="0,12,0,0"><DockPanel Margin="0,0,0,12"><Button Content="刷新按键数据" Command="{Binding Keyboard.RefreshDataCommand}" DockPanel.Dock="Right"/><TextBlock Text="{Binding PeriodTotalCount, StringFormat='当前时段累计 {0:N0} 次'}" VerticalAlignment="Center"/></DockPanel>
+     <DataGrid Height="240" ItemsSource="{Binding DisplayKeyCounts}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"><DataGrid.Columns><DataGridTextColumn Header="按键" Binding="{Binding Key}" Width="*"/><DataGridTextColumn Header="次数" Binding="{Binding Count, StringFormat=N0}" Width="*"/></DataGrid.Columns></DataGrid>
+     <TextBlock Text="最近 30 条输入 · 观察时间" Style="{StaticResource QuietText}" Margin="0,16,0,8"/>
+     <DataGrid Height="180" ItemsSource="{Binding Source={StaticResource RecentDescending}}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"><DataGrid.Columns><DataGridTextColumn Header="按键" Binding="{Binding Key}" Width="*"/><DataGridTextColumn Header="时间" Binding="{Binding Timestamp, StringFormat=yyyy-MM-dd HH:mm:ss.fff}" Width="2*"/></DataGrid.Columns></DataGrid><WrapPanel Margin="0,16,0,0"><TextBlock Text="鼠标历史日期" Margin="0,0,12,0" VerticalAlignment="Center"/><DatePicker SelectedDate="{Binding Mouse.SelectedDate}" Width="148" Margin="0,0,20,0"/><TextBlock Text="{Binding Mouse.SelectedDateLeftCount, StringFormat='左键 {0:N0}'}" VerticalAlignment="Center" Margin="0,0,16,0"/><TextBlock Text="{Binding Mouse.SelectedDateMiddleCount, StringFormat='中键 {0:N0}'}" VerticalAlignment="Center" Margin="0,0,16,0"/><TextBlock Text="{Binding Mouse.SelectedDateRightCount, StringFormat='右键 {0:N0}'}" VerticalAlignment="Center"/></WrapPanel>
+    </StackPanel>
+   </Expander>
+   <Expander x:Name="SettingsSection" Header="设备与记录设置">
+    <Border Style="{StaticResource DashboardPanel}" Margin="0,12,0,0"><StackPanel>
+     <WrapPanel Margin="0,0,0,16"><TextBlock Text="键盘记录" VerticalAlignment="Center" Margin="0,0,16,0"/><Button Content="开始" Command="{Binding Keyboard.StartRecordingCommand}" Margin="0,0,8,0"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Style.Triggers><DataTrigger Binding="{Binding Keyboard.IsRecording}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style></Button.Style></Button><Button Content="暂停" Command="{Binding Keyboard.StopRecordingCommand}" IsEnabled="{Binding Keyboard.IsRecording}" Margin="0,0,24,0"/><TextBlock Text="鼠标记录" VerticalAlignment="Center" Margin="0,0,16,0"/><Button Content="开始" Command="{Binding Mouse.StartRecordingCommand}" Margin="0,0,8,0"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Style.Triggers><DataTrigger Binding="{Binding Mouse.IsRecording}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style></Button.Style></Button><Button Content="暂停" Command="{Binding Mouse.StopRecordingCommand}" IsEnabled="{Binding Mouse.IsRecording}"/></WrapPanel>
+     <WrapPanel Margin="0,0,0,16"><TextBlock Text="界面主题" VerticalAlignment="Center" Margin="0,0,16,0"/><Button Content="深色 · KeyScope" Command="{Binding Settings.ApplyDarkCommand}" Margin="0,0,8,0"/><Button Content="浅色 · 苔绿" Command="{Binding Settings.ApplyLightCommand}" Margin="0,0,24,0"/><Button Content="打开悬浮键盘动画 ↗" Command="{Binding Settings.OpenKeyAnimationWindowCommand}"/></WrapPanel>
+     <WrapPanel><TextBlock Text="界面布局" VerticalAlignment="Center" Margin="0,0,16,0"/><ComboBox Width="132" ItemsSource="{Binding LayoutModeOptions}" SelectedItem="{Binding SelectedLayoutMode}" VerticalAlignment="Center"/><TextBlock Text="{Binding LayoutModeNote}" Style="{StaticResource QuietText}" FontSize="10" VerticalAlignment="Center" Margin="12,0,0,0"/></WrapPanel>
+    </StackPanel></Border>
+   </Expander>
+  </StackPanel>
+ </Grid>
 </UserControl>

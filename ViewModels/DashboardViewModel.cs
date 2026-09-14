@@ -52,6 +52,71 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     public PracticeViewModel Practice { get; }
     public WordFrequencyViewModel? WordFrequency { get; }
 
+    private readonly Services.Interfaces.IConfigurationService _config;
+
+    /// <summary>
+    /// 布局选项的展示文案。落盘的是英文码，配置里不留中文；两者只在这一对 switch 里换算。
+    /// </summary>
+    public string[] LayoutModeOptions { get; } = ["跟随屏幕", "横向 · 双栏", "纵向 · 单栏"];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LayoutModeNote))]
+    private string _selectedLayoutMode = "跟随屏幕";
+
+    /// <summary>
+    /// 是否把「输入」「记录」两栏并排。这里只给屏幕比例的结论；
+    /// 窗口被拖窄时视图层会再收紧成单栏，免得两栏被裁掉。
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LayoutModeNote))]
+    private bool _isWideLayout = true;
+
+    /// <summary>
+    /// 两栏排布的窗口宽度下限，与 DashboardView 里的同名常量保持一致：
+    /// 低于这个宽度，左栏分到的宽度会让热力图键帽字号掉到 7 px 以下，宁可退回单栏。
+    /// </summary>
+    private const int TwoColumnMinWidth = 1360;
+
+    /// <summary>设置区那行说明。不写清判据，用户只会觉得布局开关时灵时不灵。</summary>
+    public string LayoutModeNote
+    {
+        get
+        {
+            double width = System.Windows.SystemParameters.PrimaryScreenWidth;
+            double height = System.Windows.SystemParameters.PrimaryScreenHeight;
+            string screen = $"{width:F0}×{height:F0} 逻辑像素 · {(width >= height ? "横屏" : "竖屏")}";
+            return SelectedLayoutMode == "跟随屏幕"
+                ? $"显示器 {screen} → {(IsWideLayout ? "两栏" : "单栏")}；实际窗口窄于 {TwoColumnMinWidth} 时自动收成单栏"
+                : $"已固定为{(IsWideLayout ? "两栏" : "单栏")}（显示器 {screen}）";
+        }
+    }
+
+    partial void OnSelectedLayoutModeChanged(string value)
+    {
+        _config.SetLayoutMode(value switch { "横向 · 双栏" => "Wide", "纵向 · 单栏" => "Tall", _ => "Auto" });
+        ApplyScreenRatio();
+    }
+
+    /// <summary>重算横竖屏。主显示器分辨率变化、改缩放、转竖屏都走这里。</summary>
+    private void ApplyScreenRatio()
+    {
+        bool screenIsWide = System.Windows.SystemParameters.PrimaryScreenWidth
+            >= System.Windows.SystemParameters.PrimaryScreenHeight;
+        IsWideLayout = SelectedLayoutMode switch
+        {
+            "横向 · 双栏" => true,
+            "纵向 · 单栏" => false,
+            _ => screenIsWide,
+        };
+    }
+
+    private void OnSystemParametersChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(System.Windows.SystemParameters.PrimaryScreenWidth)
+            or nameof(System.Windows.SystemParameters.PrimaryScreenHeight))
+            ApplyScreenRatio();
+    }
+
     /// <summary>
     /// 滚动窗口选项。标签与小时数在同一处定义：“N 小时”的时长不再需要从文案里反向解析，
     /// 改标签或加一档都不会让文案与实现漂移。
@@ -275,7 +340,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         KeyCounterViewModel keyboard,
         UsageViewModel usage,
         AppUsageViewModel apps,
-        SettingsViewModel settings, PracticeViewModel practice, WordFrequencyViewModel? wordFrequency = null)
+        SettingsViewModel settings, Services.Interfaces.IConfigurationService config, PracticeViewModel practice, WordFrequencyViewModel? wordFrequency = null)
     {
         Mouse = mouse;
         Keyboard = keyboard;
@@ -284,6 +349,12 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         Settings = settings;
         Practice = practice;
         WordFrequency = wordFrequency;
+        _config = config;
+
+        // 读取持久化的排布档位走字段，不走属性：避免启动时又把同一份值写回配置
+        _selectedLayoutMode = config.GetLayoutMode() switch { "Wide" => "横向 · 双栏", "Tall" => "纵向 · 单栏", _ => "跟随屏幕" };
+        ApplyScreenRatio();
+        System.Windows.SystemParameters.StaticPropertyChanged += OnSystemParametersChanged;
 
         Mouse.PropertyChanged += OnMousePropertyChanged;
         Keyboard.PropertyChanged += OnKeyboardPropertyChanged;
@@ -748,6 +819,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         _disposed = true;
         _timer.Stop();
         _timer.Tick -= OnTimerTick;
+        System.Windows.SystemParameters.StaticPropertyChanged -= OnSystemParametersChanged;
         // 鼠标里程靠定时落库，退出前让它的最后一次冲刷把不足 1 秒的尾数写进去
         Mouse.Dispose();
         Mouse.PropertyChanged -= OnMousePropertyChanged;

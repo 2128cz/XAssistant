@@ -30,4 +30,5 @@ public class GeneralSettings
     public double WindowHeight { get; set; } = 720;
     public bool IsLogExpanded { get; set; } = false;
     public string Theme { get; set; } = "Dark"; // 界面主题：Light / Dark
+    public string LayoutMode { get; set; } = "Auto"; // 分区排布：Auto 按屏幕比例，Wide 强制双栏，Tall 强制单栏
 }
