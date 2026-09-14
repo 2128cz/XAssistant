@@ -22,12 +22,18 @@ public sealed class PracticeCatalog
             if (sentence.Words.Any(word => word == null || string.IsNullOrWhiteSpace(word.Text) || word.Text.Any(char.IsWhiteSpace)
                 || string.IsNullOrWhiteSpace(word.Annotation) || string.IsNullOrWhiteSpace(word.Translation)))
                 throw new InvalidDataException($"题目 {sentence.Id} 的单词缺少文本、注音或释义。");
-            // 要敲的字符必须是键盘上打得出来的 ASCII；否则这个句子永远敲不完，只能靠回车跳过。
-            if (sentence.Text.Any(ch => ch < 0x20 || ch > 0x7E))
-                throw new InvalidDataException($"题目 {sentence.Id} 的正文含不可打印或非 ASCII 字符，请改写成键盘能打出的形式。");
+            // 要敲的字符得是某个真实键盘布局打得出来的：ASCII 可见字符（英文布局）或西里尔字母（俄语布局）。
+            // 假名、汉字、长音符这类既折叠不掉又敲不出，只会在正文里留下一格永远落不下去的死格。
+            var untypable = PracticeText.Normalize(sentence.Text).Where(ch => !IsTypable(ch)).Distinct().ToArray();
+            if (untypable.Length > 0)
+                throw new InvalidDataException($"题目 {sentence.Id} 的正文有键盘打不出的字符「{new string(untypable)}」，请改写成 ASCII 或西里尔字母形式。");
             if (sentence.Text.Length > 300 || PracticeText.Tokens(sentence.Text).Length is < 1 or > 28) throw new InvalidDataException("每句练习最多300字符。");
         }
     }
+
+    /// <summary>这格键敲不敲得出来：0x20–0x7E 是英文布局的可见字符与空格，0x400–0x4FF 是俄语布局的西里尔字母（含 Ё）。</summary>
+    private static bool IsTypable(char ch) =>
+        (ch >= 0x20 && ch <= 0x7E) || (ch >= 0x0400 && ch <= 0x04FF);
 }
 
 /// <summary>
@@ -69,9 +75,9 @@ public sealed class PracticeSentence
 }
 public sealed class PracticeWord
 {
-    /// <summary>要敲出来的形式：英文是单词本身，日语是罗马音。</summary>
+    /// <summary>要敲出来的形式：英文是单词本身，日语是罗马音，俄语是西里尔原文。</summary>
     public string Text { get; set; } = "";
-    /// <summary>卡片上方的注音：英文是 IPA，日语是假名或汉字。</summary>
+    /// <summary>卡片上方的注音：英文是 IPA，日语是假名或汉字，俄语是拉丁转写。</summary>
     public string Annotation { get; set; } = "";
     public string Translation { get; set; } = "";
     public string Suffix { get; set; } = "";
@@ -111,6 +117,10 @@ public static class PracticeText
         '’' or '‘' or '‛' or '‚' => '\'',
         '“' or '”' or '„' => '"',
         '–' or '—' or '―' or '‐' => '-',
+        // 俄语的 ё 单独占 ` 键，很多人打字时直接按 е，两者必须等价，否则整句都是找不着北的红格
+        'ё' => 'е', 'Ё' => 'Е',
+        // 俄文引号 « » 在俄语布局里就是 Shift+2 / Shift+3，跟半角引号算同一个键位
+        '«' or '»' => '"',
         '。' => '.',
         '、' or '，' => ',',
         '？' => '?',

@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "note": "共产主义经典文献的通行俄文本 · 正文是西里尔字母，要先把输入法切到俄语布局（Win+空格）。引文取自《共产党宣言》俄文版、《国际歌》柯茨译词与列宁著作原文；上方注音是拉丁转写，不用敲。ё 与 е 算同一个键。",
+  "sentences": [
+    {
+      "id": "ru-manifesto-spectre",
+      "source": "К. Маркс, Ф. Энгельс · Манифест Коммунистической партии（1848）",
+      "sourceUrl": "",
+      "translation": "一个幽灵，共产主义的幽灵，在欧洲游荡。",
+      "words": [
+        { "text": "Призрак", "annotation": "Prizrak", "translation": "幽灵", "suffix": "" },
+        { "text": "бродит", "annotation": "brodit", "translation": "游荡、徘徊", "suffix": "" },
+        { "text": "по", "annotation": "po", "translation": "遍于（与格连用）", "suffix": "" },
+        { "text": "Европе", "annotation": "Yevrope", "translation": "欧洲（介格）", "suffix": "" },
+        { "text": "—", "annotation": "—", "translation": "破折号，按 - 键", "suffix": "" },
+        { "text": "призрак", "annotation": "prizrak", "translation": "幽灵", "suffix": "" },
+        { "text": "коммунизма", "annotation": "kommunizma", "translation": "共产主义（属格）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-manifesto-class-struggle",
+      "source": "К. Маркс, Ф. Энгельс · Манифест（第一章）",
+      "sourceUrl": "",
+      "translation": "至今一切社会的历史都是阶级斗争的历史。",
+      "words": [
+        { "text": "История", "annotation": "Istoriya", "translation": "历史", "suffix": "" },
+        { "text": "всех", "annotation": "vsekh", "translation": "一切的（属格复数）", "suffix": "" },
+        { "text": "доселе", "annotation": "dosele", "translation": "迄今", "suffix": "" },
+        { "text": "существующих", "annotation": "sushchestvuyushchikh", "translation": "存在着的（属格复数）", "suffix": "" },
+        { "text": "обществ", "annotation": "obshchestv", "translation": "社会（属格复数）", "suffix": "" },
+        { "text": "есть", "annotation": "yest'", "translation": "是", "suffix": "" },
+        { "text": "история", "annotation": "istoriya", "translation": "历史", "suffix": "" },
+        { "text": "борьбы", "annotation": "bor'by", "translation": "斗争（属格）", "suffix": "" },
+        { "text": "классов", "annotation": "klassov", "translation": "阶级（属格复数）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-manifesto-chains",
+      "source": "К. Маркс, Ф. Энгельс · Манифест（结尾）",
+      "sourceUrl": "",
+      "translation": "无产阶级在这个革命中失去的只是锁链。",
+      "words": [
+        { "text": "Пролетариям", "annotation": "Proletariyam", "translation": "无产者们（与格复数）", "suffix": "" },
+        { "text": "нечего", "annotation": "nechego", "translation": "没有什么", "suffix": "" },
+        { "text": "в", "annotation": "v", "translation": "在…之中", "suffix": "" },
+        { "text": "ней", "annotation": "ney", "translation": "它（介格，指革命）", "suffix": "" },
+        { "text": "терять", "annotation": "teryat'", "translation": "失去", "suffix": "," },
+        { "text": "кроме", "annotation": "krome", "translation": "除…之外", "suffix": "" },
+        { "text": "своих", "annotation": "svoikh", "translation": "自己的（属格复数）", "suffix": "" },
+        { "text": "цепей", "annotation": "tsepey", "translation": "锁链（属格复数）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-manifesto-unite",
+      "source": "К. Маркс, Ф. Энгельс · Манифест 结尾口号",
+      "sourceUrl": "",
+      "translation": "全世界无产者，联合起来！",
+      "words": [
+        { "text": "Пролетарии", "annotation": "Proletarii", "translation": "无产者们（主格复数）", "suffix": "" },
+        { "text": "всех", "annotation": "vsekh", "translation": "一切的", "suffix": "" },
+        { "text": "стран", "annotation": "stran", "translation": "国家（属格复数）", "suffix": "," },
+        { "text": "соединяйтесь", "annotation": "soyedinyaytes'", "translation": "联合起来（命令式）", "suffix": "!" }
+      ]
+    },
+    {
+      "id": "ru-internationale-vstavay",
+      "source": "Интернационал · А. Коц 俄译（1902）第一章",
+      "sourceUrl": "",
+      "translation": "起来，被诅咒烙了印的、全世界饥饿与为奴的人们！",
+      "words": [
+        { "text": "Вставай", "annotation": "Vstavay", "translation": "起来（命令式）", "suffix": "," },
+        { "text": "проклятьем", "annotation": "proklat'yem", "translation": "诅咒（工具格）", "suffix": "" },
+        { "text": "заклеймённый", "annotation": "zakleymyonnyy", "translation": "被烙上印记的", "suffix": "," },
+        { "text": "весь", "annotation": "ves'", "translation": "整个", "suffix": "" },
+        { "text": "мир", "annotation": "mir", "translation": "世界", "suffix": "" },
+        { "text": "голодных", "annotation": "golodnykh", "translation": "饥饿的（复数属格）", "suffix": "" },
+        { "text": "и", "annotation": "i", "translation": "和", "suffix": "" },
+        { "text": "рабов", "annotation": "rabov", "translation": "奴隶（属格复数）", "suffix": "!" }
+      ]
+    },
+    {
+      "id": "ru-internationale-nikto",
+      "source": "Интернационал · А. Коц 俄译第二章",
+      "sourceUrl": "",
+      "translation": "谁也不能给我们解救：不靠神，不靠沙皇，也不靠英雄。",
+      "words": [
+        { "text": "Никто", "annotation": "Nikto", "translation": "谁也不", "suffix": "" },
+        { "text": "не", "annotation": "ne", "translation": "不", "suffix": "" },
+        { "text": "даст", "annotation": "dast", "translation": "给（第三人称）", "suffix": "" },
+        { "text": "нам", "annotation": "nam", "translation": "我们（与格）", "suffix": "" },
+        { "text": "избавленья", "annotation": "izbavlen'ya", "translation": "解救（属格）", "suffix": ":" },
+        { "text": "ни", "annotation": "ni", "translation": "既不", "suffix": "" },
+        { "text": "бог", "annotation": "bog", "translation": "神", "suffix": "," },
+        { "text": "ни", "annotation": "ni", "translation": "也不", "suffix": "" },
+        { "text": "царь", "annotation": "tsar'", "translation": "沙皇", "suffix": "" },
+        { "text": "и", "annotation": "i", "translation": "而", "suffix": "" },
+        { "text": "не", "annotation": "ne", "translation": "不", "suffix": "" },
+        { "text": "герой", "annotation": "geroy", "translation": "英雄", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-internationale-own-hand",
+      "source": "Интернационал · А. Коц 俄译第二章",
+      "sourceUrl": "",
+      "translation": "我们要用自己的双手争得解放。",
+      "words": [
+        { "text": "Добьёмся", "annotation": "Dob'yomsya", "translation": "我们终将争得", "suffix": "" },
+        { "text": "мы", "annotation": "my", "translation": "我们", "suffix": "" },
+        { "text": "освобожденья", "annotation": "osvobozhden'ya", "translation": "解放（属格）", "suffix": "" },
+        { "text": "своею", "annotation": "svoyeyu", "translation": "自己的（工具格）", "suffix": "" },
+        { "text": "собственной", "annotation": "sobstvennoy", "translation": "亲身的（工具格）", "suffix": "" },
+        { "text": "рукой", "annotation": "rukoy", "translation": "手（工具格）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-internationale-new-world",
+      "source": "Интернационал · А. Коц 俄译第一章",
+      "sourceUrl": "",
+      "translation": "我们要把整个强权的世界砸个粉碎，然后建成我们自己的新世界。",
+      "words": [
+        { "text": "Весь", "annotation": "Ves'", "translation": "整个", "suffix": "" },
+        { "text": "мир", "annotation": "mir", "translation": "世界", "suffix": "" },
+        { "text": "насилья", "annotation": "nasil'ya", "translation": "强权、压迫（属格）", "suffix": "" },
+        { "text": "мы", "annotation": "my", "translation": "我们", "suffix": "" },
+        { "text": "разрушим", "annotation": "razrushim", "translation": "我们将摧毁", "suffix": "" },
+        { "text": "до", "annotation": "do", "translation": "直到（属格连用）", "suffix": "" },
+        { "text": "основанья", "annotation": "osnovan'ya", "translation": "根基（属格）", "suffix": "," },
+        { "text": "а", "annotation": "a", "translation": "而", "suffix": "" },
+        { "text": "затем", "annotation": "zatem", "translation": "此后", "suffix": "" },
+        { "text": "мы", "annotation": "my", "translation": "我们", "suffix": "" },
+        { "text": "наш", "annotation": "nash", "translation": "我们的", "suffix": "," },
+        { "text": "мы", "annotation": "my", "translation": "我们", "suffix": "" },
+        { "text": "новый", "annotation": "novyy", "translation": "新的", "suffix": "" },
+        { "text": "мир", "annotation": "mir", "translation": "世界", "suffix": "" },
+        { "text": "построим", "annotation": "postroim", "translation": "我们将建成", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-lenin-learn",
+      "source": "В. Ленин · Попятное направление русской социал-демократии（1899）",
+      "sourceUrl": "",
+      "translation": "学习，学习，再学习。",
+      "words": [
+        { "text": "Учиться", "annotation": "Uchitsya", "translation": "学习", "suffix": "," },
+        { "text": "учиться", "annotation": "uchitsya", "translation": "学习", "suffix": "" },
+        { "text": "и", "annotation": "i", "translation": "再", "suffix": "" },
+        { "text": "учиться", "annotation": "uchitsya", "translation": "学习", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-lenin-marx-doctrine",
+      "source": "В. Ленин · Три источника и три составных части марксизма（1913）",
+      "sourceUrl": "",
+      "translation": "马克思的学说之所以万能，就是因为它正确。",
+      "words": [
+        { "text": "Учение", "annotation": "Uchenie", "translation": "学说", "suffix": "" },
+        { "text": "Маркса", "annotation": "Marksa", "translation": "马克思（属格）", "suffix": "" },
+        { "text": "всесильно", "annotation": "vsesil'no", "translation": "万能（短尾）", "suffix": "," },
+        { "text": "потому", "annotation": "potomu", "translation": "正因", "suffix": "" },
+        { "text": "что", "annotation": "chto", "translation": "（连词）它", "suffix": "" },
+        { "text": "оно", "annotation": "ono", "translation": "它", "suffix": "" },
+        { "text": "верно", "annotation": "verno", "translation": "正确（短尾）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-lenin-slogans",
+      "source": "布尔什维克口号 · 1917",
+      "sourceUrl": "",
+      "translation": "全部政权归苏维埃！和平归各族人民，土地归农民，工厂归工人！",
+      "words": [
+        { "text": "Вся", "annotation": "Vsya", "translation": "全部的", "suffix": "" },
+        { "text": "власть", "annotation": "vlast'", "translation": "政权", "suffix": "" },
+        { "text": "Советам", "annotation": "Sovietam", "translation": "苏维埃（与格复数）", "suffix": "!" },
+        { "text": "Мир", "annotation": "Mir", "translation": "和平", "suffix": "" },
+        { "text": "народам", "annotation": "narodam", "translation": "各族人民（与格复数）", "suffix": "," },
+        { "text": "земля", "annotation": "zemlya", "translation": "土地", "suffix": "" },
+        { "text": "крестьянам", "annotation": "krest'yanam", "translation": "农民（与格复数）", "suffix": "," },
+        { "text": "фабрики", "annotation": "fabriki", "translation": "工厂（主格复数）", "suffix": "" },
+        { "text": "рабочим", "annotation": "rabochim", "translation": "工人（与格复数）", "suffix": "!" }
+      ]
+    },
+    {
+      "id": "ru-lenin-labour-rule",
+      "source": "В. Ленин · 社会主义准则（1936 年苏联宪法第 12 条）",
+      "sourceUrl": "",
+      "translation": "不劳动者不得食。",
+      "words": [
+        { "text": "Кто", "annotation": "Kto", "translation": "谁", "suffix": "" },
+        { "text": "не", "annotation": "ne", "translation": "不", "suffix": "" },
+        { "text": "работает", "annotation": "rabotayet", "translation": "劳动（第三人称）", "suffix": "," },
+        { "text": "тот", "annotation": "tot", "translation": "那人", "suffix": "" },
+        { "text": "не", "annotation": "ne", "translation": "不", "suffix": "" },
+        { "text": "ест", "annotation": "yest", "translation": "吃（第三人称）", "suffix": "." }
+      ]
+    }
+  ]
+}

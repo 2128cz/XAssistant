@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "note": "俄语故事与谚语 · 正文是西里尔字母，必须先把输入法切到俄语布局（Win+空格）才敲得进去，否则每一格都是错键。上方注音是拉丁转写，只用来认读，不用敲。ё 与 е 算同一个键，破折号按 - 键。",
+  "sentences": [
+    {
+      "id": "ru-folk-start",
+      "source": "俄罗斯民间故事 · 开场套语",
+      "sourceUrl": "",
+      "translation": "从前啊，有个老头子和一个老太婆。",
+      "words": [
+        { "text": "Жили-были", "annotation": "zhili-byli", "translation": "曾住着（开场套语）", "suffix": "" },
+        { "text": "старик", "annotation": "starik", "translation": "老头子", "suffix": "" },
+        { "text": "со", "annotation": "so", "translation": "和、跟", "suffix": "" },
+        { "text": "старухой", "annotation": "starukoy", "translation": "老太婆（工具格）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-tolstoy-land",
+      "source": "Л. Толстой · Много ли человеку земли нужно?",
+      "sourceUrl": "",
+      "translation": "一个人究竟需要多少土地？",
+      "words": [
+        { "text": "Много", "annotation": "mnogo", "translation": "多少", "suffix": "" },
+        { "text": "ли", "annotation": "li", "translation": "（疑问小品词）", "suffix": "" },
+        { "text": "человеку", "annotation": "cheloveku", "translation": "人（与格）", "suffix": "" },
+        { "text": "земли", "annotation": "zemli", "translation": "土地（属格）", "suffix": "" },
+        { "text": "нужно", "annotation": "nuzhno", "translation": "需要", "suffix": "?" }
+      ]
+    },
+    {
+      "id": "ru-pushkin-oak",
+      "source": "А. Пушкин · Руслан и Людмила",
+      "sourceUrl": "",
+      "translation": "那只有学问的猫，白天黑夜都绕着那条链子走来走去。",
+      "words": [
+        { "text": "И", "annotation": "i", "translation": "无论…还是…", "suffix": "" },
+        { "text": "днём", "annotation": "dnyom", "translation": "在白天", "suffix": "" },
+        { "text": "и", "annotation": "i", "translation": "又", "suffix": "" },
+        { "text": "ночью", "annotation": "noch'yu", "translation": "在夜里", "suffix": "" },
+        { "text": "кот", "annotation": "kot", "translation": "猫", "suffix": "" },
+        { "text": "учёный", "annotation": "uchyonyy", "translation": "有学问的", "suffix": "" },
+        { "text": "всё", "annotation": "vsyo", "translation": "总是", "suffix": "" },
+        { "text": "ходит", "annotation": "khodit", "translation": "走", "suffix": "" },
+        { "text": "по", "annotation": "po", "translation": "沿着", "suffix": "" },
+        { "text": "цепи", "annotation": "tsepi", "translation": "链子（与格）", "suffix": "" },
+        { "text": "кругом", "annotation": "krugom", "translation": "绕着圈", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-pushkin-fairy-tale",
+      "source": "А. Пушкин · 长诗手稿题记",
+      "sourceUrl": "",
+      "translation": "童话是假话，可里面有暗示，给好汉子们上一课。",
+      "words": [
+        { "text": "Сказка", "annotation": "skazka", "translation": "童话", "suffix": "" },
+        { "text": "—", "annotation": "—", "translation": "破折号，按 - 键", "suffix": "" },
+        { "text": "ложь", "annotation": "lozh'", "translation": "假话", "suffix": "," },
+        { "text": "да", "annotation": "da", "translation": "可是", "suffix": "" },
+        { "text": "в", "annotation": "v", "translation": "在…里", "suffix": "" },
+        { "text": "ней", "annotation": "ney", "translation": "它（介格）", "suffix": "" },
+        { "text": "намёк", "annotation": "namyok", "translation": "暗示", "suffix": "," },
+        { "text": "добрым", "annotation": "dobrym", "translation": "善良的好（与格复数）", "suffix": "" },
+        { "text": "молодцам", "annotation": "molodtsam", "translation": "汉子们（与格）", "suffix": "" },
+        { "text": "урок", "annotation": "urok", "translation": "一课、教训", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-krylov-cart",
+      "source": "И. Крылов · Лебедь, Рак и Щука",
+      "sourceUrl": "",
+      "translation": "可那辆大车，如今还停在老地方。",
+      "words": [
+        { "text": "А", "annotation": "a", "translation": "可是", "suffix": "" },
+        { "text": "воз", "annotation": "voz", "translation": "大车", "suffix": "" },
+        { "text": "и", "annotation": "i", "translation": "依旧（加强语气）", "suffix": "" },
+        { "text": "ныне", "annotation": "nyne", "translation": "如今", "suffix": "" },
+        { "text": "там", "annotation": "tam", "translation": "在那里", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-krylov-box",
+      "source": "И. Крылов · Ларчик",
+      "sourceUrl": "",
+      "translation": "而那小匣子，本来就是轻轻一碰就开的。",
+      "words": [
+        { "text": "А", "annotation": "a", "translation": "可是", "suffix": "" },
+        { "text": "ларчик", "annotation": "larchik", "translation": "小匣子", "suffix": "" },
+        { "text": "просто", "annotation": "prosto", "translation": "简单地", "suffix": "" },
+        { "text": "открывался", "annotation": "otkryvalsya", "translation": "就打开了", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-proverb-fish",
+      "source": "俄语谚语",
+      "sourceUrl": "",
+      "translation": "不费力气，连小鱼也从池塘里捞不上来。",
+      "words": [
+        { "text": "Без", "annotation": "bez", "translation": "没有（属格连用）", "suffix": "" },
+        { "text": "труда", "annotation": "truda", "translation": "劳动（属格）", "suffix": "" },
+        { "text": "не", "annotation": "ne", "translation": "不", "suffix": "" },
+        { "text": "вытащишь", "annotation": "vytachish'", "translation": "你捞不出（第二人称）", "suffix": "" },
+        { "text": "и", "annotation": "i", "translation": "连、也", "suffix": "" },
+        { "text": "рыбку", "annotation": "rybku", "translation": "小鱼（宾格）", "suffix": "" },
+        { "text": "из", "annotation": "iz", "translation": "从…里", "suffix": "" },
+        { "text": "пруда", "annotation": "pruda", "translation": "池塘（属格）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-proverb-frost",
+      "source": "俄语谚语",
+      "sourceUrl": "",
+      "translation": "严寒个儿不大，却不许人站着。",
+      "words": [
+        { "text": "Мороз", "annotation": "moroz", "translation": "严寒", "suffix": "" },
+        { "text": "не", "annotation": "ne", "translation": "不", "suffix": "" },
+        { "text": "велик", "annotation": "velik", "translation": "大（短尾）", "suffix": "," },
+        { "text": "да", "annotation": "da", "translation": "可是", "suffix": "" },
+        { "text": "стоять", "annotation": "stoyat'", "translation": "站着", "suffix": "" },
+        { "text": "не", "annotation": "ne", "translation": "不", "suffix": "" },
+        { "text": "велит", "annotation": "velit", "translation": "准许（第三人称）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-proverb-measure",
+      "source": "俄语谚语",
+      "sourceUrl": "",
+      "translation": "量七次，剪一次（三思而后行）。",
+      "words": [
+        { "text": "Семь", "annotation": "sem'", "translation": "七", "suffix": "" },
+        { "text": "раз", "annotation": "raz", "translation": "次", "suffix": "" },
+        { "text": "отмерь", "annotation": "otmer'", "translation": "量好（命令式）", "suffix": "," },
+        { "text": "один", "annotation": "odin", "translation": "一", "suffix": "" },
+        { "text": "раз", "annotation": "raz", "translation": "次", "suffix": "" },
+        { "text": "отрежь", "annotation": "otrezh'", "translation": "剪断（命令式）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-proverb-friends",
+      "source": "俄语谚语",
+      "sourceUrl": "",
+      "translation": "与其有一百卢布，不如有一百个朋友。",
+      "words": [
+        { "text": "Не", "annotation": "ne", "translation": "不要", "suffix": "" },
+        { "text": "имей", "annotation": "imey", "translation": "你有（命令式）", "suffix": "" },
+        { "text": "сто", "annotation": "sto", "translation": "一百", "suffix": "" },
+        { "text": "рублей", "annotation": "rubley", "translation": "卢布（属格复数）", "suffix": "," },
+        { "text": "а", "annotation": "a", "translation": "而是", "suffix": "" },
+        { "text": "имей", "annotation": "imey", "translation": "你有（命令式）", "suffix": "" },
+        { "text": "сто", "annotation": "sto", "translation": "一百", "suffix": "" },
+        { "text": "друзей", "annotation": "druzey", "translation": "朋友（属格复数）", "suffix": "." }
+      ]
+    },
+    {
+      "id": "ru-proverb-morning",
+      "source": "俄语谚语",
+      "sourceUrl": "",
+      "translation": "早晨比晚上聪明（睡一觉再拿主意）。",
+      "words": [
+        { "text": "Утро", "annotation": "utro", "translation": "早晨", "suffix": "" },
+        { "text": "вечера", "annotation": "vechera", "translation": "晚上（属格）", "suffix": "" },
+        { "text": "мудренее", "annotation": "mudreyeye", "translation": "更聪明（比较级）", "suffix": "." }
+      ]
+    }
+  ]
+}
