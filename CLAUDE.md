@@ -49,7 +49,7 @@ UI 采用基于 CommunityToolkit.Mvvm 的 WPF MVVM 架构。项目没有自动�
 ### 四个模块
 每个模块 = 钩子服务 + SQLite 仓库 + ViewModel + View：
 1. **鼠标点击** —— `MouseClickHookService`（WH_MOUSE_LL）→ `ClickDatabaseService` → `ClickCounterViewModel`
-2. **键盘** —— `KeyboardHookService`（WH_KEYBOARD_LL，通过 `_pressedKeys` 集合对按键自动重复去重）→ `KeyDatabaseService` → `KeyCounterViewModel`
+2. **键盘** —— `KeyboardHookService`（WH_KEYBOARD_LL，长按去重按物理键即扫描码 + 扩展位判定，修饰键与 Shift 状态实时取自系统键态；按键名去重会让主键盘 4 与小键盘 4、两个 `.` 互相吞掉，丢过一次 key-up 还会让某个字符从此打不出来）→ `KeyDatabaseService` → `KeyCounterViewModel`
 3. **各应用使用时长** —— `ProcessUsageTracker` → `app_usage.db` → `AppUsageViewModel`（2 秒 `DispatcherTimer` 轮询）
 4. **电脑使用时长** —— 外部服务（见上文）→ `UsageViewModel`（5 秒 `DispatcherTimer` 轮询）
 

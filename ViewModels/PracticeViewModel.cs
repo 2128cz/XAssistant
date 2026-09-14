@@ -25,6 +25,9 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
         else _dispatcher.BeginInvoke(new Action(() => { if (_hook != null) HandleKeyboardInput(input); }));
     }
     public void Dispose() { if (_hook != null) _hook.TextInput -= OnHookInput; _hook = null; }
+    // 输入不能按句长截断：错一个字符就会把缓冲填到 17/17，之后所有按键都被丢弃，玩家看到的
+    // 就是“打到最后一个字符再敲什么都没反应”。这里只设一个宽上限，多输的字符交给提交提示。
+    public const int MaxTypedCharacters = 320;
     public void HandleKeyboardInput(string input)
     {
         if (!HasContent || string.IsNullOrEmpty(input)) return;
@@ -32,7 +35,7 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
 
         if (input == "\b") { if (VerseInput.Length > 0) VerseInput = VerseInput[..^1]; return; }
         foreach (char c in input.Where(c => !char.IsControl(c)))
-            if (!VerseComplete && VerseInput.Length < (CurrentSentence?.Text.Length ?? 0)) VerseInput += c;
+            if (!VerseComplete && VerseInput.Length < MaxTypedCharacters) VerseInput += c;
     }
     [RelayCommand]
     private void ClearInput()
@@ -100,7 +103,7 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
     partial void OnVerseInputChanged(string value)
     {
         if (_loading || CurrentSentence == null) return;
-        if (value.Length > CurrentSentence.Text.Length) { VerseInput = value[..CurrentSentence.Text.Length]; return; }
+        if (value.Length > MaxTypedCharacters) { VerseInput = value[..MaxTypedCharacters]; return; }
         VerseComplete = PracticeText.Equal(value, CurrentSentence.Text);
         if (value.Length > 0 && !_verseClock.IsRunning && !_verseAwarded) _verseClock.Start();
         UpdateVerse(markErrors: false);
@@ -126,7 +129,10 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
         VerseProgress = CurrentSentence?.Text.Length > 0
             ? Enumerable.Range(0, CurrentSentence.Text.Length).Count(i => i < typed.Length && PracticeText.Equal(typed[i].ToString(), CurrentSentence.Text[i].ToString())) * 100d / CurrentSentence.Text.Length : 0;
         OnPropertyChanged(nameof(ProgressText));
-        if (!_verseAwarded) VerseStatus = markErrors ? "红色单词尚未抄对，请修正后按回车。" : "忽略大小写，标点照写 · 回车检查";
+        if (!_verseAwarded) VerseStatus = markErrors ? "红色单词尚未抄对，请修正后按回车。"
+            : typed.Length >= (CurrentSentence?.Text.Length ?? 0) && !VerseComplete
+                ? "字符数够了但没对上：退格删掉红色字符后用「清空」重试（中文标点、全角数字会自动等价）。"
+                : "忽略大小写，标点照写 · 回车检查";
     }
     [RelayCommand]
     private void SubmitVerse()

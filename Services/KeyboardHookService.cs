@@ -22,8 +22,10 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
     private LowLevelKeyboardProc _proc;
     private IntPtr _hookId = IntPtr.Zero;
 
-    // 记录当前正处于按下状态的键（名称）
-    private readonly HashSet<string> _pressedKeys = new(StringComparer.Ordinal);
+    // 长按重复检测按物理键（扫描码 + 扩展位）记录：GetKeyNameText 会把主键盘 4 与小键盘 4 都
+    // 命名成 “4”、两个 “.” 都命名成 “.”，按名字去重会吞掉其中一把键；丢过一次 key-up 时陈旧的
+    // 按下记录也会按实时键态在这里自愈，否则某个字符会从此永久打不出来（练习会卡在半句）。
+    private readonly Dictionary<int, int> _pressedPhysical = new(); // 物理键 -> vkCode
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern int GetKeyNameText(int lParam, StringBuilder lpString, int cchSize);
@@ -38,6 +40,7 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
     public void Start()
     {
         if (_hookId != IntPtr.Zero) return;
+        _pressedPhysical.Clear(); // 上一段监听里没等到 key-up 的记录不能带进来
         using var curProcess = Process.GetCurrentProcess();
         using var curModule = curProcess.MainModule!;
         _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(curModule.ModuleName), 0);
@@ -50,9 +53,14 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
         {
             UnhookWindowsHookEx(_hookId);
             _hookId = IntPtr.Zero;
-            _pressedKeys.Clear();
+            _pressedPhysical.Clear();
         }
     }
+
+    private static int PhysicalKey(KBDLLHOOKSTRUCT key) => (key.scanCode << 1) | ((key.flags & 1) != 0 ? 1 : 0);
+    private static bool IsDown(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+    // Ctrl / Alt（含右 Alt 即 AltGr）/ Win 按下时不产出文本，只记键名。
+    private static bool ComboDown() => IsDown(0x11) || IsDown(0x12) || IsDown(0x5B) || IsDown(0x5C);
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
@@ -66,16 +74,17 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
             {
                 var kb = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
                 string keyName = GetKeyNameFromScanCode(kb.vkCode, kb.scanCode, kb.flags);
+                int physical = PhysicalKey(kb);
 
                 if (isKeyDown)
                 {
-                    // 如果该键已经处于按下状态，则为长按重复，直接忽略
-                    if (_pressedKeys.Contains(keyName) && kb.vkCode != 8)
+                    // 只有同一把物理键且系统键态显示它仍按下，才是长按重复。
+                    if (kb.vkCode != 8 && _pressedPhysical.TryGetValue(physical, out var heldVk) && IsDown(heldVk))
                         return CallNextHookEx(_hookId, nCode, wParam, lParam);
 
-                    _pressedKeys.Add(keyName);
+                    _pressedPhysical[physical] = kb.vkCode;
                     string? input = null;
-                    if (!_pressedKeys.Any(k => k.Contains("Ctrl") || k.Contains("Alt") || k.Contains("Windows")))
+                    if (!ComboDown())
                     {
                         input = kb.vkCode switch { 8 => "\b", 13 => "\r", _ => TranslateInput(kb) };
 
@@ -89,7 +98,7 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
                 }
                 else // isKeyUp
                 {
-                    _pressedKeys.Remove(keyName);
+                    _pressedPhysical.Remove(physical);
                 }
             }
         }
@@ -101,7 +110,7 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
     {
         var state = new byte[256];
         GetKeyboardState(state);
-        state[0x10] = (byte)(_pressedKeys.Any(k => k.Contains("Shift")) ? 0x80 : 0);
+        state[0x10] = (byte)(IsDown(0x10) ? 0x80 : 0); // 实时取 Shift，不依赖按下集合里残留的键名
         state[0x11] = state[0x12] = 0;
         state[key.vkCode] |= 0x80;
         var buffer = new StringBuilder(8);
@@ -111,6 +120,7 @@ public class KeyboardHookService : IKeyboardHookService, IDisposable
         return count > 0 ? new string(buffer.ToString().Take(count).Where(c => !char.IsControl(c)).ToArray()) : null;
     }
     [DllImport("user32.dll")] private static extern bool GetKeyboardState(byte[] state);
+    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int vKey);
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, IntPtr process);
     [DllImport("user32.dll")] private static extern IntPtr GetKeyboardLayout(uint thread);

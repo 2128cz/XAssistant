@@ -61,8 +61,38 @@ public sealed class PracticeLedger
 }
 public static class PracticeText
 {
-    public static string Normalize(string text) => text.Replace('’', '\'').Replace('‘', '\'')
-        .Replace('“', '"').Replace('”', '"').Replace('–', '-').Replace('—', '-');
+    // 长度不变的 1:1 折叠。除弯引号与破折号外，还要接住中文输入法全角／标点状态下
+    // 产出的字符（“。”“，”“４２”等）：练习的输入直接来自键盘钩子，不折叠这些字符就永远对
+    // 不上正文，句子会停在最后一个字符上。
+    public static string Normalize(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+        var buffer = new char[text.Length];
+        for (int i = 0; i < text.Length; i++) buffer[i] = Fold(text[i]);
+        return new string(buffer);
+    }
+    private static char Fold(char c) => c switch
+    {
+        '’' or '‘' or '‛' or '‚' => '\'',
+        '“' or '”' or '„' => '"',
+        '–' or '—' or '―' or '‐' => '-',
+        '。' => '.',
+        '、' or '，' => ',',
+        '？' => '?',
+        '！' => '!',
+        '；' => ';',
+        '：' => ':',
+        '（' => '(',
+        '）' => ')',
+        '〔' or '［' => '[',
+        '〕' or '］' => ']',
+        '〈' or '《' => '<',
+        '〉' or '》' => '>',
+        '～' => '~',
+        '　' => ' ', // U+3000 表意空格：不计入长度差异才能与正文逐位对齐
+        >= '\uFF01' and <= '\uFF5E' => (char)(c - 0xFEE0), // 全角 ASCII：标点、数字、字母一律转半角
+        _ => c,
+    };
     public static string[] Tokens(string text) => Regex.Matches(Normalize(text), @"[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)*")
         .Select(match => match.Value.ToLowerInvariant()).ToArray();
     public static bool Equal(string left, string right) => string.Equals(Normalize(left), Normalize(right), StringComparison.OrdinalIgnoreCase);
