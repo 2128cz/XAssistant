@@ -54,6 +54,14 @@ UI 采用基于 CommunityToolkit.Mvvm 的 WPF MVVM 架构。项目没有自动�
 - 因此受 `Style` 控制的属性（`Grid.Row`、`Grid.Column`、`Grid.ColumnSpan`、`UniformGrid.Columns`、`Margin`）**绝不能再写本地值**：WPF 里本地值优先级高于 `Style` 触发器，写了触发器会静默失效。
 - 竖屏下窗口 `MinWidth` 降到 640（`MainWindowViewModel.WindowMinWidth` 跟着 `IsWideLayout` 走），否则 1080 宽的竖屏显示器放不下默认 1100 的窗口。
 
+### 键盘热力图的倾斜动画
+`Controls/KeyboardHeatmap` 把 144 键当成一块刚性板，敲击位置决定姿态。模型层全在 `Controls/KeyboardTilt.cs`，按三层拆开：`KeyboardTilt` 是纯几何（仿射四件套 + 越界回收）、`TiltSpring` 是单轴的二阶阻尼跟随、`TiltDriver` 管时间与渲染循环的挂卸；控件只负责两头——把键名换算成敲击向量、把算出的矩阵写回视觉树。三层都是 `internal`（离屏夹具与控件同装配，看得见，验证不必为此开洞）。
+
+- 变换只挂在键盘块 `ItemsControl` 的 `RenderTransform` 上（`RenderTransformOrigin=0.5,0.5`），所以倾斜期间布局区域一格都不动；越界回收把外接框压回「框 + 余量」，余量在 XAML 里就是 Viewbox 的 `Margin`，改一处要同步 `TiltLimits.Default` 的 `HeadroomX/Y`。
+- 三处跨文件同值的约定：键帽行高 43（XAML 的 `ContentPresenter Height` 与 `KeyboardHeatmap.KeyRowHeight`）、板框 1120×331（XAML 声明的尺寸与由 `Layout` 极值算出的 `BoardBox`）、WPF 的 `Matrix` 是行向量约定（存的是数学矩阵的转置，而屏幕 y 轴朝下，所以正角就是顺时针）。
+- 高频节拍 DP 一律走 `RegisterTick`（`KeyStrikePulse` 与鼠标那一组共用同一个注册助手），绝不能挂 `VisualPropertyChanged`，否则每敲一键都重建 144 个键帽的着色；同一个键连击时键名不变，重播只能靠自增脉冲。
+- `CompositionTarget.Rendering` 是静态事件，挂与卸都收在 `TiltDriver` 里：姿态回到水平就立刻退订，`Unloaded` 里也必须调 `Reset()` 退订并归位，否则换页卸掉的控件仍被渲染循环拽着。
+
 ### 四个模块
 每个模块 = 钩子服务 + SQLite 仓库 + ViewModel + View：
 1. **鼠标点击** —— `MouseClickHookService`（WH_MOUSE_LL）→ `ClickDatabaseService` → `ClickCounterViewModel`

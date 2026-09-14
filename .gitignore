@@ -21,6 +21,9 @@ publish/
 ## JetBrains (Rider)
 .idea/
 
+## AI 助手的本地缓存（会话历史与偏移记录，只属于这台机器）
+.recode/
+
 ## Avalonia / .NET 特定
 Logs/
 *.cache

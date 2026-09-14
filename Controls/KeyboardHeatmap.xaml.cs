@@ -35,27 +35,30 @@ public partial class KeyboardHeatmap : UserControl
     public static readonly DependencyProperty LeftClickCountProperty = Register(nameof(LeftClickCount), 0);
     public static readonly DependencyProperty MiddleClickCountProperty = Register(nameof(MiddleClickCount), 0);
     public static readonly DependencyProperty RightClickCountProperty = Register(nameof(RightClickCount), 0);
-    public static readonly DependencyProperty MouseMovementTextProperty = RegisterMouse<string>(nameof(MouseMovementText), "移动数据未采集");
-    public static readonly DependencyProperty MouseWheelTextProperty = RegisterMouse<string>(nameof(MouseWheelText), "滚轮数据未采集");
+    public static readonly DependencyProperty MouseMovementTextProperty = RegisterTick<string>(nameof(MouseMovementText), "移动数据未采集");
+    public static readonly DependencyProperty MouseWheelTextProperty = RegisterTick<string>(nameof(MouseWheelText), "滚轮数据未采集");
 
     /// <summary>小鼠标图标在位移窗内的归一化偏移（-1..1），像素换算由本控件按实际尺寸完成。</summary>
-    public static readonly DependencyProperty MouseOffsetXProperty = RegisterMouse(nameof(MouseOffsetX), 0d, MouseOffsetChanged);
-    public static readonly DependencyProperty MouseOffsetYProperty = RegisterMouse(nameof(MouseOffsetY), 0d, MouseOffsetChanged);
+    public static readonly DependencyProperty MouseOffsetXProperty = RegisterTick(nameof(MouseOffsetX), 0d, MouseOffsetChanged);
+    public static readonly DependencyProperty MouseOffsetYProperty = RegisterTick(nameof(MouseOffsetY), 0d, MouseOffsetChanged);
 
-    public static readonly DependencyProperty MouseDeltaTextProperty = RegisterMouse<string>(nameof(MouseDeltaText), "Δx 0 · Δy 0 px");
-    public static readonly DependencyProperty MouseDistanceTextProperty = RegisterMouse<string>(nameof(MouseDistanceText), "移动 今日 0.00 m · 累计 0.00 m");
+    public static readonly DependencyProperty MouseDeltaTextProperty = RegisterTick<string>(nameof(MouseDeltaText), "Δx 0 · Δy 0 px");
+    public static readonly DependencyProperty MouseDistanceTextProperty = RegisterTick<string>(nameof(MouseDistanceText), "移动 今日 0.00 m · 累计 0.00 m");
 
     /// <summary>最近一次按下的键名（Left/Middle/Right），与自增的 <see cref="MouseClickPulse"/> 配合点亮对应区域。</summary>
-    public static readonly DependencyProperty MouseButtonProperty = RegisterMouse<string>(nameof(MouseButton), string.Empty);
-    public static readonly DependencyProperty MouseClickPulseProperty = RegisterMouse(nameof(MouseClickPulse), 0L, MouseClickChanged);
+    public static readonly DependencyProperty MouseButtonProperty = RegisterTick<string>(nameof(MouseButton), string.Empty);
+    public static readonly DependencyProperty MouseClickPulseProperty = RegisterTick(nameof(MouseClickPulse), 0L, MouseClickChanged);
+
+    /// <summary>每敲一键自增一次的脉冲。连击同一个键时 <see cref="RecentKey"/> 根本不变，靠它才能让倾斜动画每次都重播。</summary>
+    public static readonly DependencyProperty KeyStrikePulseProperty = RegisterTick(nameof(KeyStrikePulse), 0L, KeyStrikeChanged);
 
     /// <summary>垫在鼠标读数下方的 X / Y 偏移与滚轮速率三条轨迹，坐标已是控件内那块 Canvas 的设计尺寸，本控件不再换算。</summary>
     public static readonly DependencyProperty MouseTrailXPointsProperty =
-        RegisterMouse(nameof(MouseTrailXPoints), new PointCollection());
+        RegisterTick(nameof(MouseTrailXPoints), new PointCollection());
     public static readonly DependencyProperty MouseTrailYPointsProperty =
-        RegisterMouse(nameof(MouseTrailYPoints), new PointCollection());
+        RegisterTick(nameof(MouseTrailYPoints), new PointCollection());
     public static readonly DependencyProperty MouseTrailWheelPointsProperty =
-        RegisterMouse(nameof(MouseTrailWheelPoints), new PointCollection());
+        RegisterTick(nameof(MouseTrailWheelPoints), new PointCollection());
 
     public IEnumerable? ItemsSource { get => (IEnumerable?)GetValue(ItemsSourceProperty); set => SetValue(ItemsSourceProperty, value); }
     public string RecentKey { get => (string)GetValue(RecentKeyProperty); set => SetValue(RecentKeyProperty, value); }
@@ -74,6 +77,7 @@ public partial class KeyboardHeatmap : UserControl
     public string MouseDistanceText { get => (string)GetValue(MouseDistanceTextProperty); set => SetValue(MouseDistanceTextProperty, value); }
     public string MouseButton { get => (string)GetValue(MouseButtonProperty); set => SetValue(MouseButtonProperty, value); }
     public long MouseClickPulse { get => (long)GetValue(MouseClickPulseProperty); set => SetValue(MouseClickPulseProperty, value); }
+    public long KeyStrikePulse { get => (long)GetValue(KeyStrikePulseProperty); set => SetValue(KeyStrikePulseProperty, value); }
     public PointCollection MouseTrailXPoints { get => (PointCollection)GetValue(MouseTrailXPointsProperty); set => SetValue(MouseTrailXPointsProperty, value); }
     public PointCollection MouseTrailYPoints { get => (PointCollection)GetValue(MouseTrailYPointsProperty); set => SetValue(MouseTrailYPointsProperty, value); }
     public PointCollection MouseTrailWheelPoints { get => (PointCollection)GetValue(MouseTrailWheelPointsProperty); set => SetValue(MouseTrailWheelPointsProperty, value); }
@@ -85,6 +89,9 @@ public partial class KeyboardHeatmap : UserControl
     private bool _observing;
     private bool _refreshPending;
     private static readonly Dictionary<string, string> Aliases;
+
+    /// <summary>键位标识到其布局定义的索引，倾斜动画要按敲到的键算出它在板面上的位置。</summary>
+    private static readonly Dictionary<string, KeyDefinition> KeyById = new(StringComparer.Ordinal);
 
     /// <summary>热力色阶，从低到高单调变亮。按键着色与图例渐变条共用这一份，避免两处描述漂移。</summary>
     private static readonly byte[][] HeatRamp =
@@ -99,16 +106,21 @@ public partial class KeyboardHeatmap : UserControl
     /// <summary>有记录的按键最低档强度：让“按得最少”与“从未按过”保持可见色差，而不是掉进同一个底色。</summary>
     private const double PressedFloor = 0.18;
 
-    static KeyboardHeatmap() { Aliases = BuildAliases(); }
+    static KeyboardHeatmap()
+    {
+        Aliases = BuildAliases();
+        foreach (var key in Layout) KeyById[key.Id] = key;
+    }
 
     public KeyboardHeatmap()
     {
+        _tilt = new TiltDriver(ApplyTilt);
         foreach (var key in Layout)
             KeyCaps.Add(new KeyCap(key));
         InitializeComponent();
         LegendBar.Background = BuildRampBrush();
-        Loaded += (_, _) => { _observing = true; ObserveSource(); Refresh(); LayoutMouseGlyph(); };
-        Unloaded += (_, _) => { _observing = false; DetachSource(); };
+        Loaded += (_, _) => { _observing = true; ObserveSource(); Refresh(); LayoutMouseGlyph(); _tilt.Reset(); };
+        Unloaded += (_, _) => { _observing = false; DetachSource(); _tilt.Reset(); };
         Refresh();
     }
 
@@ -116,11 +128,11 @@ public partial class KeyboardHeatmap : UserControl
         name, typeof(T), typeof(KeyboardHeatmap), new PropertyMetadata(value, VisualPropertyChanged));
 
     /// <summary>
-    /// 鼠标移动相关属性的注册。这些值随取样节拍高频变化（节拍定义在 ClickCounterViewModel），
-    /// 绝不能再走 <see cref="VisualPropertyChanged"/>：那条路径会连带重建 144 个键帽的着色，
+    /// 高频节拍属性的注册。鼠标侧（取样节拍定义在 ClickCounterViewModel）与键盘侧（每敲一键一次）共用这一条：
+    /// 这类回调绝不能再走 <see cref="VisualPropertyChanged"/>，那条路径会连带重建 144 个键帽的着色，
     /// 把热力图的开销放大到跟随刷新频率。
     /// </summary>
-    private static DependencyProperty RegisterMouse<T>(string name, T value, PropertyChangedCallback? changed = null) =>
+    private static DependencyProperty RegisterTick<T>(string name, T value, PropertyChangedCallback? changed = null) =>
         DependencyProperty.Register(name, typeof(T), typeof(KeyboardHeatmap), new PropertyMetadata(value, changed));
 
     private static void MouseOffsetChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) =>
@@ -128,6 +140,9 @@ public partial class KeyboardHeatmap : UserControl
 
     private static void MouseClickChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) =>
         ((KeyboardHeatmap)d).FlashMouseButton(((KeyboardHeatmap)d).MouseButton);
+
+    private static void KeyStrikeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) =>
+        ((KeyboardHeatmap)d).StrikeTilt();
 
     private static void SourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -414,6 +429,67 @@ public partial class KeyboardHeatmap : UserControl
         }
         gradient.Freeze();
         return gradient;
+    }
+
+    // ===== 整块键盘随敲击倾斜 =====
+
+    /// <summary>键帽行高，与 KeyboardHeatmap.xaml 里 ContentPresenter 的 Height 同值；改一处要同步另一处。</summary>
+    private const double KeyRowHeight = 43;
+
+    /// <summary>
+    /// 键盘块在设计单位下的外接框。延迟到首次使用才算：静态字段初始化按声明顺序跑，
+    /// 直接写在 <see cref="Layout"/> 之前会读到还没赋值的数组。
+    /// </summary>
+    private static Rect? _boardBox;
+    internal static Rect BoardBox => _boardBox ??= ComputeBoardBox();
+
+    /// <summary>
+    /// 倾斜动画的时间驱动（弹簧、停留计时、收敛、渲染循环的挂卸都在它那儿）。
+    /// 本控件只负责两头：把敲到的键换算成敲击向量喂进去，把算出的姿态写回键盘块的渲染变换。
+    /// </summary>
+    private readonly TiltDriver _tilt;
+
+    /// <summary>敲一键就把倾斜目标交给驱动器；“等待输入”这类对不上键位的占位文字不该牵动键盘。</summary>
+    private void StrikeTilt()
+    {
+        if (TryPressVector(RecentKey, out double u, out double v))
+            _tilt.Press(u, v);
+    }
+
+    /// <summary>
+    /// 键名 → 该键在板面上的归一化敲击位置。拆出来是给离屏夹具用的：倾斜动画拿到的键位对不对，
+    /// 只看真键名能不能经过别名表、布局坐标、板框归一化这条链落到预期的 u / v 上。
+    /// </summary>
+    internal static bool TryPressVector(string? keyName, out double u, out double v)
+    {
+        u = v = 0;
+        if (!Aliases.TryGetValue(Normalize(keyName), out var id) || !KeyById.TryGetValue(id, out var key)) return false;
+        (u, v) = KeyboardTilt.PressVector(new Point(key.X + key.Width / 2, key.Y + KeyRowHeight / 2), BoardBox);
+        return true;
+    }
+
+    /// <summary>把姿态写成键盘块的渲染变换。离屏夹具也走这条路径，保证验的就是实装用的那块变换。</summary>
+    internal void ApplyTilt(double u, double v)
+    {
+        if (BoardTilt is null) return;   // InitializeComponent 完成前可能已经被推过值
+        var box = BoardBox;
+        BoardTilt.Matrix = KeyboardTilt.Build(u, v, box.Width, box.Height);
+    }
+
+    /// <summary>离屏夹具的另一个缝隙：按固定步长把倾斜动画推完，不必等真渲染帧。</summary>
+    internal void StepTilt(double deltaSeconds) => _tilt.Step(deltaSeconds);
+
+    private static Rect ComputeBoardBox()
+    {
+        double left = double.MaxValue, right = double.MinValue, top = double.MaxValue, bottom = double.MinValue;
+        foreach (var key in Layout)
+        {
+            left = Math.Min(left, key.X);
+            right = Math.Max(right, key.X + key.Width);
+            top = Math.Min(top, key.Y);
+            bottom = Math.Max(bottom, key.Y + KeyRowHeight);
+        }
+        return new Rect(left, top, right - left, bottom - top);
     }
 
     // ===== 位移窗内的小鼠标图标 =====

@@ -38,8 +38,13 @@
                         <TextBlock x:Name="LegendMaxText" Text="-" Style="{StaticResource HeatmapNote}" FontFamily="Consolas" FontSize="10"/>
                     </StackPanel>
                 </Grid>
-                <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch">
-                    <ItemsControl ItemsSource="{Binding KeyCaps, ElementName=Root}" Width="1120" Height="331">
+                <!--  上下各留 16 的余量：整块键盘会随敲击倾斜，姿态的外接框靠 KeyboardTilt 的越界回收收在这段空里，不会压到图例行与鼠标行  -->
+                <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,16,0,16">
+                    <!--  键盘块是倾斜动画的唯一作用对象：只挂 RenderTransform，布局区域一格都不动；
+                        变换以板心为锚，矩阵由 KeyboardTilt 按敲击位置算出  -->
+                    <ItemsControl ItemsSource="{Binding KeyCaps, ElementName=Root}" Width="1120" Height="331"
+                                  x:Name="BoardHost" RenderTransformOrigin="0.5,0.5">
+                        <ItemsControl.RenderTransform><MatrixTransform x:Name="BoardTilt"/></ItemsControl.RenderTransform>
                         <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                         <ItemsControl.ItemContainerStyle>
                             <Style TargetType="ContentPresenter">

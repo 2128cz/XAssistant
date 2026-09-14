@@ -34,6 +34,12 @@ public partial class KeyCounterViewModel : ViewModelBase, IDisposable
     /// <summary>最近 30 个按键的实时顺序流（最新在末尾）</summary>
     public ObservableCollection<string> RecentKeySequence { get; } = new();
 
+    /// <summary>敲击脉冲。连击同一个键时键名不变，靠这个自增值让键盘倾斜动画每次都重播。</summary>
+    [ObservableProperty]
+    private long _keyStrikePulse;
+
+    private long _keyStrikeSequence;
+
     // 总计
     public ObservableCollection<KeyCountItem> KeyCounts { get; } = new();
 
@@ -166,6 +172,10 @@ public partial class KeyCounterViewModel : ViewModelBase, IDisposable
         RecentKeySequence.Add(key);
         if (RecentKeySequence.Count > 30)
             RecentKeySequence.RemoveAt(0);
+
+        // 热力图的整块键盘倾斜也跟着每次敲击重播一次（与鼠标的 MouseClickPulse 同一个套路）。
+        // 必须排在上面那句 Add 之后：控件读的是 LastKeyText，脉冲到得比键名早就会让键盘倾到上一个键的方向
+        KeyStrikePulse = ++_keyStrikeSequence;
 
         UpdateTodayAverage();
     }

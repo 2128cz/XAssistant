@@ -136,8 +136,10 @@
    <Border Style="{StaticResource DashboardPanel}" Padding="20" Margin="0,0,0,20">
     <StackPanel>
      <DockPanel Margin="0,0,0,24"><ComboBox DockPanel.Dock="Right" Width="120" ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}" ToolTip="{Binding PeriodRangeHint}"/><TextBlock Text="键盘热力图" Style="{StaticResource SectionHeading}" VerticalAlignment="Center"/></DockPanel>
-     <!-- 色阶条与最少/最多次数由 KeyboardHeatmap 自己渲染，与按键着色同源；位移图标只收归一化偏移，像素换算在控件里 -->
+     <!-- 色阶条与最少/最多次数由 KeyboardHeatmap 自己渲染，与按键着色同源；位移图标只收归一化偏移，像素换算在控件里；
+          整块键盘的倾斜只收敲击脉冲，倾斜角度由敲到的键在板面上的位置算出 -->
      <controls:KeyboardHeatmap ShowHeader="False" IsRecording="{Binding Keyboard.IsRecording}" ItemsSource="{Binding DisplayKeyCounts}" RecentKey="{Binding LastKeyText}"
+                               KeyStrikePulse="{Binding Keyboard.KeyStrikePulse}"
                                LeftClickCount="{Binding Mouse.LeftClickToday}" MiddleClickCount="{Binding Mouse.MiddleClickToday}" RightClickCount="{Binding Mouse.RightClickToday}"
                                MouseMovementText="{Binding Mouse.MouseMovementText}" MouseDeltaText="{Binding Mouse.MouseDeltaText}"
                                MouseDistanceText="{Binding Mouse.MouseDistanceText}" MouseWheelText="{Binding Mouse.MouseWheelText}"
