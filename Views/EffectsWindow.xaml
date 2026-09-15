@@ -1,0 +1,38 @@
+<Window
+  x:Class="XAssistant.Views.EffectsWindow"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  Title="效果层"
+  WindowStyle="None"
+  ResizeMode="NoResize"
+  AllowsTransparency="True"
+  Background="Transparent"
+  Topmost="True"
+  ShowInTaskbar="False"
+  ShowActivated="False"
+  Focusable="False"
+  IsHitTestVisible="False">
+  <!--  整块铺满虚拟屏幕的效果层：粒子从顶部浮岛下方一颗颗落下来；触发时屏幕中间一句警告语，
+        同时屏幕四边亮一圈——两者同一个透明度一起淡入淡出，算一个效果。
+        窗口本身点击穿透（见代码里的 WS_EX_TRANSPARENT）也不抢焦点——本程序监听全局按键，
+        彩蛋挡手或打断输入都是事故。  -->
+  <Grid>
+    <!--  边缘高亮：两层描边，外面那层糊开当辉光，里面那层留一条实线。只描边不填充  -->
+    <Border x:Name="EdgeGlow" Margin="4" BorderThickness="10" CornerRadius="10" Opacity="0" IsHitTestVisible="False">
+      <Border.Effect><BlurEffect Radius="22"/></Border.Effect>
+    </Border>
+    <Border x:Name="EdgeLine" Margin="4" BorderThickness="2" CornerRadius="10" Opacity="0" IsHitTestVisible="False"/>
+    <!--  警告语：中间一句大字，左右两道斜线各占一半屏宽、一直铺到屏幕边——只贴着文字写四个斜杠
+          不叫警告。斜线用平铺画刷画（画刷在代码里按当前颜色与文字高度生成），所以它跟文字等高、
+          又能跟着窗口宽度走。文字背后不垫背景框：垫了就像贴了块便利贴，跟这套 1 px 发丝线的界面不合。  -->
+    <Grid x:Name="Tape" Opacity="0" IsHitTestVisible="False" Margin="0">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <Border x:Name="SlashLeft" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,22,0"/>
+      <TextBlock x:Name="TapeText" Grid.Column="1" Text="" VerticalAlignment="Center"
+                 FontFamily="Consolas, Microsoft YaHei UI" FontSize="46" FontWeight="Bold"
+                 Foreground="{DynamicResource AccentBrush}"/>
+      <Border x:Name="SlashRight" Grid.Column="2" VerticalAlignment="Center" Margin="22,0,0,0"/>
+    </Grid>
+    <Canvas x:Name="Stage" IsHitTestVisible="False" ClipToBounds="True"/>
+  </Grid>
+</Window>

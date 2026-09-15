@@ -9,13 +9,18 @@
     <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
   </PropertyGroup>
 
-  <!--  Assets 下两类资源都要跟着输出走：键盘动画的 index.html 由 WebView2 加载，练习题库按「语言目录 / 句式文件」分档  -->
+  <!--  Assets 下这几类资源都要跟着输出走：键盘动画的 index.html 由 WebView2 加载，练习题库按「语言目录 / 句式文件」分档，
+        Keywords 下的 keywords.json 与 images/ 是打字关键词彩蛋的用户入口  -->
   <ItemGroup>
     <Content Include="Assets\KeyboardAnimation\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
     <Content Include="Assets\Practice\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Assets\Keywords\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

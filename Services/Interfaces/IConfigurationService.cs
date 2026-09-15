@@ -51,9 +51,15 @@ public interface IConfigurationService
     void SetTheme(string theme);
 
     // ---------- 界面布局 ----------
-    /// <summary>获取分区排布（"Auto" / "Wide" / "Tall"）；Auto 表示由屏幕分辨率比例决定</summary>
+    /// <summary>获取分区排布（"Auto" / "Wide" / "Tall"）；Auto 表示逐行按页面实际宽度决定要不要拆右栏</summary>
     string GetLayoutMode();
 
     /// <summary>设置分区排布并持久化</summary>
     void SetLayoutMode(string mode);
+
+    /// <summary>打字关键词彩蛋（换肤与掉粒子）是否开着</summary>
+    bool GetKeywordEffects();
+
+    /// <summary>设置关键词彩蛋开关并持久化</summary>
+    void SetKeywordEffects(bool enabled);
 }

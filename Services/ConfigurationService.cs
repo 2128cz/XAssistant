@@ -110,4 +110,12 @@ public class ConfigurationService : IConfigurationService
         _appSettings.General.LayoutMode = mode;
         Save();
     }
+
+    public bool GetKeywordEffects() => _appSettings.General.KeywordEffects;
+
+    public void SetKeywordEffects(bool enabled)
+    {
+        _appSettings.General.KeywordEffects = enabled;
+        Save();
+    }
 }

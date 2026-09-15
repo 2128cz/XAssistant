@@ -52,3 +52,7 @@ appsettings.*.json
 
 ## 离屏夹具的快照与报告输出
 shots/
+
+## Python 字节码缓存（mcp/ 下的垫片脚本跑一次就会生成，不属于源码）
+__pycache__/
+*.py[cod]

@@ -5,6 +5,7 @@ using Microsoft.Win32;
 using Serilog;
 using XAssistant.Services;
 using XAssistant.Services.Interfaces;
+using XAssistant.Services.Keywords;
 using XAssistant.Services.QuickNote;
 using XAssistant.ViewModels;
 using XAssistant.Views;
@@ -18,6 +19,9 @@ public partial class App : System.Windows.Application
     private QuickNoteCaptureService? _quickNoteCapture;
     private GlobalHotkeyService? _globalHotkey;
     internal static bool IsShuttingDown { get; private set; }
+
+    /// <summary>这轮进程只是来放一个效果的（--fx）：不建容器、不装钩子、不开主窗。</summary>
+    private static bool _headlessEffect;
 
     private ILogger<App>? _appLogger;
     private bool _isDataSaved;
@@ -41,6 +45,16 @@ public partial class App : System.Windows.Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // 无头效果：`XAssistant.exe --fx warn 3 "AI Computer Use"` / `--fx confetti` / `--fx off`。
+        // 排在一切启动工作前面：脚本与 MCP 调一次只想要一个动画，不该顺手装钩子、开数据库、弹主窗。
+        _headlessEffect = EffectCli.TryHandle(e.Args, this);
+        if (_headlessEffect) return;
+
+        // 常驻托盘的程序不能让「最后一个窗口关掉」决定进程寿命：默认模式下，彩蛋粒子窗、
+        // 悬浮键盘动画窗这类关掉就没的窗口一旦成为最后一个窗口，就会把整个程序带走。
+        // 退出只由托盘菜单的「退出」与系统注销触发（两处都已各自走 SaveDataAndStopTracker）。
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         // 准备日志目录
         string logDir = AppDataPathHelper.GetAppDataFolder();
@@ -82,6 +96,11 @@ public partial class App : System.Windows.Application
         services.AddSingleton<SettingsViewModel>();
 
         services.AddSingleton<ProcessUsageTracker>();
+
+        // 打字关键词彩蛋（white / black / flower …）：切词与词频统计共用同一条物理键规则，
+        // 命中就换本次运行的主题并掉一把粒子。它跟着钩子走，所以键盘记录开着才生效。
+        services.AddSingleton(sp => KeywordCatalog.Load(KeywordCatalog.DefaultRoot));
+        services.AddSingleton<KeywordWatcher>();
 
         // 速记唤起（全局热键 + 原生捕获窗 + 直插速记库 + 保存确认 toast）
         services.AddSingleton<IQuickNoteDatabaseService, QuickNoteDatabaseService>();
@@ -125,6 +144,10 @@ public partial class App : System.Windows.Application
         var configService = provider.GetRequiredService<IConfigurationService>();
         ThemeManager.Apply(configService.GetTheme());
         _appLogger.LogInformation("已应用界面主题：{Theme}", ThemeManager.Current);
+
+        // 关键词引擎订阅钩子：只订事件，装钩子仍是键盘记录自己的事
+        provider.GetRequiredService<KeywordWatcher>()
+            .ConnectKeyboard(provider.GetRequiredService<IKeyboardHookService>());
 
         // 后续主窗口
         var mainVM = provider.GetRequiredService<MainWindowViewModel>();
@@ -244,6 +267,12 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // 无头那轮什么都没建，去容器里取服务只会抛空引用
+        if (_headlessEffect)
+        {
+            base.OnExit(e);
+            return;
+        }
         // 防止重复保存（如果已经通过 SessionEnding 或 ShutdownApplication 保存过）
         SaveDataAndStopTracker();
 
@@ -261,6 +290,7 @@ public partial class App : System.Windows.Application
         Services.GetRequiredService<MainWindowViewModel>().Dispose();
         Services.GetRequiredService<WordFrequencyViewModel>().Dispose();
         Services.GetRequiredService<PracticeViewModel>().Dispose();
+        Services.GetRequiredService<KeywordWatcher>().Dispose();
         _globalHotkey?.Dispose();
         _notifyIcon?.Dispose();
         // 移除事件订阅，避免内存泄漏

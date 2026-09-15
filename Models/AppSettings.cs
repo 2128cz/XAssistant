@@ -30,5 +30,6 @@ public class GeneralSettings
     public double WindowHeight { get; set; } = 720;
     public bool IsLogExpanded { get; set; } = false;
     public string Theme { get; set; } = "Dark"; // 界面主题：Light / Dark
-    public string LayoutMode { get; set; } = "Auto"; // 分区排布：Auto 按屏幕比例，Wide 强制双栏，Tall 强制单栏
+    public string LayoutMode { get; set; } = "Auto"; // 分区排布：Auto 按页面宽度逐行判，Wide 只要塞得进就分栏，Tall 整页单栏
+    public bool KeywordEffects { get; set; } = true; // 打字关键词彩蛋（white / black / flower …）：换肤与掉粒子
 }

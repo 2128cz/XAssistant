@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "note": "自己加词就往 keywords 里追加，改完重启生效。词必须小写、不带空格（切词按物理键走，与词频统计同一条规则，中文输入法下拿到的是拼音字母）。theme 只认 Light / Dark；colors 的键必须是 ThemeManager.BrushKeys 里的画刷名，认不出的键会被丢掉并写进日志；banner 是横在屏幕中间那条警告带上写的字（两侧斜线由主题色拼出，最长 40 字）；particles 是每次触发从顶部浮岛下方吐几颗，1 就够（上限 4，再多就是撒沙子）；glyph 是单色字形（WPF 不支持彩色 emoji 字体），要彩色就把图片放进 Assets/Keywords/images/ 再写 image。同一个词写在后面会覆盖前面的内置规则。",
+  "keywords": [
+    { "word": "pizza", "glyph": "🍕", "particles": 1, "banner": "点外卖了" },
+    { "word": "banana", "glyph": "🍌", "particles": 1 },
+    { "word": "meeting", "banner": "会议中，勿扰" },
+    {
+      "word": "sunset",
+      "theme": "Dark",
+      "palette": "sunset",
+      "glyph": "🌇",
+      "particles": 2,
+      "banner": "暖橘配色 · 敲 white / black 回到原色",
+      "colors": {
+        "WindowBackground": "#1A1118",
+        "MenuBackground": "#1A1118",
+        "CardBackground": "#241820",
+        "CardBorderBrush": "#402C38",
+        "PanelBackground": "#2C1E28",
+        "ControlBackground": "#3A2833",
+        "ControlBorder": "#54394A",
+        "DataGridBackground": "#241820",
+        "DataGridHeaderBackground": "#2F2029",
+        "TextPrimary": "#FFEDE0",
+        "TextSecondary": "#D7B4A6",
+        "TextHint": "#A98B81",
+        "AccentBrush": "#FF8A3D",
+        "AccentText": "#2A1004",
+        "HighlightNumber": "#FFD9A0",
+        "LinkBrush": "#FF8A3D",
+        "DangerBrush": "#FF7B6B",
+        "SuccessBrush": "#FFB86B",
+        "KeyChipBackground": "#3D2A33",
+        "KeyChipText": "#FFD9A0",
+        "NavHoverBackground": "#2F2029",
+        "NavSelectedBackground": "#43303A",
+        "NavSelectedForeground": "#FF8A3D",
+        "DashboardNumber": "#B3FF8A3D",
+        "DashboardWatermark": "#26FF8A3D"
+      }
+    }
+  ]
+}
