@@ -56,26 +56,41 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// 布局选项的展示文案。落盘的是英文码，配置里不留中文；两者只在这一对 switch 里换算。
+    /// 「自动」不再看显示器横竖屏，只看页面实际宽度——竖屏 1080 的页面照样放得下 340 的读数栏。
     /// </summary>
-    public string[] LayoutModeOptions { get; } = ["跟随屏幕", "横向 · 双栏", "纵向 · 单栏"];
+    public string[] LayoutModeOptions { get; } = ["自动 · 按宽度", "横向 · 分栏", "纵向 · 单栏"];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LayoutModeNote))]
-    private string _selectedLayoutMode = "跟随屏幕";
+    [NotifyPropertyChangedFor(nameof(AllowsRailSplit))]
+    [NotifyPropertyChangedFor(nameof(PrefersWideRail))]
+    private string _selectedLayoutMode = "自动 · 按宽度";
 
     /// <summary>
-    /// 是否把「输入」「记录」两栏并排。这里只给屏幕比例的结论；
-    /// 窗口被拖窄时视图层会再收紧成单栏，免得两栏被裁掉。
+    /// 档位是否允许板内行拆成「主体 + 右栏」。只有「纵向 · 单栏」会一票否决；
+    /// 够不够宽由 <see cref="Views.DashboardView"/> 按页面实际宽度逐行判。
+    /// </summary>
+    public bool AllowsRailSplit => SelectedLayoutMode != "纵向 · 单栏";
+
+    /// <summary>
+    /// 档位是否要求「只要塞得进就分栏」：跳过可读性下限，只留一条不塌掉的硬下限。
+    /// 给的是「我就是要把读数放右边，键帽小一点无所谓」这个选择权。
+    /// </summary>
+    public bool PrefersWideRail => SelectedLayoutMode == "横向 · 分栏";
+
+    /// <summary>
+    /// 主显示器是横屏还是竖屏。这个只用来定窗口最小宽度：竖屏常只有 1080 宽，
+    /// 写死 1100 会让窗口根本放不下。
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LayoutModeNote))]
-    private bool _isWideLayout = true;
+    private bool _isLandscapeScreen = true;
 
-    /// <summary>
-    /// 两栏排布的窗口宽度下限，与 DashboardView 里的同名常量保持一致：
-    /// 低于这个宽度，左栏分到的宽度会让热力图键帽字号掉到 7 px 以下，宁可退回单栏。
-    /// </summary>
-    private const int TwoColumnMinWidth = 1360;
+    /// <summary>通用行内分栏的页面宽度下限，与 DashboardView 里的同名常量保持一致。</summary>
+    private const int RailSplitMinWidth = 940;
+
+    /// <summary>热力图那一行的分栏下限，同样与 DashboardView 同步：键帽名不能掉到 8 px 以下。</summary>
+    private const int HeatRailMinWidth = 1310;
 
     /// <summary>设置区那行说明。不写清判据，用户只会觉得布局开关时灵时不灵。</summary>
     public string LayoutModeNote
@@ -84,37 +99,34 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         {
             double width = System.Windows.SystemParameters.PrimaryScreenWidth;
             double height = System.Windows.SystemParameters.PrimaryScreenHeight;
-            string screen = $"{width:F0}×{height:F0} 逻辑像素 · {(width >= height ? "横屏" : "竖屏")}";
-            return SelectedLayoutMode == "跟随屏幕"
-                ? $"显示器 {screen} → {(IsWideLayout ? "两栏" : "单栏")}；实际窗口窄于 {TwoColumnMinWidth} 时自动收成单栏"
-                : $"已固定为{(IsWideLayout ? "两栏" : "单栏")}（显示器 {screen}）";
+            string screen = $"显示器 {width:F0}×{height:F0} 逻辑像素";
+            return SelectedLayoutMode switch
+            {
+                "纵向 · 单栏" => $"已固定单栏：整页一列，读数栏摞回主体下方（{screen}）",
+                "横向 · 分栏" => $"已要求尽量分栏：只要 340 的右栏塞得进就拆，不再看键帽字号下限（{screen}）",
+                _ => $"按页面宽度逐行拆：≥ {RailSplitMinWidth} 拆出右栏；热力图行要 ≥ {HeatRailMinWidth}，否则键帽名撑不到 8 px（{screen}）",
+            };
         }
     }
 
     partial void OnSelectedLayoutModeChanged(string value)
     {
-        _config.SetLayoutMode(value switch { "横向 · 双栏" => "Wide", "纵向 · 单栏" => "Tall", _ => "Auto" });
-        ApplyScreenRatio();
+        _config.SetLayoutMode(value switch { "横向 · 分栏" => "Wide", "纵向 · 单栏" => "Tall", _ => "Auto" });
+        RefreshScreenShape();
     }
 
-    /// <summary>重算横竖屏。主显示器分辨率变化、改缩放、转竖屏都走这里。</summary>
-    private void ApplyScreenRatio()
+    /// <summary>重算屏幕形状。主显示器分辨率变化、改缩放、转竖屏都走这里；它只管窗口最小宽度那一档。</summary>
+    private void RefreshScreenShape()
     {
-        bool screenIsWide = System.Windows.SystemParameters.PrimaryScreenWidth
+        IsLandscapeScreen = System.Windows.SystemParameters.PrimaryScreenWidth
             >= System.Windows.SystemParameters.PrimaryScreenHeight;
-        IsWideLayout = SelectedLayoutMode switch
-        {
-            "横向 · 双栏" => true,
-            "纵向 · 单栏" => false,
-            _ => screenIsWide,
-        };
     }
 
     private void OnSystemParametersChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(System.Windows.SystemParameters.PrimaryScreenWidth)
             or nameof(System.Windows.SystemParameters.PrimaryScreenHeight))
-            ApplyScreenRatio();
+            RefreshScreenShape();
     }
 
     /// <summary>
@@ -352,8 +364,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         _config = config;
 
         // 读取持久化的排布档位走字段，不走属性：避免启动时又把同一份值写回配置
-        _selectedLayoutMode = config.GetLayoutMode() switch { "Wide" => "横向 · 双栏", "Tall" => "纵向 · 单栏", _ => "跟随屏幕" };
-        ApplyScreenRatio();
+        _selectedLayoutMode = config.GetLayoutMode() switch { "Wide" => "横向 · 分栏", "Tall" => "纵向 · 单栏", _ => "自动 · 按宽度" };
+        RefreshScreenShape();
         System.Windows.SystemParameters.StaticPropertyChanged += OnSystemParametersChanged;
 
         Mouse.PropertyChanged += OnMousePropertyChanged;

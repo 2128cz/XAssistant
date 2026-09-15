@@ -2,7 +2,8 @@
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
  <StackPanel>
   <DockPanel>
-   <TextBlock Text="词频统计" Foreground="{DynamicResource AccentBrush}" FontSize="16"/>
+   <!-- 小格标题统一 13 号：这块面板与旁边的练习成绩同格并列，字号再大就抢了板头的层次 -->
+   <TextBlock Text="词频统计" Foreground="{DynamicResource AccentBrush}" FontSize="13"/>
    <Button Command="{Binding RebuildCommand}" HorizontalAlignment="Right" FontSize="11" Padding="8,3">
     <TextBlock Text="{Binding RefreshLabel}" MaxWidth="220" TextTrimming="CharacterEllipsis"/>
     <Button.ToolTip><ToolTip MaxWidth="320"><TextBlock Text="{Binding RefreshTip}" TextWrapping="Wrap"/></ToolTip></Button.ToolTip>
