@@ -53,21 +53,31 @@ UI 采用基于 CommunityToolkit.Mvvm 的 WPF MVVM 架构。项目没有自动�
 - View→ViewModel 的映射通过 `App.xaml` 中的 `DataTemplate`（每个 VM 一个）完成。`MainWindow` 显示一个绑定到 `MainWindowViewModel.CurrentViewModel` 的 `ContentControl`；左侧菜单通过 `Navigate` 中继命令切换页面。`MainWindowViewModel` 还负责底部日志面板、日志过滤和窗口大小持久化。
 - `HomeViewModel` 聚合四个模块的 ViewModel，并将其 `PropertyChanged` 事件转发到自身同名的属性。所有模块 ViewModel 都是单例，因此无论当前显示哪个页面，实时数据（钩子、定时器）都会持续流动。
 
-### 工作台三分区与横竖屏
-`DashboardView` 是一页到底的工作台，内容按标题聚成三部分：PART 1 概览（统计卡，恒为通栏）、PART 2 输入（节奏曲线 / 热力图 / 排行 / 词频 / 练习）、PART 3 记录（会话表 / 原始记录 / 设置）。横屏时 2 与 3 左右并排（`3*` / 20 px 沟 / `2*`，通栏块用 `ColumnSpan=3` 跨过沟列），竖屏时三者垂直单栏。
+### 工作台「大嵌小」与逐行分栏
+`DashboardView` 是一页到底的工作台，只有三块板（`Board` 样式，一块一个边框）：PART 1 概览（标语 + 四格累计）、PART 2 输入（节奏曲线带六格速率 / 热力图带排行与最近按键 / 短句练习带成绩与词频）、PART 3 记录（会话表 / 原始记录 / 设置）。三块板恒为通栏，**切换发生在每一行内部**：每一行都是「主体格 + 340 右栏」，够宽时子参数站在主体右边，不够宽才摞回主体下方。格与格之间靠 1 px 发丝线（`BoardRule`，或格子自身的 `BorderThickness`）分开，不靠空白分块——每卡 20 px 的沟就是松散的来源。
 
-- 判据分两级：`DashboardViewModel.IsWideLayout` 只看主显示器分辨率比例（`SystemParameters.StaticPropertyChanged` 监听分辨率 / 缩放 / 转屏后重算），可被 `AppSettings.General.LayoutMode`（`Auto` / `Wide` / `Tall`）覆盖；`DashboardView` 再用 `ActualWidth` 兜底（两栏 1360、四卡一排 1000），两个常量在 VM 与 View 各留一份，改一处要同步另一处。
-- 排布切换全部由 `DashboardView.xaml` 里的布局 `Style`（`PartOverview` / `PartInput` / `PartRecord` / `OverviewCards` / `RhythmChart` / `RhythmTiles` / `RankingCell` / `RecentCell` / `SessionTiles`）的 `DataTrigger` 改 `Grid.Row` / `Grid.Column` / `Grid.ColumnSpan` / `Columns` 完成。**同一棵树只有一份内容**——这些控件都带状态，复制两套布局就会变成双份订阅与双份焦点。
-- 因此受 `Style` 控制的属性（`Grid.Row`、`Grid.Column`、`Grid.ColumnSpan`、`UniformGrid.Columns`、`Margin`）**绝不能再写本地值**：WPF 里本地值优先级高于 `Style` 触发器，写了触发器会静默失效。
-- 竖屏下窗口 `MinWidth` 降到 640（`MainWindowViewModel.WindowMinWidth` 跟着 `IsWideLayout` 走），否则 1080 宽的竖屏显示器放不下默认 1100 的窗口。
+- 判据只看页面实际宽度，**不看显示器横竖屏**：`DashboardView.RefreshLayoutSignals` 按 `ActualWidth` 逐行算 `IsRailSplit` / `IsHeatRailSplit` / `IsOverviewInRow`。屏幕比例一票否决曾把 1100 宽的窗口整页摊平（页面 1003 够放 340 的读数栏却不让放），这条已废；`SystemParameters.StaticPropertyChanged` 现在只用来重算窗口 `MinWidth`（竖屏 1080 放不下默认 1100 的窗口，`MainWindowViewModel.WindowMinWidth` 跟着 `DashboardViewModel.IsLandscapeScreen` 走）。
+- 四行不是一个档：热力图行的键盘是 1120 的设计稿、键帽名 10 号，等比缩到八成以下就读不动——反推「主体 ≥ 896 + 控件内边距与边框 42 = 938」，加右栏 340 与格的左右留白 34，就是 **1312**；其余三行（节奏 / 练习 / 记录）只放读数与文本，下限 **940**（主体剩 566，六格速率 2 列每格 163、44 号读数不贴边）。概览四卡一排 **1000**。三个数在 `DashboardView` 与 `DashboardViewModel`（只为写进 `LayoutModeNote`）各存一份，改一处要同步另一处。
+- 设置里的「界面布局」三档：「自动 · 按宽度」走上面那三条下限；「横向 · 分栏」跳过可读性下限、只留硬下限 700（340 的右栏塞得进就拆，键帽小一点是用户自己的选择）；「纵向 · 单栏」一票否决。VM 侧只暴露两个布尔：`AllowsRailSplit`（是否否决）与 `PrefersWideRail`（是否只看塞得进），落盘仍是 `Auto` / `Wide` / `Tall`。
+- 实测账（离屏夹具 `bin/boardshot`，真 View + 真 VM，只把钩子与数据库换成假的）：1100 宽的窗口（页面 1003）下节奏、练习、记录三行都并排，整页从 2896 px 矮到 2440 px（省 456）；热力图行仍整行独占，键盘实绘 968 px = 设计的 0.864、键帽名 8.6 px——这正是不许它分栏的理由。夹具按「窗口宽 − 97」复现页面宽（边框 16 + 滚动条 17 + 页边距 64），拿窗口宽当页面宽会高估出一个不存在的档。
+- 排布切换全部由 `DashboardView.xaml` 里的布局 `Style`（`OverviewCards` / `RhythmTiles` / `MainCell` / `RailCell` / `HeatMainCell` / `HeatRailCell` / `RailRanking` / `RailRecent`）的 `DataTrigger` 改 `Grid.Row` / `Grid.Column` / `Grid.ColumnSpan` / `Columns` / `BorderThickness` / `Margin` 完成。**同一棵树只有一份内容**——这些控件都带状态，复制两套布局就会变成双份订阅与双份焦点。热力图行那两格与通用两格只差在绑哪个信号；`BasedOn` 到底继不继承触发器不写测试说不清，所以四份样式各自写全，拿几行重复换读得懂的确定性。
+- 那条分隔线在「并排」与「摞上下」之间切换时只换 `BorderThickness` 的朝向（左边线 ↔ 上边线），不额外留沟列：沟是空白，线不是空白。热力图行摊平时，栏内的排行与最近按键再并排一次（`RailRanking` / `RailRecent`），否则 34 号的读数会一路飘到板右缘。
+- 因此受 `Style` 控制的属性（`Grid.Row`、`Grid.Column`、`Grid.ColumnSpan`、`UniformGrid.Columns`、`BorderThickness`、`Margin`）**绝不能再写本地值**：WPF 里本地值优先级高于 `Style` 触发器，写了触发器会静默失效。
+- 子控件（`VersePractice` / `PracticeScoreboard` / `WordFrequencyPanel`）不再自带浮卡边框与外边距，贴板边由 `DashboardView` 给；否则一块小格里套两层卡、叠两份 20 px 留白。
+- 两处随窄布局暴露出来的冗余：曲线被挤到 660 宽之后峰值线两端的标注会撞车，采样口径那串元信息（`CadenceSummary`）从峰值线右侧挪进下方的轴标注行（那里原来那句「每秒敲击 · 近 1 秒滚动窗口…」是同义重复，一并换掉）；时段选择器删掉了右栏里那排 `ListBox`：它与热力图标题行的 `ComboBox` 绑同一个属性、两处选互相覆盖，还白吃 70 px 行高（板 1 板头另留一个下拉作为全局快捷入口，同一属性两处入口已经嫌多，三处就只剩互相打架），连带 `DashboardStyles.xaml` 里的 `PeriodSelector` / `PeriodChoice` 两份死样式一起删了。
 
-### 键盘热力图的倾斜动画
-`Controls/KeyboardHeatmap` 把 144 键当成一块刚性板，敲击位置决定姿态。模型层全在 `Controls/KeyboardTilt.cs`，按三层拆开：`KeyboardTilt` 是纯几何（仿射四件套 + 越界回收）、`TiltSpring` 是单轴的二阶阻尼跟随、`TiltDriver` 管时间与渲染循环的挂卸；控件只负责两头——把键名换算成敲击向量、把算出的矩阵写回视觉树。三层都是 `internal`（离屏夹具与控件同装配，看得见，验证不必为此开洞）。
+### 键盘热力图的透视倾转
+`Controls/KeyboardHeatmap` 把 144 键当成一块悬在屏幕前方的刚性板，敲击位置决定姿态。模型层全在 `Controls/KeyboardTilt.cs`，按三层拆开：`KeyboardTilt` 是纯几何（单应投影 + 逐键一阶仿射 + 越界回收）、`TiltSpring` 是单轴的二阶阻尼跟随、`TiltDriver` 管时间与渲染循环的挂卸；控件只负责两头——把键名换算成敲击向量、把算出的姿态写回视觉树。三层都是 `internal`（离屏夹具与控件同装配，看得见，验证不必为此开洞）。
 
-- 变换只挂在键盘块 `ItemsControl` 的 `RenderTransform` 上（`RenderTransformOrigin=0.5,0.5`），所以倾斜期间布局区域一格都不动；越界回收把外接框压回「框 + 余量」，余量在 XAML 里就是 Viewbox 的 `Margin`，改一处要同步 `TiltLimits.Default` 的 `HeadroomX/Y`。
+- **仿射 + 斜切做不出透视，这不是调参能救的**：仿射矩阵只有一份线性部分，平行线映完还是平行线、等长的平行线段映完还是等长，所以「远边比近边短」永远画不出来；斜切只能把角歪掉，拉不开尺度差。真透视是射影变换（单应），必须让远端真的变小。
+- 姿态的算法：把板面点 (x,y,0) 绕「过板心且垂直于敲击方向」的板内轴 â = (−Ny, Nx) 倾转 α 得到 3D 点（纵深 Z = −sin α·(n̂·p)），再过一道针孔相机 `w = 1 + sinα·along/Depth` 做透视除法，然后绕视线滚 γ、朝敲击方向跟 T、越界回收 S。α=0 或 Depth→∞ 时严格退回原来的正交模型。
+- 但 WPF 的 `MatrixTransform` 只能装仿射，所以**单应要逐键压到每颗键帽上**：键帽中心走精确投影，中心处用中心差分求雅可比当线性部分（`KeyboardTilt.ApplyPose`）。键帽只几十设计单位宽，二阶残差≈½·|f″|·L² 随宽度平方增长，最宽的空格上约 2 个设计单位（屏幕上 1.5 px），看不出来；144 块拼起来就是完整的梯形轮廓。旧模型那块「整块板共用的仿射四件套」已整体删除，`TiltLimits` 里的 `ShearDegrees` 也删了——切变现在由透视自然产出。
+- 变换因此挂在 144 个 `ContentPresenter` 容器的 `RenderTransform` 上（`KeyboardHeatmap.AttachKeyTilts` 走 `ItemContainerGenerator` 取容器，一次建好长期复用，每帧只改 `.Matrix`），键盘块 `ItemsControl` 本身不再挂变换。Canvas 面板不虚拟化，容器不会中途消失；但**容器没生成齐时一帧都不写**，否则写了一半会让剩下的键帽停在上一帧位置。键帽的 `RenderTransformOrigin` 必须留在默认 (0,0)：那块矩阵里已经把「从键帽左上角算起的平移」一并带上了。
+- 越界回收把板框四角的外接框压回「框 + 余量」，余量在 XAML 里就是 Viewbox 的 `Margin`，改一处要同步 `TiltLimits.Default` 的 `HeadroomX/Y`。`DepthBoardWidths`（相机距离，以板宽为单位）决定近大远小有多狠，2.2 个板宽下敲最右时近端键帽比远端大约 21%。
 - 三处跨文件同值的约定：键帽行高 43（XAML 的 `ContentPresenter Height` 与 `KeyboardHeatmap.KeyRowHeight`）、板框 1120×331（XAML 声明的尺寸与由 `Layout` 极值算出的 `BoardBox`）、WPF 的 `Matrix` 是行向量约定（存的是数学矩阵的转置，而屏幕 y 轴朝下，所以正角就是顺时针）。
 - 高频节拍 DP 一律走 `RegisterTick`（`KeyStrikePulse` 与鼠标那一组共用同一个注册助手），绝不能挂 `VisualPropertyChanged`，否则每敲一键都重建 144 个键帽的着色；同一个键连击时键名不变，重播只能靠自增脉冲。
-- `CompositionTarget.Rendering` 是静态事件，挂与卸都收在 `TiltDriver` 里：姿态回到水平就立刻退订，`Unloaded` 里也必须调 `Reset()` 退订并归位，否则换页卸掉的控件仍被渲染循环拽着。
+- `CompositionTarget.Rendering` 是静态事件，挂与卸都收在 `TiltDriver` 里：姿态回到水平就立刻退订，`Unloaded` 里也必须调 `Reset()` 退订并归位，否则换页卸掉的控件仍被渲染循环拽着。归位时 `ApplyPose(0,0,…)` 写的是**精确的** `Matrix.Identity`，不留浮点尾巴。
+- 离屏夹具 `bin/tiltshot`（只 `Compile Include` 那两个源文件 + XAML，不引用主工程）拿两条「仿射做不到」的性质当判据：同一排键帽的竖边长度近端/远端 > 1.15，与各排上沿斜率沿纵向单调收拢（仿射下这个差恒为 0）；另外还比 576 个角点的二阶残差、全姿态 60×60 网格扫描的越出量、与单帧 144 块写回成本。
 
 ### 四个模块
 每个模块 = 钩子服务 + SQLite 仓库 + ViewModel + View：
@@ -77,6 +87,30 @@ UI 采用基于 CommunityToolkit.Mvvm 的 WPF MVVM 架构。项目没有自动�
 4. **电脑使用时长** —— 外部服务（见上文）→ `UsageViewModel`（5 秒 `DispatcherTimer` 轮询）
 
 实时 UI 更新全部通过 `DispatcherTimer` 轮询或事件驱动计数器实现——没有发布/订阅总线。
+
+### 随机打字练习的字符口径
+题库按 `Assets/Practice/<语言>/<句式>.json` 两级目录加载（`PracticeScoreStore.LoadCatalogTree`），要敲的是 `text + suffix`，`annotation` 只是卡片上方给人读的。出题约束与验证场景见 `docs/typing-practice.md`，这里只记三条容易踩的：
+
+- **不可见字符靠黑名单，不靠人工发现**：`PracticeText.Sanitize` 在加载时逐字段洗一遍——控制字符整段按 `char.IsControl` 认（含 JSON 转义混进来的 `\n` `\r` `\t` 与 C1 段），零宽 / 方向标记 / 软连字符 / BOM 按码位列出来，一律剔除；NBSP 这类怪空白折成半角空格（直删会把两个词粘成一个）。它们留在正文里就是一格永远敲不上的死位（进度卡在 N-1/N 那类死锁的根子），留在注音里则会把「这是音标还是要读的正文」判定带偏。
+- **洗不能静默**：码位记到 `PracticeCatalog.IgnorableFindings`，`PracticeViewModel.CatalogWarning` 在练习块顶部念出来（`HasCatalogWarning` 控制那一行的显隐）；`Validate` 里这条检查排在「单词缺少文本」前面，因为 `\n` 也是空白，不排队就会被误报成缺字段。
+- **注音不参与统计，显示判定走排除法**：进度分母与逐格计数只数 `text + suffix`，全角折叠（`Normalize` / `Fold`）也只作用在要敲的正文上。包不包 `/…/` 由 `PracticeText.IsReadingScript`（假名 / 汉字 / 谚文 / CJK 标点 / 长音符）与「整串有没有字母」决定；写成「整串是不是 ASCII」的白名单会把英语 IPA 的 `ː ð ʌ ə æ` 当成假名，一下弄掉 614 个注音的斜杠。`bin/practicheck` 把这两种极性逐个断言，改回白名单当场就红。
+
+### 打字关键词彩蛋（换肤 + 浮岛粒子 + 警告带）
+入口在 `Services/Keywords/`（`KeywordRule` / `KeywordCatalog` / `KeywordWatcher`）、`Services/ParticleMotion.cs` 与 `Views/EffectsWindow`。
+
+- 切词直接复用 `WordFrequencyStore.DecodeKey`（字母数字算词、其它键是分隔符、退格撤销一个字符）——「词频面板里看到的词」与「能触发彩蛋的词」必须同一批。中文输入法下拿到的是拼音字母，所以词表只收 ASCII 词。
+- 命中是**边打边判**：缓冲区一等于某个词就触发，不等空格；同一个词没被分隔符冲掉前只算一次。代价是 white 也是 whiteboard 的前缀，会提前掉一次。
+- 主题色是程序化的：`ThemeManager.ApplyPalette(base, name, colors)` 在主题字典之上叠一层覆盖，只认 `BrushKeys` 列出的画刷键，认不出的键与写错的颜色逐条忽略（换肤是彩蛋，不该有让界面崩掉的可能）；`Apply(theme)` 会连带抹掉覆盖层，所以设置里那两个主题按钮就是「回到原色」的出口。关键词换肤**不落盘**（误触一个词不该改掉用户持久化的偏好），落盘只走 `SettingsViewModel`。
+- 粒子一次只给一颗（`Particles` 默认 1、上限 4，同屏上限 12）。每颗一份 `ParticleState`，`CompositionTarget.Rendering` 上各算一次 `ParticleMotion.Step`：速度与角速度按 e^(-k·dt) 取闭式解衰减。**没有重力**——上一版加过一点，看着仍然像「东西往下掉」；现在粒子就沿自己那份随机矢量直行（每步只乘同一个标量，所以位移与初速永远平行，夹具就断言这一条），越飞越慢、停在半空，尾段 0.9 s 边缩边淡。渲染循环的挂卸跟着「还有没有粒子、还有没有警告语在淡」，全空就 `Close`。
+- **位置走布局、缩放旋转走 RenderTransform**：每帧把「中心 − 半边长」写进 `Canvas.Left/Top`，变换组里绝不出现 `TranslateTransform`。上一版把平移也塞进变换组，收尾缩放到 0 时组合矩阵把粒子拽回原点，看着就是「跳回左上角再原地消失」；夹具现在直接断言组里没有平移。
+- 警告语 + 边缘高亮是**一个动作**：触发时屏幕中间一句大字（`KeywordRule.Banner`，例：AI接管中），左右两道斜线各占一半屏宽、一直铺到屏幕边（斜线是 `Hatch()` 生成的平铺画刷，瓦片高 = 字号×1.25，所以与文字等高），同时屏幕四边亮一圈辉光；四者共用同一段关键帧（淡入 → 闪 N 下 → 淡掉，`FillBehavior.Stop`）。文字 46 号加粗、**背后可不垫背景框**（垫了就像贴了块便利贴，跟这套 1 px 发丝线的界面不合）。颜色取当前 `AccentBrush`，换肤后跟着变。只贴着文字写四个斜杠不叫警告——列覆盖率（亮着的列数/总列数）现在低于 90% 夹具就红。
+- 同时只能挂一条警告语：新一条上来先 `_bannerStory?.Stop()` 再开新的。曾经踩过两个坑：两条动画同时抢 `Tape.Opacity` 时 `HideBanner` 归零会被旧动画抬回去；而用「当前有没有在闪」这个标志位当闸门，它一旦被上一句的 Completed 抢先清掉，收起就变成空操作、窗口永远关不掉。现在 `HideNow` 无条件执行，并且用 `BeginAnimation(OpacityProperty, null)` 把属性交回本地值——光 `story.Stop()` 不够。
+- **斜杠命令**（`SlashParser`）：`/warn 3 AI Computer Use`、`/e 1.5-3 编译失败`、`/i 跑完了`。三段是「类型 → 显示时间-闪烁次数 → 正文」；次数段只写一个数（`3`）就是闪 3 下、用默认时长，带横杠（`1.5-3`）才是时长+次数。类型→颜色：error/err/e/r 红、warn/warning/w 黄（主题里没现成警告色，给一支固定琥珀）、info/log/i/l 用当前强调色。`/` 或 `/off` 收起当前那句。词表是**封闭**的：斜杠后第一个词不在表里就整条丢掉，后面的字只吞不重试，等下一个 `/` 进入；第一个词一碰到空格就定性，不会拖到回车。命令走 `TextInput`（只有它带得出 `/`），且**收命令期间词流暂停匹配**，否则敲 `/info white` 会中途把界面切成浅色。
+- **无头命令**（`EffectCli`）：`XAssistant.exe --fx warn 3 "AI Computer Use"` / `--fx confetti` / `--fx off`。判据在 `App.OnStartup` 最前面，命中就 `return`：不建容器、不装钩子、不开主窗、不碰数据库，`OnExit` 也要先看 `_headlessEffect` 否则去容器取服务只会抛空引用。存在的理由是让别的进程（脚本、快捷键、CI、MCP）能触发同一套效果，而不必再多装一个客户端。
+- **MCP 入口**：`mcp/xassistant_fx_server.py`（纯标准库的 stdio JSON-RPC 垫片）把 `xassistant_banner` / `xassistant_confetti` / `xassistant_off` 三个工具翻译成上面的 `--fx` 命令。它不自己渲染也不常驻服务：对话进行中闪一条、做完了撒一把，都是客户端 hook 调一下这个工具。可执行文件位置优先取环境变量 `XASSISTANT_EXE`；那边的颜色档 `TONES` 与 `SlashParser.Vocabulary` 分组对应，改产品要同步。
+- 浮岛（`ToastWindow`）必须复用同一个窗口：每次 `Show` 新建一个，连击关键词会在屏幕顶上叠出一摞提示条并互相遮挡（上一版的事故）。`Reset` 换文案重计时，并用 generation 号让在飞的淡出动画作废，否则旧动画到点会把刚复用的窗口关掉。
+- 词表：代码内置 + `Assets/Keywords/keywords.json`（用户入口，人手写的坏条目只能丢掉并记进 `LoadNotes`，引擎启动时进日志）。效果窗三条硬约束：`ShowActivated=False`、`Focusable=False`、`WS_EX_TRANSPARENT` 点击穿透；`App.OnStartup` 里 `ShutdownMode = OnExplicitShutdown`——不然粒子窗一关就成了「最后一个窗口」，会把整个常驻程序带走。
+- 离屏夹具 `bin/keywordcheck`（三段）：物理用纯数值对 e^(-k·t) 的解析解、「位移与初速平行」（无重力）、「真的停住」（推 4 秒后一帧只挪出生那一帧的 11%）与「能飘过一千像素」（200 个方向×初速样本里最近的一例 1228 DIP）；斜杠命令逐条核语法、颜色档、上限夹逼与「表外整条跳过 + 收命令期间词流暂停」；真窗口那侧拍像素数非背景点与列覆盖率（斜线 98% 列覆盖、左右各 1384 DIP、斜线高 58 vs 文字高 54），并断言自定义 banner 原样上屏、`/` 能当场收起、同屏粒子数有顶、浮岛只有一个。注意快照拍的是窗口内容，内容坐标从虚拟屏左上角起算：拿屏幕 DIP 直接裁会整块偏一个 `VirtualScreenTop`。
 
 ### 速记唤起（灵感速记的 OS 级入口）
 本仓库为 xapp「灵感速记」功能提供全局唤起与写库链路（速记表、tRPC 接口、列表页都在 xapp 仓库，spec 见 xapp 仓库的 `docs/specs/global-quick-note.md`，写入归属决策见 xapp `docs/adr/0010`）。相关文件在 `Services/QuickNote/` 与 `Views/QuickNoteWindow`：
