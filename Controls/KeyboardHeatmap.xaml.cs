@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using UserControl = System.Windows.Controls.UserControl;
+using ContentPresenter = System.Windows.Controls.ContentPresenter;
 using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
@@ -449,6 +450,16 @@ public partial class KeyboardHeatmap : UserControl
     /// </summary>
     private readonly TiltDriver _tilt;
 
+    /// <summary>逐键仿射的载体，与 <see cref="KeySlots"/> 同序，挂在键帽容器的 RenderTransform 上。</summary>
+    private MatrixTransform[]? _keyTilts;
+
+    /// <summary>
+    /// 键帽槽位（画布坐标）。透视要逐键算雅可比，槽位就是它的输入；布局是静态的，所以全实例共用一份。
+    /// 延迟到首次使用才算，理由同 <see cref="BoardBox"/>：静态字段按声明顺序初始化，写在 Layout 之前会读到空数组。
+    /// </summary>
+    private static Rect[]? _keySlots;
+    private static Rect[] KeySlots => _keySlots ??= BuildKeySlots();
+
     /// <summary>敲一键就把倾斜目标交给驱动器；“等待输入”这类对不上键位的占位文字不该牵动键盘。</summary>
     private void StrikeTilt()
     {
@@ -468,12 +479,35 @@ public partial class KeyboardHeatmap : UserControl
         return true;
     }
 
-    /// <summary>把姿态写成键盘块的渲染变换。离屏夹具也走这条路径，保证验的就是实装用的那块变换。</summary>
+    /// <summary>
+    /// 把姿态写回每个键帽自己的仿射变换。离屏夹具也走这条路径，保证验的就是实装用的那 144 块变换。
+    /// 透视不是「整块板共用一个仿射矩阵」能画出来的：仿射保持平行性，远边永远不比近边短，
+    /// 所以由 <see cref="KeyboardTilt.ApplyPose"/> 把单应逐键压成一阶仿射，144 块拼出梯形轮廓。
+    /// </summary>
     internal void ApplyTilt(double u, double v)
     {
-        if (BoardTilt is null) return;   // InitializeComponent 完成前可能已经被推过值
+        if (!AttachKeyTilts()) return;   // 容器还没生成齐（首次排版前），下一帧再试
         var box = BoardBox;
-        BoardTilt.Matrix = KeyboardTilt.Build(u, v, box.Width, box.Height);
+        KeyboardTilt.ApplyPose(u, v, box.Width, box.Height, KeySlots, _keyTilts!);
+    }
+
+    /// <summary>
+    /// 取得（必要时新建）挂在键帽容器上的变换数组。键盘块的容器由 Canvas 面板承载、不虚拟化，
+    /// 一次生成长期复用，所以这个数组只建一次，每帧只改 <see cref="MatrixTransform.Matrix"/>。
+    /// 返回 false 表示还有容器没生成：此时不能写姿态，否则写了一半会让剩下的键帽停在上一帧的位置上。
+    /// </summary>
+    private bool AttachKeyTilts()
+    {
+        var slots = KeySlots;
+        if (_keyTilts is null || _keyTilts.Length != slots.Length) _keyTilts = new MatrixTransform[slots.Length];
+        for (int i = 0; i < slots.Length; i++)
+        {
+            if (BoardHost.ItemContainerGenerator.ContainerFromIndex(i) is not ContentPresenter container) return false;
+            _keyTilts[i] ??= new MatrixTransform();
+            // 容器被重建过则 RenderTransform 会跟着丢掉，按引用比一下重新挂上
+            if (!ReferenceEquals(container.RenderTransform, _keyTilts[i])) container.RenderTransform = _keyTilts[i];
+        }
+        return true;
     }
 
     /// <summary>离屏夹具的另一个缝隙：按固定步长把倾斜动画推完，不必等真渲染帧。</summary>
@@ -490,6 +524,15 @@ public partial class KeyboardHeatmap : UserControl
             bottom = Math.Max(bottom, key.Y + KeyRowHeight);
         }
         return new Rect(left, top, right - left, bottom - top);
+    }
+
+    /// <summary>把每颗键帽的槽位按布局声明算成矩形，供逐键投影用。</summary>
+    private static Rect[] BuildKeySlots()
+    {
+        var slots = new Rect[Layout.Length];
+        for (int i = 0; i < Layout.Length; i++)
+            slots[i] = new Rect(Layout[i].X, Layout[i].Y, Layout[i].Width, KeyRowHeight);
+        return slots;
     }
 
     // ===== 位移窗内的小鼠标图标 =====

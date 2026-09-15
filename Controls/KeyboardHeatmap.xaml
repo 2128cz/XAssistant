@@ -38,13 +38,14 @@
                         <TextBlock x:Name="LegendMaxText" Text="-" Style="{StaticResource HeatmapNote}" FontFamily="Consolas" FontSize="10"/>
                     </StackPanel>
                 </Grid>
-                <!--  上下各留 16 的余量：整块键盘会随敲击倾斜，姿态的外接框靠 KeyboardTilt 的越界回收收在这段空里，不会压到图例行与鼠标行  -->
+                <!--  上下各留 16 的余量：整块键盘会随敲击做透视倾转，姿态的外接框靠 KeyboardTilt 的越界回收收在这段空里，不会压到图例行与鼠标行  -->
                 <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,16,0,16">
-                    <!--  键盘块是倾斜动画的唯一作用对象：只挂 RenderTransform，布局区域一格都不动；
-                        变换以板心为锚，矩阵由 KeyboardTilt 按敲击位置算出  -->
+                    <!--  透视倾转挂在每颗键帽自己的 RenderTransform 上（由代码从 ItemContainerGenerator 取容器后挂上），
+                        键盘块本身不挂变换：一块仿射矩阵保持平行性，画不出「远边比近边短」，
+                        只能把单应逐键近似，让近端键帽大、远端键帽小。键帽的 RenderTransformOrigin 必须留在默认 (0,0)，
+                        因为那块矩阵里已经把「从键帽左上角算起的平移」一并带上了  -->
                     <ItemsControl ItemsSource="{Binding KeyCaps, ElementName=Root}" Width="1120" Height="331"
-                                  x:Name="BoardHost" RenderTransformOrigin="0.5,0.5">
-                        <ItemsControl.RenderTransform><MatrixTransform x:Name="BoardTilt"/></ItemsControl.RenderTransform>
+                                  x:Name="BoardHost">
                         <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                         <ItemsControl.ItemContainerStyle>
                             <Style TargetType="ContentPresenter">

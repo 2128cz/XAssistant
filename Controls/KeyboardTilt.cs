@@ -9,32 +9,39 @@ namespace XAssistant.Controls;
 /// <summary>一组倾斜幅值。各值都是「敲到最边缘的键」时的上限，其余姿态按敲击距离线性缩放。</summary>
 internal readonly record struct TiltLimits(
     double RollDegrees,
-    double ShearDegrees,
     double ForeshortenDegrees,
+    double DepthBoardWidths,
     double SwingPixels,
     double HeadroomX,
     double HeadroomY)
 {
     /// <summary>
-    /// 选用的一组幅值：敲最左 / 最右的键时板子总共歪 6.2°（绕法线转 2.2° + 纵向切变 4.0°），
-    /// 沿敲击方向压掉 cos 26° ≈ 10%，整块板朝敲击方向跟 6 个设计单位。
+    /// 选用的一组幅值：敲最左 / 最右的键时，板子绕视线滚 2.2°（敲击侧在屏幕上沉下去），
+    /// 再绕板内轴倾转 26°（敲击侧退到远处去，正交分量就是压掉 cos 26° ≈ 10%）。
+    /// 相机放在 2.2 个板宽之外，这个距离决定近大远小有多明显：敲最右时退远的右缘纵向尺度只剩约 0.90 倍、
+    /// 就近的左缘涨到约 1.09 倍（夹具实测量到两头差 21%），板子从平行四边形收成梯形。整块板还朝敲击方向跟 6 个设计单位。
     /// 跟随量必须明显小于压缩量，否则上下敲击会把整块板推出原框，读出来不是「收进去」而是「探出去」。
-    /// 余量是键盘框上下左右各允许越出的距离，超出的部分由 <see cref="KeyboardTilt.Build"/> 自动回收。
+    /// 余量是键盘框上下左右各允许越出的距离，超出的部分由 <see cref="KeyboardTilt.BuildPose"/> 自动回收。
     /// </summary>
-    public static readonly TiltLimits Default = new(2.2, 4.0, 26, 6, 26, 26);
+    public static readonly TiltLimits Default = new(2.2, 26, 2.2, 6, 26, 26);
 }
 
 /// <summary>
-/// 键盘热力图的「敲击倾斜」模型：把整块 144 键布局看成一块悬在屏幕前方、由板心吊住的刚性板。
-/// 敲哪个键，板就朝那个方向倾过去——敲左边左边沉，接着敲右边又荡回右边，停手之后回平。
+/// 键盘热力图的「敲击倾斜」模型：把整块 144 键布局看成一块悬在屏幕前方、由板心吊住的刚性板，板前有一个真的相机。
+/// 敲哪个键，那个方向就转到远处去——退远的那一侧键帽变小、行距变窄，近大远小把整块板拉成梯形。
 ///
-/// 姿态矩阵只用仿射四件套拼成，每一项都有明确的几何身份（一切变换都绕板心做）：
-///   平移 T 整块板朝敲击方向跟一点，让敲击点不脱手；
-///   旋转 R 绕屏幕法线转，敲击侧下沉，就是肉眼说出来的「左倾 / 右倾」；
-///   切变 K skewY，竖边仍然保持竖直而两端一高一低，读作「敲击那一侧转到后面去了」；
-///   压缩 F 沿敲击方向按 cos α 缩短：把板绕「过板心且垂直于敲击方向」的轴倾转 α 之后做正交投影，
-///          落在倾转轴上的分量不变、垂直分量恰好乘 cos α，四件套里只有这一项是物理推出来的。
-/// 复合顺序 A = T · R · K · F，最后再按两个轴各回收一次，把倾斜后的外接框压回「键盘框 + 余量」以内，
+/// 为什么不能只用一块仿射矩阵：仿射保持平行性，矩形怎么转都是平行四边形，「远边比近边短」它永远画不出来；
+/// 斜切只能把角歪掉，不能把尺度拉开。所以姿态改成先算单应（3D 倾转 + 透视除法），再把它压到每个键帽自己那一小块上：
+///   键帽中心走精确投影，键帽内部用该处的雅可比做一阶仿射——键帽才几十设计单位宽，
+///   二阶残差不到半个百分点，肉眼不可见，144 块拼起来就是完整的透视轮廓。
+///
+/// 姿态本身只有三个物理量（一切变换都绕板心做）：
+///   倾转 α 绕「过板心且垂直于敲击方向」的板内轴 â 转，敲击侧退远：
+///          落在 â 上的分量不变、沿敲击方向的分量乘 cos α（这就是正交投影下看得到的那截压缩），
+///          而 Z = −sin α·(n̂·p) 正是透视除法要用的纵深。
+///   滚转 γ 绕视线转，敲击侧在屏幕上再沉一点，就是肉眼说出来的「左倾 / 右倾」。
+///   跟随 T 整块板朝敲击方向平移一点，让敲击点不脱手。
+/// 最后按两个轴各回收一次，把投影后的外接框压回「键盘框 + 余量」以内，
 /// 保证姿态再怎么荡都不会越出它所在的那块布局区域。
 ///
 /// 本文件是这套动画的模型层，全部按 internal 收着：几何（<see cref="KeyboardTilt"/>）、
@@ -43,39 +50,101 @@ internal readonly record struct TiltLimits(
 /// </summary>
 internal static class KeyboardTilt
 {
-    /// <summary>按默认幅值算出某个敲击位置对应的姿态矩阵。(0,0) 即板心，返回单位矩阵。</summary>
-    public static Matrix Build(double u, double v, double width, double height) =>
-        Build(u, v, width, height, TiltLimits.Default);
+    /// <summary>雅可比的中心差分步长（设计单位）。相对 1120 的板宽足够小，又远大于浮点噪声。</summary>
+    private const double JacobianStep = 1;
 
-    /// <summary>算出姿态矩阵。<paramref name="u"/> / <paramref name="v"/> 是敲击点相对板心的归一化偏移，板心 0、板边 ±1。</summary>
-    public static Matrix Build(double u, double v, double width, double height, in TiltLimits limits)
+    /// <summary>
+    /// 一次姿态的全部投影参数：一个敲击位置算一份，整帧共用（三角函数只在这里求一次，
+    /// 每个键帽只跑代数）。越界回收的两个系数也在里面，<see cref="Map"/> 顺手带出去。
+    /// </summary>
+    private struct Pose
     {
-        var raw = BuildRaw(u, v, width, height, in limits);
-        if (raw.IsIdentity) return raw;
-        var box = TransformedBox(raw, width, height);
-        // 越界回收：倾得越狠、外接框越大，就把两个轴各自压回去一点，直到刚好塞进「框 + 余量」。
-        // 盯的是「最远端离板心多远」而不是框的边长：平移会把外接框推偏，按边长算是漏的。
-        // 顺带补上了正交投影缺的那点纵深——实物倾过去本来就是会变扁的。
-        double fitX = Math.Min(1, (width / 2 + limits.HeadroomX) / Math.Max(Math.Abs(box.Left), Math.Abs(box.Right)));
-        double fitY = Math.Min(1, (height / 2 + limits.HeadroomY) / Math.Max(Math.Abs(box.Top), Math.Abs(box.Bottom)));
-        if (fitX >= 1 && fitY >= 1) return raw;
-        // 缩放同样绕板心、并且要乘在 raw 之后（q = S·(L·p + t) = (S·L)·p + S·t）。
-        // WPF 的 Matrix 是行向量约定 p' = p·M + offset，逐项乘出来即是：
-        return new Matrix(
-            raw.M11 * fitX, raw.M12 * fitY,
-            raw.M21 * fitX, raw.M22 * fitY,
-            raw.OffsetX * fitX, raw.OffsetY * fitY);
+        /// <summary>敲击方向的板面单位向量，倾转轴就是它的垂直方向 â = (−Ny, Nx)。</summary>
+        public double Nx, Ny;
+
+        /// <summary>倾转角的 cos / sin。</summary>
+        public double Cos, Sin;
+
+        /// <summary>绕视线滚转的 cos / sin。屏幕 y 轴朝下，所以正角就是顺时针。</summary>
+        public double RollCos, RollSin;
+
+        /// <summary>相机到板心的距离（设计单位）。越近透视越狠。</summary>
+        public double Depth;
+
+        /// <summary>整块板朝敲击方向的跟随平移。</summary>
+        public double SwingX, SwingY;
+
+        /// <summary>越界回收：两个轴各一个，1 表示没碰到余量上限。第一轮算 CornerBox 时先置 1，量完再写回真值。</summary>
+        public double FitX, FitY;
+
+        /// <summary>板心坐标（以板心为原点）→ 屏幕坐标，含回收后的最终尺度。</summary>
+        public readonly Point Map(double x, double y)
+        {
+            // 1) 绕板内轴 â 倾转 α：沿敲击方向的分量退到屏幕里（Z 为负即更远），轴上分量不变
+            double along = Nx * x + Ny * y;
+            double axis = -Ny * x + Nx * y;
+            double keep = 1 - Cos;
+            double px = x * Cos - Ny * axis * keep;
+            double py = y * Cos + Nx * axis * keep;
+            // 2) 透视除法：相机在板心正前方 Depth 处，Z 为正即朝镜头，分母变小就是放大
+            double w = 1 + Sin * along / Depth;
+            px /= w;
+            py /= w;
+            // 3) 绕视线滚一点，4) 朝敲击方向跟随，5) 越界回收
+            double rx = px * RollCos - py * RollSin;
+            double ry = px * RollSin + py * RollCos;
+            return new Point((rx + SwingX) * FitX, (ry + SwingY) * FitY);
+        }
     }
 
-    /// <summary>整块板经过变换后的外接框，坐标以板心为原点。仿射把矩形映成平行四边形，极值必在四角，故只取四角。</summary>
-    public static Rect TransformedBox(Matrix matrix, double width, double height)
+    /// <summary>算出姿态的投影参数，并把四角落到的外接框回收进「板框 + 余量」。</summary>
+    private static Pose BuildPose(double u, double v, double width, double height, in TiltLimits limits)
+    {
+        u = Math.Clamp(u, -1, 1);
+        v = Math.Clamp(v, -1, 1);
+        var pose = new Pose
+        {
+            Depth = limits.DepthBoardWidths * width,
+            SwingX = limits.SwingPixels * u,
+            SwingY = limits.SwingPixels * v,
+            FitX = 1,
+            FitY = 1,
+        };
+        double roll = DegreesToRadians(limits.RollDegrees) * u;
+        pose.RollCos = Math.Cos(roll);
+        pose.RollSin = Math.Sin(roll);
+        // 敲击距离：板心附近几乎不倾，角落键与边缘中点一样封顶，不让斜向敲击额外疯
+        double distance = Math.Min(1, Math.Sqrt(u * u + v * v));
+        double offsetX = u * width / 2, offsetY = v * height / 2;
+        double length = Math.Sqrt(offsetX * offsetX + offsetY * offsetY);
+        if (distance >= 0.001 && length > 0)
+        {
+            pose.Nx = offsetX / length;
+            pose.Ny = offsetY / length;
+            double alpha = DegreesToRadians(limits.ForeshortenDegrees) * distance;
+            pose.Cos = Math.Cos(alpha);
+            pose.Sin = Math.Sin(alpha);
+        }
+        else
+        {
+            pose.Cos = 1;
+            pose.Sin = 0;
+        }
+        // 越界回收：盯的是「最远端离板心多远」而不是框的边长——平移会把外接框推偏，按边长算是漏的。
+        // 键帽铺满整块板，所以拿板框四角投影就是保守的外接框，不会算少。
+        var box = CornerBox(pose, width, height);
+        pose.FitX = Math.Min(1, (width / 2 + limits.HeadroomX) / Math.Max(Math.Abs(box.Left), Math.Abs(box.Right)));
+        pose.FitY = Math.Min(1, (height / 2 + limits.HeadroomY) / Math.Max(Math.Abs(box.Top), Math.Abs(box.Bottom)));
+        return pose;
+    }
+
+    /// <summary>把板框四角投影后的外接框，坐标以板心为原点。单应把矩形映成梯形，极值仍在四角。</summary>
+    private static Rect CornerBox(in Pose pose, double width, double height)
     {
         double left = double.MaxValue, top = double.MaxValue, right = double.MinValue, bottom = double.MinValue;
         for (int corner = 0; corner < 4; corner++)
         {
-            var point = matrix.Transform(new Point(
-                (corner & 1) == 0 ? -width / 2 : width / 2,
-                (corner & 2) == 0 ? -height / 2 : height / 2));
+            var point = pose.Map((corner & 1) == 0 ? -width / 2 : width / 2, (corner & 2) == 0 ? -height / 2 : height / 2);
             left = Math.Min(left, point.X);
             right = Math.Max(right, point.X);
             top = Math.Min(top, point.Y);
@@ -84,7 +153,70 @@ internal static class KeyboardTilt
         return new Rect(left, top, right - left, bottom - top);
     }
 
-    /// <summary>把键帽中心换算成归一化敲击向量：板心 (0,0)，左右上下四边 ±1。</summary>
+    /// <summary>默认幅值下整块板的外接框。</summary>
+    public static Rect PoseBox(double u, double v, double width, double height) =>
+        PoseBox(u, v, width, height, TiltLimits.Default);
+
+    /// <summary>
+    /// 把画布坐标下的一个点按姿态精确投影，结果仍回到画布坐标。留给离屏夹具：
+    /// 逐键一阶仿射实绘出的角点与这个精确投影之间的差就是二阶残差，它必须小到屏幕上看不出来。
+    /// 每次调用重算一份姿态，只在验证里跑，不进渲染帧。
+    /// </summary>
+    public static Point Project(double u, double v, double width, double height, Point canvasPoint)
+    {
+        var mapped = BuildPose(u, v, width, height, TiltLimits.Default)
+            .Map(canvasPoint.X - width / 2, canvasPoint.Y - height / 2);
+        return new Point(mapped.X + width / 2, mapped.Y + height / 2);
+    }
+
+    /// <summary>姿态下整块板的外接框（已含越界回收），坐标以板心为原点。离屏夹具拿它对量实绘位置。</summary>
+    public static Rect PoseBox(double u, double v, double width, double height, in TiltLimits limits) =>
+        CornerBox(BuildPose(u, v, width, height, limits), width, height);
+
+    /// <summary>按默认幅值把姿态压到每个键帽上。</summary>
+    public static void ApplyPose(double u, double v, double width, double height,
+        ReadOnlySpan<Rect> slots, MatrixTransform[] transforms) =>
+        ApplyPose(u, v, width, height, slots, transforms, TiltLimits.Default);
+
+    /// <summary>
+    /// 把姿态压到每个键帽上，结果写进 <paramref name="transforms"/>（与 <paramref name="slots"/> 同序）。
+    /// <paramref name="slots"/> 是键帽在画布坐标里的槽位（Canvas.Left / Top 加自身宽高），与板框同一原点。
+    /// RenderTransform 不改布局槽位，所以平移量要算成「目标位置 − 槽位左上角」。
+    /// </summary>
+    public static void ApplyPose(double u, double v, double width, double height,
+        ReadOnlySpan<Rect> slots, MatrixTransform[] transforms, in TiltLimits limits)
+    {
+        if (u == 0 && v == 0)
+        {
+            // 静置：精确写回单位矩阵，不留浮点尾巴（下次加载进来是平的、夹具判归位都靠这条）
+            for (int i = 0; i < transforms.Length; i++) transforms[i].Matrix = Matrix.Identity;
+            return;
+        }
+        var pose = BuildPose(u, v, width, height, in limits);
+        const double step = JacobianStep;
+        for (int i = 0; i < slots.Length && i < transforms.Length; i++)
+        {
+            var slot = slots[i];
+            double qx = slot.Width / 2, qy = slot.Height / 2;
+            // 键帽中心的板心坐标
+            double cx = slot.X + qx - width / 2, cy = slot.Y + qy - height / 2;
+            var center = pose.Map(cx, cy);
+            // 键帽很小，把它那一块的单应压成一阶仿射：中心走精确投影，四周用中心处的雅可比
+            var right = pose.Map(cx + step, cy);
+            var left = pose.Map(cx - step, cy);
+            var down = pose.Map(cx, cy + step);
+            var up = pose.Map(cx, cy - step);
+            double j11 = (right.X - left.X) / (2 * step), j12 = (down.X - up.X) / (2 * step);
+            double j21 = (right.Y - left.Y) / (2 * step), j22 = (down.Y - up.Y) / (2 * step);
+            // WPF 存的是数学矩阵的转置（x' = x·M11 + y·M21），而平移要相对键帽左上角
+            transforms[i].Matrix = new Matrix(
+                j11, j21, j12, j22,
+                center.X + width / 2 - slot.X - (j11 * qx + j12 * qy),
+                center.Y + height / 2 - slot.Y - (j21 * qx + j22 * qy));
+        }
+    }
+
+    /// <summary>把键名换算成归一化敲击向量：板心 (0,0)，左右上下四边 ±1。</summary>
     public static (double U, double V) PressVector(Point keyCenter, Rect board)
     {
         if (board.Width <= 0 || board.Height <= 0) return (0, 0);
@@ -92,47 +224,6 @@ internal static class KeyboardTilt
             (keyCenter.X - board.X - board.Width / 2) * 2 / board.Width,
             (keyCenter.Y - board.Y - board.Height / 2) * 2 / board.Height);
     }
-
-    /// <summary>四件套依次相乘，不做越界回收；单独留给验证用。</summary>
-    private static Matrix BuildRaw(double u, double v, double width, double height, in TiltLimits limits)
-    {
-        u = Math.Clamp(u, -1, 1);
-        v = Math.Clamp(v, -1, 1);
-        // 敲击距离：板心附近几乎不倾，角落键与边缘中点一样封顶，不让斜向敲击额外疯
-        double distance = Math.Min(1, Math.Sqrt(u * u + v * v));
-        if (distance < 0.001) return Matrix.Identity;
-
-        // 压缩方向取板面像素方向上的单位向量：敲上边压纵向、敲左边压横向、敲角落压斜向
-        double offsetX = u * width / 2, offsetY = v * height / 2;
-        double length = Math.Sqrt(offsetX * offsetX + offsetY * offsetY);
-        double nx = offsetX / length, ny = offsetY / length;
-        double cos = Math.Cos(DegreesToRadians(limits.ForeshortenDegrees) * distance);
-        // F = I + (cos α − 1)·n̂n̂ᵀ，行主序 [a b; c d]
-        var squash = (
-            1 + (cos - 1) * nx * nx, (cos - 1) * nx * ny,
-            (cos - 1) * nx * ny, 1 + (cos - 1) * ny * ny);
-
-        // 屏幕 y 轴朝下，所以数学上的正角在屏幕上就是顺时针：敲右边 u>0 → 右边下沉，敲左边反号
-        double roll = DegreesToRadians(limits.RollDegrees) * u;
-        var rotate = (Math.Cos(roll), -Math.Sin(roll), Math.Sin(roll), Math.Cos(roll));
-        // y' = y + x·tan β：竖边保持竖直，横边歪斜，正是绕竖直轴转身在仿射下的骨架
-        double shear = DegreesToRadians(limits.ShearDegrees) * u;
-        var skew = (1d, 0d, Math.Tan(shear), 1d);
-
-        var linear = Multiply(Multiply(rotate, skew), squash);
-        // WPF 存的是数学矩阵的转置：x' = x·M11 + y·M21，y' = x·M12 + y·M22
-        return new Matrix(linear.a, linear.c, linear.b, linear.d,
-            limits.SwingPixels * u, limits.SwingPixels * v);
-    }
-
-    /// <summary>行主序 2×2 相乘，列向量约定 p' = L·p，因此越靠左的矩阵越晚施加。</summary>
-    private static (double a, double b, double c, double d) Multiply(
-        (double a, double b, double c, double d) left, (double a, double b, double c, double d) right) =>
-        (
-            left.a * right.a + left.b * right.c,
-            left.a * right.b + left.b * right.d,
-            left.c * right.a + left.d * right.c,
-            left.c * right.b + left.d * right.d);
 
     private static double DegreesToRadians(double degrees) => degrees * Math.PI / 180;
 }
