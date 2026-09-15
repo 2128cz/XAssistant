@@ -3,11 +3,15 @@
  <UserControl.Resources>
   <Style x:Key="Letter" TargetType="TextBlock"><Setter Property="FontFamily" Value="Consolas"/><Setter Property="FontSize" Value="22"/><Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/><Style.Triggers><DataTrigger Binding="{Binding IsCorrect}" Value="True"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></DataTrigger><DataTrigger Binding="{Binding IsWrong}" Value="True"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}"/></DataTrigger><DataTrigger Binding="{Binding DataContext.HasError, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Value="True"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}"/></DataTrigger></Style.Triggers></Style>
  </UserControl.Resources>
- <Border BorderBrush="#66DCC99D" BorderThickness="0,1" Background="{DynamicResource CardBackground}" Padding="18,16" IsEnabled="{Binding HasContent}">
+ <!-- 只算内容块：边框、背景与留白由调用方（工作台那块板的格子）给，不再自己套一层浮卡 -->
+ <Border Background="Transparent" Padding="0" IsEnabled="{Binding HasContent}">
   <StackPanel>
    <DockPanel LastChildFill="True">
     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" ToolTip="{Binding FilterNote}"><ComboBox Width="92" ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}" Margin="0,0,8,0"/><ComboBox Width="128" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" Margin="0,0,8,0"/><Button Focusable="False" Content="清空" Command="{Binding ClearInputCommand}" Margin="0,0,8,0"/><Button Focusable="False" Content="换一句 ↗" Command="{Binding NextSentenceCommand}"/></StackPanel>
-    <StackPanel><TextBlock Text="VERSE / 随机练习" FontFamily="Consolas" Foreground="{DynamicResource TextSecondary}" FontSize="11"/><TextBlock Text="{Binding SourceText}" FontSize="11" Foreground="{DynamicResource TextHint}" Margin="0,5,8,0" TextWrapping="Wrap"/></StackPanel>
+    <StackPanel><TextBlock Text="VERSE / 随机练习" FontFamily="Consolas" Foreground="{DynamicResource TextSecondary}" FontSize="11"/><TextBlock Text="{Binding SourceText}" FontSize="11" Foreground="{DynamicResource TextHint}" Margin="0,5,8,0" TextWrapping="Wrap"/>
+     <!-- 题库里被黑名单剔掉的不可见字符：静默吞掉就等于把数据问题藏起来，念出来才有人去改源文件。干净时整行折叠 -->
+     <TextBlock Text="{Binding CatalogWarning}" FontSize="10" Foreground="{DynamicResource DangerBrush}" Margin="0,4,8,0" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding HasCatalogWarning}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+    </StackPanel>
    </DockPanel>
    <ItemsControl ItemsSource="{Binding Words}" Margin="0,18,0,12">
     <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>

@@ -145,6 +145,13 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
     public string SourceText => CurrentSentence == null ? "题库不可用"
         : $"{CurrentSentence.Language} · {CurrentSentence.Category} · {CurrentSentence.Source}";
     public string Translation => CurrentSentence?.Translation ?? "请检查 Assets/Practice/ 下的题库目录";
+    /// <summary>
+    /// 题库里被黑名单洗掉的字符（控制字符、零宽、怪空白）。不静默吞：它们会虚增字符数、
+    /// 把注音的斜杠判定带偏，报出来才有人去改源文件。空串表示题库干净。
+    /// </summary>
+    public string CatalogWarning { get; }
+    /// <summary>那行警告要不要占位。空串时整行折叠，不留一行高的空白。</summary>
+    public bool HasCatalogWarning => CatalogWarning.Length > 0;
     /// <summary>当前句式的拼写约定，悬停在筛选下拉上显示。</summary>
     public string FilterNote => CurrentSentence?.Note ?? "";
 
@@ -170,6 +177,9 @@ public partial class PracticeViewModel : ObservableObject, IDisposable
         _catalog = catalog;
         _store = store;
         if (catalog.Sentences.Count > 0) catalog.Validate();
+        CatalogWarning = catalog.IgnorableFindings.Count == 0 ? ""
+            : $"题库里有 {catalog.IgnorableFindings.Count} 处控制字符 / 零宽 / 怪空白已按黑名单洗掉：{string.Join("；", catalog.IgnorableFindings.Take(3))}"
+              + (catalog.IgnorableFindings.Count > 3 ? " 等" : "");
         Languages = new[] { "全部" }.Concat(catalog.Sentences.Select(s => s.Language).Distinct(StringComparer.Ordinal)).ToArray();
         RebuildCategories();
         try { _ledger = store.Load(); }
@@ -334,10 +344,19 @@ public partial class PracticeWordState : ObservableObject
     [ObservableProperty] private bool _hasError;
     public PracticeWordState(PracticeWord word, bool mask)
     {
-        // 拉丁字符是音标，得包在 /…/ 里；假名与汉字本身就是要读的正文，再加斜杠反而认不出来
-        Annotation = word.Annotation.All(char.IsAscii) ? "/" + word.Annotation.Trim('/') + "/" : word.Annotation;
+        // 注音不参与字符统计（要敲的只有 text + suffix），它只决定卡片上方怎么显示：
+        // 音标包进 /…/，假名 / 汉字本身就是要读的正文，再加斜杠反而认不出来。
+        // 判定走排除法（IsReadingScript），不是「整串是不是 ASCII」的白名单：
+        // 英语音标的 ː ð ʌ ə 都不在 ASCII，白名单会把它们当成假名，斜杠就这么丢了。
+        // 这里再洗一遍是防御：绕开加载器拼出来的题库也不能带着控制字符上屏。
+        string annotation = PracticeText.Sanitize(word.Annotation);
+        // 一个字母都没有的注音（破折号、省略号这类占位）不是读音，别给它套上音标壳
+        Annotation = PracticeText.IsReadingScript(annotation) || !annotation.Any(char.IsLetter)
+            ? annotation
+            : "/" + annotation.Trim('/') + "/";
         // 悬停提示不能泄露答案：闭卷时左边给假名，不写罗马音
-        Translation = (mask ? word.Annotation : word.Text) + " = " + word.Translation;
+        Translation = (mask ? annotation : word.Text) + " = " + word.Translation;
+        // 逐格只数要敲的字符：注音里的任何字符都不进这把计数
         Characters = new((word.Text + word.Suffix).Select(c => new PracticeCharacter(c.ToString(), mask)));
     }
 }

@@ -59,10 +59,34 @@ public sealed class PracticeScoreStore(string filePath) : IPracticeScoreStore
                 sentence.Category = name;
                 sentence.Note = parsed.Note?.Trim() ?? "";
                 sentence.Mask = parsed.Mask;
+                // 逐字段过一遍黑名单：控制字符与零宽这类不可见字符会虚增字符数（正文里就是一格敲不上的死位），
+                // 落在注音里则会把「这是音标还是正文」的判定带偏（斜杠就是这么丢的）。剔掉什么一律记账。
+                var where = $"{relative} · {sentence.Id}";
+                sentence.Id = Clean(sentence.Id, $"{where} ID", catalog.IgnorableFindings);
+                sentence.Source = Clean(sentence.Source, $"{where} 出处", catalog.IgnorableFindings);
+                sentence.SourceUrl = Clean(sentence.SourceUrl, $"{where} 链接", catalog.IgnorableFindings);
+                sentence.Translation = Clean(sentence.Translation, $"{where} 译文", catalog.IgnorableFindings);
+                sentence.Note = Clean(sentence.Note, $"{where} 约定", catalog.IgnorableFindings);
+                foreach (var word in sentence.Words)
+                {
+                    word.Text = Clean(word.Text, $"{where} 正文", catalog.IgnorableFindings);
+                    word.Suffix = Clean(word.Suffix, $"{where} 标点", catalog.IgnorableFindings);
+                    word.Annotation = Clean(word.Annotation, $"{where} 注音", catalog.IgnorableFindings);
+                    word.Translation = Clean(word.Translation, $"{where} 词义", catalog.IgnorableFindings);
+                }
                 catalog.Sentences.Add(sentence);
             }
         }
         catalog.Validate();
         return catalog;
+    }
+
+    /// <summary>洗一个字段，顺手把被洗掉的码位按「位置 → 码位」记进题库的账上。</summary>
+    static string Clean(string? value, string where, List<string> findings)
+    {
+        var notes = new List<string>();
+        string clean = PracticeText.Sanitize(value, notes);
+        if (notes.Count > 0) findings.Add($"{where} 洗掉了 {string.Join("、", notes.Distinct().Order())}");
+        return clean;
     }
 }

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using System.IO;
 
@@ -7,6 +8,11 @@ public sealed class PracticeCatalog
 {
     public int Version { get; set; } = 1;
     public List<PracticeSentence> Sentences { get; set; } = [];
+    /// <summary>
+    /// 加载时被黑名单洗掉的不可见字符与怪空白，按「文件 · 句 · 字段 → 码位」记下来。
+    /// 洗不能静默：题库里混进了什么只有报出来才有人去改源文件。
+    /// </summary>
+    public List<string> IgnorableFindings { get; } = [];
     public void Validate()
     {
         if (Version != 1 || Sentences is not { Count: > 0 }) throw new InvalidDataException("题库版本不支持或没有题目。");
@@ -19,6 +25,11 @@ public sealed class PracticeCatalog
             // 分类以文件位置为凭：语言 = 一级目录，句式 = 文件名。绕过加载器拼出来的题库视为脏数据。
             if (string.IsNullOrWhiteSpace(sentence.Language) || string.IsNullOrWhiteSpace(sentence.Category))
                 throw new InvalidDataException($"题目 {sentence.Id} 缺少语言或句式分类，必须由题库目录结构赋值。");
+            // 不可见字符先报：\n 也是空白，排在后面就会被「单词缺少文本」那条误报成缺字段，
+            // 报错了地方人就找不到真因。判据与 PracticeText.Sanitize 同一份，不各写一套。
+            var invisible = PracticeText.IgnorableCodePoints(sentence.Text);
+            if (invisible.Count > 0)
+                throw new InvalidDataException($"题目 {sentence.Id} 的正文含不可见字符 {string.Join("、", invisible.Distinct().Order())}，必须先过 PracticeText.Sanitize。");
             if (sentence.Words.Any(word => word == null || string.IsNullOrWhiteSpace(word.Text) || word.Text.Any(char.IsWhiteSpace)
                 || string.IsNullOrWhiteSpace(word.Annotation) || string.IsNullOrWhiteSpace(word.Translation)))
                 throw new InvalidDataException($"题目 {sentence.Id} 的单词缺少文本、注音或释义。");
@@ -147,4 +158,53 @@ public static class PracticeText
 
     /// <summary>逐位比对：折叠后只区分大小写，与 <see cref="Equal"/> 的口径一致。</summary>
     public static bool EqualChar(char left, char right) => char.ToUpperInvariant(Fold(left)) == char.ToUpperInvariant(Fold(right));
+
+    /// <summary>
+    /// 黑名单之一：一律剔除的不可见字符。控制字符整段按 <see cref="char.IsControl"/> 认
+    /// （U+0000–U+001F 与 U+007F–U+009F，包括被 JSON 转义混进来的 \n \r \t 与 C1 段），
+    /// 零宽、方向标记、软连字符、BOM 这些「看着是空白、其实占一格」的格式字符按码位列出来。
+    /// 它们会虚增字符数，让进度永远好不到 N/N，所以正文与注音都不收。
+    /// </summary>
+    public static bool IsIgnorable(char c) => char.IsControl(c)
+        || c is '\u200B' or '\u200C' or '\u200D' or '\u200E' or '\u200F'
+            or '\u2060' or '\u2061' or '\u2062' or '\u2063' or '\u2064' or '\uFEFF' or '\u00AD';
+
+    /// <summary>
+    /// 黑名单之二：五花八门的怪空白。它们不该占一格，但删掉会把两个词粘成一个，所以折回半角空格
+    /// （U+3000 表意空格已经在 <see cref="Fold"/> 里折成空格，不重列）。
+    /// </summary>
+    public static bool IsStraySpace(char c) => c is '\u00A0' or '\u1680' or '\u2007' or '\u202F' or '\u205F' or '\u180E';
+
+    /// <summary>按黑名单洗一遍文本：不可见剔除、怪空白折成半角空格。notes 收集被改动的码位供加载器记账。</summary>
+    public static string Sanitize(string? text, List<string>? notes = null)
+    {
+        if (string.IsNullOrEmpty(text)) return text ?? "";
+        var buffer = new StringBuilder(text.Length);
+        foreach (char c in text)
+        {
+            if (IsIgnorable(c)) { notes?.Add($"U+{(int)c:X4}"); continue; }
+            if (IsStraySpace(c)) notes?.Add($"U+{(int)c:X4}→空格");
+            buffer.Append(IsStraySpace(c) ? ' ' : c);
+        }
+        return buffer.ToString();
+    }
+
+    /// <summary>文本里残留的不可见字符与怪空白码位。校验用，与 <see cref="Sanitize"/> 共用同一份判据。</summary>
+    public static List<string> IgnorableCodePoints(string text)
+    {
+        var found = new List<string>();
+        Sanitize(text, found);
+        return found;
+    }
+
+    /// <summary>
+    /// 注音是不是「本身就要读的正文」：假名、汉字、谚文、长音符与 CJK 符号标点。
+    /// 判定走排除法，不是「整串是不是 ASCII」那种白名单——英语音标里的 ː ð ʌ ə 都不在 ASCII，
+    /// 白名单会把它们当成假名，斜杠就这么丢了（注音不参与要敲的字符统计，它只决定怎么显示）。
+    /// </summary>
+    public static bool IsReadingScript(string text) => text.Any(c =>
+        c is '\u30FC' or '\u30FB' or '\uFF61' or '\uFF9E' or '\uFF9F'
+        || c >= '\u2E80' && c <= '\u9FFF'     // CJK 部首、假名、汉字、CJK 标点连成一段
+        || c >= '\uAC00' && c <= '\uD7A3'     // 谚文音节与谚文字母
+        || c >= '\uF900' && c <= '\uFAFF');   // CJK 兼容表意文字
 }
