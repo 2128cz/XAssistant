@@ -79,21 +79,42 @@ try {
         if ($s.Length -gt $n) { $s.Substring(0, $n) + '…' } else { $s }
     }
 
-    # 事件带来的上下文：cwd 叶名是项目，transcript 首条用户消息就是对话标题（流式只读前几行）
+    # 事件带来的上下文：cwd 叶名是项目；对话标题读 IDE 的 state.vscdb（tasks 里 id→name 的真实任务名，
+    # 不是首句对话内容——拿内容当标题会把聊天原文晒到屏幕上，用户明确不要）。
+    # vscdb 被 IDE 独占，用 FileShare.ReadWrite 开流拷出来查；Latin1 字节↔字符 1:1，IndexOf 秒级
     $project = if ($evt.cwd) { Split-Path $evt.cwd -Leaf } else { '' }
-    function Get-SessionTitle([string]$path) {
-        if (-not $path -or -not (Test-Path $path)) { return '' }
+    $DbPaths = @{
+        'qoder'      = Join-Path $env:APPDATA 'QoderCN\User\globalStorage\state.vscdb'
+        'trae'       = Join-Path $env:APPDATA 'Trae CN\User\globalStorage\state.vscdb'
+        'trae-intl'  = Join-Path $env:APPDATA 'Trae\User\globalStorage\state.vscdb'
+    }
+    function Get-TaskTitle([string]$sessionId, [string]$db) {
+        if (-not $sessionId -or -not $db -or -not (Test-Path $db)) { return '' }
         try {
-            foreach ($line in (Get-Content $path -TotalCount 12 -Encoding UTF8)) {
-                $o = $line | ConvertFrom-Json
-                if ($o.type -eq 'user' -and $o.message.content -is [string]) {
-                    return (Cut ([string]$o.message.content) 24)   # 标题只取一小截，认得出是哪场对话就够
-                }
+            $fs = [IO.File]::Open($db, 'Open', 'Read', 'ReadWrite')
+            $bytes = New-Object byte[] $fs.Length
+            [void]$fs.Read($bytes, 0, $bytes.Length)
+            $fs.Dispose()
+        } catch { return '' }
+        $latin = [Text.Encoding]::GetEncoding('ISO-8859-1').GetString($bytes)
+        $taskId = $sessionId -replace '\.session\..*$', ''
+        $anchor = '"' + $taskId + '"'
+        $i = $latin.IndexOf($anchor)
+        while ($i -ge 0) {
+            # 同一个任务对象里 id 在前、name/title 在后；窗口 900 字节够跨到
+            $seg = $latin.Substring($i, [Math]::Min(900, $latin.Length - $i))
+            $m = [regex]::Match($seg, '"(?:name|title)":"([^"]{1,80})"')
+            if ($m.Success) {
+                # 值里的中文是 UTF-8 字节被 Latin1 原样映射，还原字节再正确解码
+                $vb = [Text.Encoding]::GetEncoding('ISO-8859-1').GetBytes($m.Groups[1].Value)
+                $title = ([Text.Encoding]::UTF8.GetString($vb) -replace '[\r\n\t]+', ' ').Trim()
+                if ($title) { return $title }
             }
-        } catch { }
+            $i = $latin.IndexOf($anchor, $i + 1)
+        }
         return ''
     }
-    $dialog = Get-SessionTitle ([string]$evt.transcript_path)
+    $dialog = Get-TaskTitle ([string]$evt.session_id) $DbPaths[$Platform]
 
     # 文案格式固定为「事件词 · 请求人类介入：项目 · “对话标题” · 细节」，缺哪段省哪段
     $who = @()
@@ -125,9 +146,12 @@ try {
             Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"中断 · 请求人类介入$ctx$detail`""
         }
         'PostToolUseFailure' {
-            $why = Cut $evt.error 48
+            # 报错只留定位信息：code = NNNNN 优先（IDE 错误都带这个码），其次错误首句——回复/详情原文不上屏
+            $errText = Clean ([string]$evt.error)
+            $code = if ($errText -match 'code\s*=\s*(\d+)') { 'code ' + $Matches[1] } elseif ($errText) { Cut $errText 40 } else { '' }
+            if (-not $code) { $code = Cut $evt.tool_name 30 }
             $lead = if ($evt.is_interrupt) { '中断' } else { '故障' }
-            $detail = if ($why) { ' · ' + $why } else { '' }
+            $detail = if ($code) { ' · ' + $code } else { '' }
             Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$lead · 请求人类介入$ctx$detail`""
         }
         'PermissionRequest' {

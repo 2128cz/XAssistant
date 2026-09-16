@@ -120,7 +120,7 @@ xa -s <色|类型> [持续 [淡入 [淡出]]] [-border on|off [渐宽 [延伸 [�
 | 需人工接管（黄） | `PermissionRequest`、`Notification`（确认/提问类通知，**未知类型宁可多报不漏**） | 黄带「提问 / 接管 / 授权(工具) · 请求人类介入：项目 · “标题”」+ 消息卡 |
 | 对话结束（普通） | `Stop` | info 色「回复 · 已完成：项目 · “标题”」，5 秒 |
 
-文案格式固定为「事件词 · 行动指令：上下文」：项目名取事件 `cwd` 的叶目录，对话标题读 `transcript_path` 会话文件的首条用户消息（截 24 字），多项目并行时一眼看出是哪场对话卡住了；事件自带的机器码文案（如 `AskUserQuestion`）映射到事件词，缺哪段省哪段。提醒文案里不写颜色词，颜色由效果本身表达。
+文案格式固定为「事件词 · 行动指令：上下文」：项目名取事件 `cwd` 的叶目录；对话标题拿事件 `session_id` 去 IDE 的 `state.vscdb` 查真实任务名（就是对话列表里显示的那个名字，vscdb 被 IDE 独占所以用 FileShare.ReadWrite 开流拷字节查；查不到就整段省略）——**不把对话内容晒上屏**，曾拿 transcript 首句当标题把聊天原文弹到了桌面上，这是明确要避免的；报错只留定位信息（`code = 40441` 这类错误码优先，其次错误首句截断）。多项目并行时一眼看出是哪场对话卡住了；事件自带的机器码文案（如 `AskUserQuestion`）映射到事件词，缺哪段省哪段。提醒文案里不写颜色词，颜色由效果本身表达。
 
 **各平台的事件集合不一样，装错了等于没装**：Claude Code / Qoder 挂全套 4 事件；Trae 官方只有 6 个事件（没有 `PermissionRequest`/`PostToolUseFailure`，挂上去永不触发），它的「等待确认」与「任务完成」都用 `Notification(idle_prompt)` 发——所以安装器按平台落地不同事件集，`agent-status.ps1` 里 `idle_prompt` 也按平台分流（Trae 当完成静默交给 Stop，其他平台当空闲等人归黄）。
 
@@ -134,7 +134,7 @@ powershell -ExecutionPolicy Bypass -File mcp\agent-hooks\install-agent-hooks.ps1
 powershell -ExecutionPolicy Bypass -File mcp\agent-hooks\install-agent-hooks.ps1 -Platform qoder -Remove           # 拆
 ```
 
-脚本拷到各配置根的 `hooks\agent-status.ps1`，只增删指向它的条目（你自己挂的别家 hooks 原样保留、先备份 `.bak`），命令自动带 `-from <平台>` 让消息卡认得出来源。**Qoder / Claude Code 的 hooks 不支持热重载，装完重启 IDE 生效**（Trae 改完建议也重启一次；IDE 自动更新可能把配置改旧或把主程序带走，更新后没提醒先重跑安装脚本并确认 XAssistant 在跑）。每次触发都把原始事件 JSON 记进 `%LOCALAPPDATA%\XAssistant\agent-hooks\agent-status.log`，字段对不上时拿它校准；脚本按 **UTF-8 直读 stdin**（PowerShell 控制台默认拿系统 GBK 码页解码，而 Stop 事件带着回复全文 `last_assistant_message`——中文一花 JSON 结构就碎，曾把正常结束误报成红档「事件数据不完整」），真遇到截断时也是正则捞回事件名报红而非静默吞。提醒脚本永远 `exit 0`，再坏也不会阻断对话。改完 `mcp/agent-hooks/` 里的脚本跑一次 `selftest.ps1`（42 项断言：装/幂等/结构自适应/拆卸不伤用户条目/各平台事件分诊与静默/来源标记）。新装 IDE 想上徽章：跑 `extract-ide-icons.ps1` 重抽一轮图标。
+脚本拷到各配置根的 `hooks\agent-status.ps1`，只增删指向它的条目（你自己挂的别家 hooks 原样保留、先备份 `.bak`），命令自动带 `-from <平台>` 让消息卡认得出来源。**Qoder / Claude Code 的 hooks 不支持热重载，装完重启 IDE 生效**（Trae 改完建议也重启一次；IDE 自动更新可能把配置改旧或把主程序带走，更新后没提醒先重跑安装脚本并确认 XAssistant 在跑）。每次触发都把原始事件 JSON 记进 `%LOCALAPPDATA%\XAssistant\agent-hooks\agent-status.log`，字段对不上时拿它校准；脚本按 **UTF-8 直读 stdin**（PowerShell 控制台默认拿系统 GBK 码页解码，而 Stop 事件带着回复全文 `last_assistant_message`——中文一花 JSON 结构就碎，曾把正常结束误报成红档「事件数据不完整」），真遇到截断时也是正则捞回事件名报红而非静默吞。提醒脚本永远 `exit 0`，再坏也不会阻断对话。改完 `mcp/agent-hooks/` 里的脚本跑一次 `selftest.ps1`（44 项断言：装/幂等/结构自适应/拆卸不伤用户条目/各平台事件分诊与静默/来源标记）。新装 IDE 想上徽章：跑 `extract-ide-icons.ps1` 重抽一轮图标。
 
 生效与排查：
 

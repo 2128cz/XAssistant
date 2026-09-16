@@ -183,10 +183,11 @@ Fire '{"hook_event_name":"Stop","cwd":"D:\\repo"}' | Out-Null
 $e = LastEffect
 Check 'Stop → info 档 + 已完成' (($e -match '-s info') -and ($e -match '已完成')) $e
 
-# 真实回归：Qoder 的 Stop 带中文 last_assistant_message，GBK/UTF-8 错配时解析挂→误报红档；修好后必须走 info
+# 真实回归：Qoder 的 Stop 带中文 last_assistant_message，GBK/UTF-8 错配时解析挂→误报红档；修好后必须走 info，
+# 且标题只认 vscdb 任务名——回复原文不得被当标题晒上屏
 Fire '{"hook_event_name":"Stop","cwd":"D:\\repo","last_assistant_message":"没有需要提交的内容，徽章已全部上屏。"}' | Out-Null
 $e = LastEffect
-Check '含中文长回复的 Stop → info 档而非红档「数据不完整」' (($e -match '-s info') -and ($e -notmatch '数据不完整')) $e
+Check '含中文长回复的 Stop → info 档、不晒回复原文' (($e -match '-s info') -and ($e -notmatch '数据不完整') -and ($e -notmatch '没有需要提交')) $e
 
 Fire '{"hook_event_name":"Stop","stop_hook_active":true}' 0 | Out-Null
 Check 'stop_hook_active 的 Stop 静默（防死循环）' ((LineCount) -eq 0) "写到 $(LineCount) 行"
