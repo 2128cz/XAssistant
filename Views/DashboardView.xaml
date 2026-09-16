@@ -32,9 +32,9 @@
   <!--
    ===== 排布的开关 =====
    板本身恒为通栏（三块板依次往下），切换的是每一行内部：够宽时把这一行切成「主体 + 右栏」，
-   不够宽则摞回上下。信号 IsRailSplit（节奏 / 练习 / 记录三行）与 IsHeatRailSplit（热力图行，
-   下限按键帽名不得跌破 8 px 倒推）/ IsOverviewInRow 由 DashboardView 代码按页面实际宽度算，
-   不看显示器横竖屏；VM 只递上设置里那一档的意向（是否否决、是否只看塞得进）。
+   不够宽则摞回上下。四行共用同一个信号 IsRailSplit（另有 IsOverviewInRow 管顶部四卡），
+   由 DashboardView 代码按页面实际宽度算，不看显示器横竖屏；VM 只递上设置里那一档的意向
+   （是否否决、是否只看塞得进）。
    不复制第二份内容——热力图、练习输入框这些控件都带状态，复制一份就是两份订阅、两份焦点。
   -->
   <!-- 顶部四张统计卡：够宽排一排，窗口只有七八百像素时改两列两张，否则 58 号的缩写会被挤到裁字 -->
@@ -59,26 +59,18 @@
    <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="16,14"/>
    <Style.Triggers><DataTrigger Binding="{Binding IsRailSplit, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="BorderThickness" Value="1,0,0,0"/></DataTrigger></Style.Triggers>
   </Style>
-  <!-- 热力图那一行的两格与上面同构，只是判据换成更严的 IsHeatRailSplit（键盘是 1120 设计稿，右边塞进 340
-       就要让出键帽的可读性）。两份样式各自写全而不走 BasedOn：派生样式到底安不继承触发器，
-       不写测试说不清；多那四行 Setter 换来的是读得懂的确定性 -->
-  <Style x:Key="HeatMainCell" TargetType="FrameworkElement"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="16,14"/>
-   <Style.Triggers><DataTrigger Binding="{Binding IsHeatRailSplit, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.ColumnSpan" Value="1"/></DataTrigger></Style.Triggers>
-  </Style>
-  <Style x:Key="HeatRailCell" TargetType="Border">
-   <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="16,14"/>
-   <Style.Triggers><DataTrigger Binding="{Binding IsHeatRailSplit, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="BorderThickness" Value="1,0,0,0"/></DataTrigger></Style.Triggers>
-  </Style>
+  <!-- 热力图行用的就是上面这两份样式：键盘被挤窄后键帽名靠 KeyboardHeatmap 自己的字号补偿拉回可读，
+       所以不再为它单开一份绑到更严判据上的样式。 -->
   <!-- 右栏摊平（整页只有一栏）时，栏内的排行与最近按键再并排一次：
        摊成整页宽的话，34 号的读数会一路飘到板右缘，键名和数字之间全是空；并排后每格只剩半栏宽，
        正好回到分栏时那 340 的口径。极性与上面两条相反——不分栏才是默认值 -->
   <Style x:Key="RailRanking" TargetType="Grid">
    <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Margin" Value="0,0,12,0"/>
-   <Style.Triggers><DataTrigger Binding="{Binding IsHeatRailSplit, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,0,0,12"/></DataTrigger></Style.Triggers>
+   <Style.Triggers><DataTrigger Binding="{Binding IsRailSplit, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,0,0,12"/></DataTrigger></Style.Triggers>
   </Style>
   <Style x:Key="RailRecent" TargetType="Border">
    <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/><Setter Property="BorderThickness" Value="1,0,0,0"/><Setter Property="Margin" Value="12,0,0,0"/>
-   <Style.Triggers><DataTrigger Binding="{Binding IsHeatRailSplit, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Margin" Value="0,12,0,0"/></DataTrigger></Style.Triggers>
+   <Style.Triggers><DataTrigger Binding="{Binding IsRailSplit, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Margin" Value="0,12,0,0"/></DataTrigger></Style.Triggers>
   </Style>
  </ResourceDictionary></UserControl.Resources>
  <StackPanel>
@@ -165,13 +157,13 @@
     </Grid>
     <Border Style="{StaticResource BoardRule}"/>
     <!-- 小格 B · 热力图与它的两份读数：排行、最近按键都读同一时段，贴在键盘右边的栏里，不再各自占满一整块。
-         这一行的分栏下限比其它行严得多（代码里的 HeatRailMinWidth）：键盘是 1120 的设计稿，
-         整页只这一块靠等比缩放读数——右栏再吃 340，键帽名就要掉到 8 px 以下，不如整行留给它。
+         这一行与其它行用同一档分栏判据：键盘是 1120 的设计稿，被挤窄时键帽名由控件自己按缩放补回可读，
+         计数补不回来就收掉——总比整行独占、把两份读数摞到键盘下面去、白占一屏高好。
          右栏宽 340：低于这个数时 34 号的排行读数就要换行 -->
     <Grid>
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="340"/></Grid.ColumnDefinitions>
-     <StackPanel Style="{StaticResource HeatMainCell}">
+     <StackPanel Style="{StaticResource MainCell}">
       <DockPanel Margin="0,0,0,10">
        <ComboBox DockPanel.Dock="Right" Width="120" ItemsSource="{Binding KeyboardPeriodOptions}" SelectedItem="{Binding SelectedKeyboardPeriod}" ToolTip="{Binding PeriodRangeHint}"/>
        <TextBlock Text="键盘热力图" Style="{StaticResource CellHeading}" Margin="0,0,14,0"/>
@@ -191,7 +183,7 @@
       <!--  时段锚点：滚动窗口跟着当前时刻跑，不标起算点就读不出这些数字覆盖哪一段时间  -->
       <DockPanel Margin="0,10,0,0"><TextBlock DockPanel.Dock="Right" Text="刷新 1 s" Style="{StaticResource CellNote}"/><TextBlock Style="{StaticResource CellNote}"><Run Text="◇  "/><Run Text="{Binding PeriodRangeHint, Mode=OneWay}"/><Run Text=" · 热力图与排行共享该时段"/></TextBlock></DockPanel>
      </StackPanel>
-     <Border Style="{StaticResource HeatRailCell}">
+     <Border Style="{StaticResource RailCell}">
       <Grid>
        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>

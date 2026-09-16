@@ -17,6 +17,7 @@ using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
 using Point = System.Windows.Point;
+using Size = System.Windows.Size;
 
 namespace XAssistant.Controls;
 
@@ -125,8 +126,41 @@ public partial class KeyboardHeatmap : UserControl
         Refresh();
     }
 
+    /// <summary>键帽名的设计字号，与 KeyboardHeatmap.xaml 里那个 TextBlock 的原值同值。</summary>
+    private const double DesignLabelFont = 10;
+    private const double DesignCountFont = 8;
+
+    /// <summary>
+    /// 键盘块被 Viewbox 等比缩小后，固定设计字号会跟着一起变小：1120 的设计稿缩到一半时
+    /// 10 号字只剩 5 px 左右，读不出是什么键。所以按实际缩放反算设计字号，
+    /// 保证落在屏幕上的字不低于这个下限。
+    /// </summary>
+    private const double MinLabelPx = 8.5, MinCountPx = 6.5;
+
+    /// <summary>放大上限：字号相对键帽长太大会把键帽糊满，宁可少读两个像素也不挤。</summary>
+    private const double MaxLabelFont = 16, MaxCountFont = 12;
+
+    /// <summary>键盘块在设计单位下的尺寸，与 XAML 里 ItemsControl 的 Width/Height 同值；改一处要同步另一处。</summary>
+    private const double BoardDesignWidth = 1120, BoardDesignHeight = 331;
+
+    /// <summary>
+    /// 排版变化时重算键帽字号：窄布局（右侧摆着排行与最近按键）下键盘会被缩得很小，
+    /// 靠这两个字号把键帽名拉回可读，计数拉不回来就直接收掉（见 <see cref="CountVisibility"/>）。
+    /// </summary>
+    public static readonly DependencyProperty LabelFontSizeProperty = RegisterLayout(nameof(LabelFontSize), DesignLabelFont);
+    public static readonly DependencyProperty CountFontSizeProperty = RegisterLayout(nameof(CountFontSize), DesignCountFont);
+    public static readonly DependencyProperty CountVisibilityProperty = RegisterLayout(nameof(CountVisibility), Visibility.Visible);
+
+    public double LabelFontSize { get => (double)GetValue(LabelFontSizeProperty); set => SetValue(LabelFontSizeProperty, value); }
+    public double CountFontSize { get => (double)GetValue(CountFontSizeProperty); set => SetValue(CountFontSizeProperty, value); }
+    public Visibility CountVisibility { get => (Visibility)GetValue(CountVisibilityProperty); set => SetValue(CountVisibilityProperty, value); }
+
     private static DependencyProperty Register<T>(string name, T value) => DependencyProperty.Register(
         name, typeof(T), typeof(KeyboardHeatmap), new PropertyMetadata(value, VisualPropertyChanged));
+
+    /// <summary>由排版算出来的视觉参数：变了只需重排文字，不该连带重建 144 个键帽的着色。</summary>
+    private static DependencyProperty RegisterLayout<T>(string name, T value) => DependencyProperty.Register(
+        name, typeof(T), typeof(KeyboardHeatmap), new PropertyMetadata(value));
 
     /// <summary>
     /// 高频节拍属性的注册。鼠标侧（取样节拍定义在 ClickCounterViewModel）与键盘侧（每敲一键一次）共用这一条：
@@ -436,6 +470,20 @@ public partial class KeyboardHeatmap : UserControl
 
     /// <summary>键帽行高，与 KeyboardHeatmap.xaml 里 ContentPresenter 的 Height 同值；改一处要同步另一处。</summary>
     private const double KeyRowHeight = 43;
+
+    /// <summary>Viewbox 拿到多大就等于键盘能被画到多大：按实际缩放反算键帽字号。</summary>
+    private void OnBoardSurfaceSizeChanged(object sender, SizeChangedEventArgs e) => ApplyKeyCapFonts(e.NewSize);
+
+    private void ApplyKeyCapFonts(Size available)
+    {
+        if (available.Width <= 1 || available.Height <= 1) return;
+        double scale = Math.Min(available.Width / BoardDesignWidth, available.Height / BoardDesignHeight);
+        // 屏幕上的字号 = 设计字号 × scale，所以反算就是「下限 ÷ scale」
+        LabelFontSize = Math.Clamp(Math.Ceiling(MinLabelPx / scale), DesignLabelFont, MaxLabelFont);
+        CountFontSize = Math.Clamp(Math.Ceiling(MinCountPx / scale), DesignCountFont, MaxCountFont);
+        // 计数是次要信息：放大到上限还读不动就收掉，别把键帽糊成一团
+        CountVisibility = CountFontSize * scale >= MinCountPx ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     /// <summary>
     /// 键盘块在设计单位下的外接框。延迟到首次使用才算：静态字段初始化按声明顺序跑，

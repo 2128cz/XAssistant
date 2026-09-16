@@ -86,11 +86,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     [NotifyPropertyChangedFor(nameof(LayoutModeNote))]
     private bool _isLandscapeScreen = true;
 
-    /// <summary>通用行内分栏的页面宽度下限，与 DashboardView 里的同名常量保持一致。</summary>
+    /// <summary>行内分栏的页面宽度下限，与 DashboardView 里的同名常量保持一致（节奏、热力图、练习、记录四行共用）。</summary>
     private const int RailSplitMinWidth = 940;
-
-    /// <summary>热力图那一行的分栏下限，同样与 DashboardView 同步：键帽名不能掉到 8 px 以下。</summary>
-    private const int HeatRailMinWidth = 1310;
 
     /// <summary>设置区那行说明。不写清判据，用户只会觉得布局开关时灵时不灵。</summary>
     public string LayoutModeNote
@@ -103,8 +100,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
             return SelectedLayoutMode switch
             {
                 "纵向 · 单栏" => $"已固定单栏：整页一列，读数栏摞回主体下方（{screen}）",
-                "横向 · 分栏" => $"已要求尽量分栏：只要 340 的右栏塞得进就拆，不再看键帽字号下限（{screen}）",
-                _ => $"按页面宽度逐行拆：≥ {RailSplitMinWidth} 拆出右栏；热力图行要 ≥ {HeatRailMinWidth}，否则键帽名撑不到 8 px（{screen}）",
+                "横向 · 分栏" => $"已要求尽量分栏：只要 340 的右栏塞得进就拆，不再看可读性下限（{screen}）",
+                _ => $"页面宽 ≥ {RailSplitMinWidth} 就把每一行的子参数拆到右边；节奏、热力图、练习、记录四行同一档，不分横竖屏（{screen}）",
             };
         }
     }

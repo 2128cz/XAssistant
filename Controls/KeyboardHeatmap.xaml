@@ -39,7 +39,8 @@
                     </StackPanel>
                 </Grid>
                 <!--  上下各留 16 的余量：整块键盘会随敲击做透视倾转，姿态的外接框靠 KeyboardTilt 的越界回收收在这段空里，不会压到图例行与鼠标行  -->
-                <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,16,0,16">
+                <Viewbox x:Name="BoardSurface" Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,16,0,16"
+                         SizeChanged="OnBoardSurfaceSizeChanged">
                     <!--  透视倾转挂在每颗键帽自己的 RenderTransform 上（由代码从 ItemContainerGenerator 取容器后挂上），
                         键盘块本身不挂变换：一块仿射矩阵保持平行性，画不出「远边比近边短」，
                         只能把单应逐键近似，让近端键帽大、远端键帽小。键帽的 RenderTransformOrigin 必须留在默认 (0,0)，
@@ -61,10 +62,16 @@
                                         BorderThickness="1" CornerRadius="2" Padding="5,4"
                                         ToolTip="{Binding Tooltip}" ToolTipService.InitialShowDelay="150">
                                     <Grid>
-                                        <TextBlock Text="{Binding Label}" Foreground="{Binding LabelBrush}" FontFamily="Consolas"
-                                                   FontSize="10" FontWeight="SemiBold" VerticalAlignment="Top"/>
-                                        <TextBlock Text="{Binding CountText}" Foreground="{Binding CountBrush}" FontFamily="Consolas"
-                                                   FontSize="8" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                                        <!--  字号绑在控件上：键盘整块被 Viewbox 等比缩小，固定 10 号在窄布局下会掉到 6 px 以下读不动。
+                                            代码按实际缩放反算出一个设计字号，让落在屏幕上的字始终不低于下限（见 LabelFontSize）。  -->
+                                        <TextBlock Text="{Binding Label}" Foreground="{Binding LabelBrush}"
+                                                   FontFamily="Consolas" FontSize="{Binding LabelFontSize, ElementName=Root}"
+                                                   FontWeight="SemiBold" VerticalAlignment="Top"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding CountText}" Foreground="{Binding CountBrush}"
+                                                   FontFamily="Consolas" FontSize="{Binding CountFontSize, ElementName=Root}"
+                                                   Visibility="{Binding CountVisibility, ElementName=Root}"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
