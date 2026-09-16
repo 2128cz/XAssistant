@@ -30,8 +30,8 @@ public readonly record struct SlashCommand(SlashTone Tone, double Seconds, int B
 /// </summary>
 public static class SlashParser
 {
-    /// <summary>不写时长时的默认显示秒数。</summary>
-    public const double DefaultSeconds = 2.4;
+    /// <summary>不写时长时的默认显示秒数：= 淡入 1 s + 持续 5 s + 淡出 1 s（EffectsWindow 的默认节奏，改一处要同步另一处）。</summary>
+    public const double DefaultSeconds = 7.0;
 
     /// <summary>闪烁次数上限：再多就成频闪，看着难受也不礼貌。</summary>
     public const int MaxBlinks = 5;

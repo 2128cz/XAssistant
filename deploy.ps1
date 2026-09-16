@@ -7,6 +7,7 @@
     3. 备份目标目录下的旧文件（如有）
     4. 将发布输出复制到目标目录
     5. 启动应用
+    6. 注册 xa 命令（把 <目标目录>\XAssistant.exe 指向给 cmd / AI 用；-SkipXa 跳过）
 .NOTES
     脚本需在项目根目录（XAssistant.csproj 所在目录）以管理员身份运行，
     因为系统盘根目录下的部署目录可能需要管理员权限。
@@ -14,7 +15,9 @@
 
 param(
     # 部署目标目录。默认跟着 SystemDrive 走，不写死盘符
-    [string]$TargetDir = (Join-Path $env:SystemDrive "XAssistant")
+    [string]$TargetDir = (Join-Path $env:SystemDrive "XAssistant"),
+    # 跳过第 6 步的 xa 命令注册（只想部署不想动用户 PATH 时用）
+    [switch]$SkipXa
 )
 
 $ErrorActionPreference = "Stop"
@@ -29,7 +32,7 @@ $processName  = "XAssistant"
 $publishDir   = Join-Path $scriptPath "bin\deploy\publish"
 
 # ---------- 1. 构建发布 ----------
-Write-Host "[1/5] 正在发布项目 (Release)..." -ForegroundColor Cyan
+Write-Host "[1/6] 正在发布项目 (Release)..." -ForegroundColor Cyan
 # 先清干净：第 4 步是把这个目录里的所有东西拷到部署目录，残留的旧文件会跟着过去
 if (Test-Path $publishDir) {
     Remove-Item "$publishDir\*" -Recurse -Force -ErrorAction SilentlyContinue
@@ -41,7 +44,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "    发布完成: $publishDir" -ForegroundColor Green
 
 # ---------- 2. 停止正在运行的实例 ----------
-Write-Host "[2/5] 检查是否正在运行..." -ForegroundColor Cyan
+Write-Host "[2/6] 检查是否正在运行..." -ForegroundColor Cyan
 $runningProcess = Get-Process -Name $processName -ErrorAction SilentlyContinue
 if ($runningProcess) {
     Write-Host "    发现运行中的进程，正在停止..." -ForegroundColor Yellow
@@ -53,7 +56,7 @@ if ($runningProcess) {
 }
 
 # ---------- 3. 备份旧版本 ----------
-Write-Host "[3/5] 备份旧版本..." -ForegroundColor Cyan
+Write-Host "[3/6] 备份旧版本..." -ForegroundColor Cyan
 if (Test-Path $targetDir) {
     $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $backupDir = "$($targetDir.TrimEnd('\','/'))_Backup_$timestamp"
@@ -65,7 +68,7 @@ if (Test-Path $targetDir) {
 }
 
 # ---------- 4. 复制新文件 ----------
-Write-Host "[4/5] 复制新文件到 $targetDir ..." -ForegroundColor Cyan
+Write-Host "[4/6] 复制新文件到 $targetDir ..." -ForegroundColor Cyan
 # 确保目标目录存在
 New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
 
@@ -77,13 +80,30 @@ Copy-Item -Path "$publishDir\*" -Destination $targetDir -Recurse -Force
 Write-Host "    复制完成。" -ForegroundColor Green
 
 # ---------- 5. 启动应用 ----------
-Write-Host "[5/5] 启动 XAssistant..." -ForegroundColor Cyan
+Write-Host "[5/6] 启动 XAssistant..." -ForegroundColor Cyan
 $appExe = Join-Path $targetDir "XAssistant.exe"
 if (Test-Path $appExe) {
     Start-Process $appExe
     Write-Host "    应用已启动。" -ForegroundColor Green
 } else {
     throw "未找到 $appExe ，部署可能不完整。"
+}
+
+# ---------- 6. 注册 xa 命令 ----------
+if (-not $SkipXa) {
+    Write-Host "[6/6] 注册 xa 命令（cmd / AI 可直接调用）..." -ForegroundColor Cyan
+    $registerScript = Join-Path $scriptPath "register-xa.ps1"
+    if (Test-Path $registerScript) {
+        try {
+            & $registerScript -ExePath $appExe
+        } catch {
+            Write-Host "    xa 注册失败（不影响主程序使用）: $_" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "    未找到 register-xa.ps1，跳过（不影响主程序）。" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "[6/6] 已跳过 xa 注册（-SkipXa）。" -ForegroundColor DarkGray
 }
 
 Write-Host "`n部署成功！" -ForegroundColor Green

@@ -18,6 +18,7 @@ public partial class App : System.Windows.Application
     private NotifyIcon? _notifyIcon;
     private QuickNoteCaptureService? _quickNoteCapture;
     private GlobalHotkeyService? _globalHotkey;
+    private NotificationPipeServer? _notifyPipe;
     internal static bool IsShuttingDown { get; private set; }
 
     /// <summary>这轮进程只是来放一个效果的（--fx）：不建容器、不装钩子、不开主窗。</summary>
@@ -144,6 +145,13 @@ public partial class App : System.Windows.Application
         var configService = provider.GetRequiredService<IConfigurationService>();
         ThemeManager.Apply(configService.GetTheme());
         _appLogger.LogInformation("已应用界面主题：{Theme}", ThemeManager.Current);
+
+        // xa 命令的接手方：无头实例与本程序同时在跑时，整条命令交给这里执行——
+        // 效果窗与顶部持久消息栈只归一份，而持久窗只有常驻进程养得住（见 NotificationPipe）
+        _notifyPipe = new NotificationPipeServer();
+        _notifyPipe.LineReceived += line => Dispatcher.Invoke(() => EffectDispatch.OnLine(line));
+        if (!_notifyPipe.TryStart())
+            _appLogger.LogInformation("xa 转发管道已被别的实例占着：命令将由发起方本地执行");
 
         // 关键词引擎订阅钩子：只订事件，装钩子仍是键盘记录自己的事
         provider.GetRequiredService<KeywordWatcher>()
@@ -291,6 +299,7 @@ public partial class App : System.Windows.Application
         Services.GetRequiredService<WordFrequencyViewModel>().Dispose();
         Services.GetRequiredService<PracticeViewModel>().Dispose();
         Services.GetRequiredService<KeywordWatcher>().Dispose();
+        _notifyPipe?.Dispose();
         _globalHotkey?.Dispose();
         _notifyIcon?.Dispose();
         // 移除事件订阅，避免内存泄漏

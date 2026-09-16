@@ -17,11 +17,17 @@
         窗口本身点击穿透（见代码里的 WS_EX_TRANSPARENT）也不抢焦点——本程序监听全局按键，
         彩蛋挡手或打断输入都是事故。  -->
   <Grid>
-    <!--  边缘高亮：两层描边，外面那层糊开当辉光，里面那层留一条实线。只描边不填充  -->
-    <Border x:Name="EdgeGlow" Margin="4" BorderThickness="10" CornerRadius="10" Opacity="0" IsHitTestVisible="False">
-      <Border.Effect><BlurEffect Radius="22"/></Border.Effect>
-    </Border>
-    <Border x:Name="EdgeLine" Margin="4" BorderThickness="2" CornerRadius="10" Opacity="0" IsHitTestVisible="False"/>
+    <!--  边缘高亮：四边各一条从屏边向内渐隐的渐变带（画刷与带宽在代码里按 -border 参数生成）。
+          分两层是为了两条动画不抢同一个属性：外层 Edge 走整段的淡入淡出，内层 EdgePulse 走
+          持续段里的亮度呼吸循环——都写 Opacity 的话后挂的那条会把先挂的踩掉。  -->
+    <Grid x:Name="Edge" Opacity="0" IsHitTestVisible="False">
+      <Grid x:Name="EdgePulse">
+        <Rectangle x:Name="EdgeTop" VerticalAlignment="Top"/>
+        <Rectangle x:Name="EdgeBottom" VerticalAlignment="Bottom"/>
+        <Rectangle x:Name="EdgeLeft" HorizontalAlignment="Left"/>
+        <Rectangle x:Name="EdgeRight" HorizontalAlignment="Right"/>
+      </Grid>
+    </Grid>
     <!--  警告语：中间一句大字，左右两道斜线各占一半屏宽、一直铺到屏幕边——只贴着文字写四个斜杠
           不叫警告。斜线用平铺画刷画（画刷在代码里按当前颜色与文字高度生成），所以它跟文字等高、
           又能跟着窗口宽度走。文字背后不垫背景框：垫了就像贴了块便利贴，跟这套 1 px 发丝线的界面不合。  -->

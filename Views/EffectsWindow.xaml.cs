@@ -7,12 +7,14 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using XAssistant.Services;
+using XAssistant.Services.Keywords;
 using WinForms = System.Windows.Forms;
 
-// 主工程开了 UseWindowsForms，隐式 using 里的 System.Drawing.Image / Brush / Brushes / Point / FontFamily / Pen 会跟 WPF 的撞名
+// 主工程开了 UseWindowsForms，隐式 using 里的 System.Drawing.Image / Brush / Brushes / Color / Point / FontFamily / Pen 会跟 WPF 的撞名
 using Image = System.Windows.Controls.Image;
 using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
+using Color = System.Windows.Media.Color;
 using Pen = System.Windows.Media.Pen;
 using Point = System.Windows.Point;
 using FontFamily = System.Windows.Media.FontFamily;
@@ -22,7 +24,8 @@ namespace XAssistant.Views;
 /// <summary>
 /// 关键词彩蛋的效果层：一块铺满虚拟屏幕的透明窗口，管两件事。
 ///
-/// 1) 粒子：顶部浮岛（toast）下方一次只给一颗，沿自己的随机矢量直行（没有重力，轨迹不会往下弯），
+/// 1) 粒子：顶部浮岛（toast）下方一次只给一颗，方向来自下半圆 180° 扇面（从正右经正下到正左），
+///    沿自己的随机矢量直行（没有重力，轨迹不会往下弯），
 ///    转着越飞越慢、停在半空，然后原地缩小消失。每颗一份 <see cref="ParticleState"/>，
 ///    渲染帧上各算一次 <see cref="ParticleMotion.Step"/>。刻意不做"一次炸一把"：几十颗同屏既费渲染又像撒沙子。
 /// 2) 警告语 + 边缘高亮：触发时屏幕中间一句大字（两侧斜线夹着，不垫背景框），同时屏幕四边亮一圈；
@@ -36,6 +39,15 @@ public sealed partial class EffectsWindow : Window
     /// <summary>同屏粒子数上限。连击关键词时宁可少而清楚，不要多而糊。</summary>
     private const int MaxParticles = 12;
 
+    /// <summary>默认淡入秒数（用户定的节奏：淡入 1 s → 持续 5 s → 淡出 1 s）。</summary>
+    public const double BannerFadeInSeconds = 1.0;
+
+    /// <summary>默认持续秒数：闪烁铺在这一段里，不写时长时就是这一段撑住可读。</summary>
+    public const double BannerHoldSeconds = 5.0;
+
+    /// <summary>默认淡出秒数。</summary>
+    public const double BannerFadeOutSeconds = 1.0;
+
     /// <summary>粒子的布局盒边长与字形大小的比例：留够余量，转起来不会被盒子裁掉。</summary>
     private const double BoxRatio = 1.8;
 
@@ -45,6 +57,19 @@ public sealed partial class EffectsWindow : Window
     private bool _loopAttached;
     private bool _bannerOn;
     private Storyboard? _bannerStory;
+    private Storyboard? _breathStory;
+
+    /// <summary>
+    /// 一条条带的完整规格：<see cref="ShowBanner"/>（旧调用）与 <see cref="ShowCommand"/>（xa 命令行）
+    /// 都先换算成这个再进 <see cref="Banner"/>。颜色在这里已经是画刷（换刷要在 UI 线程，
+    /// 换算那步就在 Dispatcher.Invoke 里，不跨线程留资源）。
+    /// </summary>
+    private readonly record struct BannerSpec(
+        string? Text, Brush Color, double Hold, double FadeIn, double FadeOut, int Blinks,
+        bool BorderOn, double BorderWidth, double BorderFade, double BorderCycle, double FontSize);
+
+    /// <summary>边框呼吸的暗端（亮端是 1）：只收 45%，看着是「亮暗之间循环」，不是「闪灭」。</summary>
+    private const double BreathLow = 0.55;
 
     /// <summary>
     /// 一颗粒子。数值状态交给 <see cref="ParticleMotion"/>，这里只挂视觉。
@@ -84,7 +109,7 @@ public sealed partial class EffectsWindow : Window
     // ===== 对外动作 =====
     
     /// <summary>
-    /// 从 origin（屏幕 DIP，浮岛下沿就是这一系）朝下给一颗粒子。
+    /// 从 origin（屏幕 DIP，浮岛下沿就是这一系）朝下 180° 扇面里给一颗粒子。
     /// WPF 不支持彩色 emoji 字体，字形是单色轮廓；tint 留空则跟着当前强调色。
     /// </summary>
     public static void Emit(Point origin, string glyph, string? imagePath, Brush? tint = null)
@@ -104,9 +129,10 @@ public sealed partial class EffectsWindow : Window
     
     /// <summary>
     /// 屏幕中间横一句警告语：左右两道斜线铺满屏宽，同时四边亮一圈。
-    /// color 留空用当前强调色；seconds 是总时长，blinks 是闪几下。
+    /// color 留空用当前强调色；seconds 是总时长（默认 = 淡入 1 s + 持续 5 s + 淡出 1 s），blinks 是闪几下。
+    /// 保持字面签名不动：<see cref="Services.Keywords.KeywordWatcher"/> 与测试夹具直接调这个。
     /// </summary>
-    public static void ShowBanner(string text, Brush? color = null, double seconds = 1.9, int blinks = 1)
+    public static void ShowBanner(string text, Brush? color = null, double seconds = SlashParser.DefaultSeconds, int blinks = 1)
     {
         var app = System.Windows.Application.Current;
         if (app is null) return;
@@ -114,7 +140,51 @@ public sealed partial class EffectsWindow : Window
         {
             _shared ??= new EffectsWindow();
             if (!_shared.IsVisible) _shared.Show();
-            _shared.Banner(text, color, seconds, blinks);
+            // 旧调用没有新参数：边框按默认宽度静态亮着（cycle 0 = 不循环），首尾按旧规则各收缩到三分之一
+            double span = Math.Max(0.6, seconds);
+            double fadeIn = Math.Min(BannerFadeInSeconds, span / 3);
+            double fadeOut = Math.Min(BannerFadeOutSeconds, span / 3);
+            _shared.Banner(new BannerSpec(
+                Text: text,
+                Color: color ?? _shared.Accent(),
+                Hold: Math.Max(0.1, span - fadeIn - fadeOut),
+                FadeIn: fadeIn,
+                FadeOut: fadeOut,
+                Blinks: blinks,
+                BorderOn: true,
+                BorderWidth: 50,
+                BorderFade: 30,
+                BorderCycle: 0,
+                FontSize: 46));
+        });
+    }
+
+    /// <summary>
+    /// 一条解析好的效果指令（cmd / MCP 都走这里）：文字、颜色、三段节奏、边框带宽与呼吸循环
+    /// 全部按参数来。文字为空又不要边框的指令直接不开窗——省得留一块全屏透明窗在上面。
+    /// </summary>
+    public static void ShowCommand(EffectCommand command)
+    {
+        var app = System.Windows.Application.Current;
+        if (app is null) return;
+        if (command.Hide) { HideBanner(); return; }
+        if (command.Text is null && !command.BorderOn) return;
+        app.Dispatcher.Invoke(() =>
+        {
+            _shared ??= new EffectsWindow();
+            if (!_shared.IsVisible) _shared.Show();
+            _shared.Banner(new BannerSpec(
+                Text: command.Text,
+                Color: EffectCommand.BrushOf(command.Color) ?? _shared.Accent(),
+                Hold: command.Hold,
+                FadeIn: command.FadeIn,
+                FadeOut: command.FadeOut,
+                Blinks: command.Blinks,
+                BorderOn: command.BorderOn,
+                BorderWidth: command.BorderWidth,
+                BorderFade: command.BorderFade,
+                BorderCycle: command.BorderCycle,
+                FontSize: command.FontSize));
         });
     }
     
@@ -153,8 +223,8 @@ public sealed partial class EffectsWindow : Window
         // 调用方给的是屏幕 DIP，画布原点在虚拟屏左上角：进来先减掉这一段
         var center = new Point(screenDip.X - SystemParameters.VirtualScreenLeft, screenDip.Y - SystemParameters.VirtualScreenTop);
     
-        // 朝下方 60° 锥角内随机一个方向：正下方是 π/2（屏幕 y 轴朝下），左右各让 30°
-        double direction = Math.PI / 2 + (Random.Shared.NextDouble() - 0.5) * (Math.PI / 3);
+        // 下半圆 180° 扇面里随机一个方向（正右 ↔ 正左，正下为中心）：粒子从浮岛像洒下来，不是窄锥
+        double direction = ParticleMotion.ScatterDirection(Random.Shared.NextDouble());
         // 阻力很轻（ParticleMotion.Drag）：初速要够高才能飘到一千像素开外，再低就成「飘一下就停了」
         double speed = 800 + Random.Shared.NextDouble() * 500;
         double size = 26 + Random.Shared.NextDouble() * 14;
@@ -240,33 +310,44 @@ public sealed partial class EffectsWindow : Window
 
     // ===== 警告语 + 边缘高亮：一个动作，一起淡入淡出 =====
 
-    private void Banner(string text, Brush? color, double seconds, int blinks)
+    private void Banner(BannerSpec spec)
     {
-        var accent = color ?? TryFindResource("AccentBrush") as Brush ?? Brushes.Gainsboro;
-        TapeText.Text = text;
-        TapeText.Foreground = accent;
-        // 斜线跟文字等高：行高由字号推，画刷的瓦片尺寸就按这个高算
-        double height = TapeText.FontSize * 1.25;
-        SlashLeft.Height = SlashRight.Height = height;
-        SlashLeft.Background = SlashRight.Background = Hatch(accent, height);
-        EdgeGlow.BorderBrush = accent;
-        EdgeLine.BorderBrush = accent;
+        var accent = spec.Color;
+        // 文字条带：不给正文就整段收起，只剩边框那圈渐变带在工作
+        bool hasText = spec.Text is { Length: > 0 };
+        Tape.Visibility = hasText ? Visibility.Visible : Visibility.Collapsed;
+        if (hasText)
+        {
+            TapeText.Text = spec.Text;
+            TapeText.Foreground = accent;
+            TapeText.FontSize = spec.FontSize;
+            // 斜线跟文字等高：行高由字号推，画刷的瓦片尺寸就按这个高算
+            double height = spec.FontSize * 1.25;
+            SlashLeft.Height = SlashRight.Height = height;
+            SlashLeft.Background = SlashRight.Background = Hatch(accent, height);
+        }
+
+        // 四边渐变带：关了边框就整层收起，不再铺画刷
+        Edge.Visibility = spec.BorderOn ? Visibility.Visible : Visibility.Collapsed;
+        if (spec.BorderOn) BuildBands(accent, spec.BorderWidth, spec.BorderFade);
+
         // 同时只挂一条：上一句还在飞就先停下。两条动画同时抢 Tape.Opacity 的话，
         // 结果就是 HideBanner 归零后又被旧动画抬回去，且计数器只减不增、窗口永远关不掉
-        _bannerStory?.Stop();
-        _bannerStory = null;
+        StopAnimation();
         _bannerOn = true;
         AttachLoop();
 
-        // 中间这句与屏幕四边同时闪：四个目标各一份动画实例（SetTarget 存在动画对象上，共用会互相踩）
+        double total = Math.Max(0.1, spec.FadeIn + spec.Hold + spec.FadeOut);
+        // 中间这句与屏幕四边一起淡入淡出：两个目标各一份动画实例（SetTarget 存在动画对象上，共用会互相踩）
         var story = new Storyboard();
-        foreach (var target in new FrameworkElement[] { Tape, EdgeGlow, EdgeLine })
+        foreach (var target in new FrameworkElement[] { Tape, Edge })
         {
-            var pulse = Pulse(Math.Max(0.6, seconds), Math.Clamp(blinks, 1, 5));
+            var pulse = Pulse(spec, total);
             Storyboard.SetTarget(pulse, target);
             Storyboard.SetTargetProperty(pulse, new PropertyPath(OpacityProperty));
             story.Children.Add(pulse);
         }
+        AddBreath(spec);
         story.Completed += (_, _) =>
         {
             // 被新一条或 HideNow 接过的不重复收尾
@@ -274,8 +355,7 @@ public sealed partial class EffectsWindow : Window
             _bannerStory = null;
             _bannerOn = false;
             // 动画自然走完时也要把属性交回去，否则下一次本地赋值会被已结束的动画按住
-            foreach (var target in new FrameworkElement[] { Tape, EdgeGlow, EdgeLine })
-                target.BeginAnimation(OpacityProperty, null);
+            StopAnimation();
             if (_live.Count == 0) Close();
         };
         _bannerStory = story;
@@ -287,19 +367,36 @@ public sealed partial class EffectsWindow : Window
     /// ① 不能拿「当前有没有在闪」当闸门——那个标志位一旦被上一句的 Completed 抢先清掉，
     ///    收起就变成空操作，条带永远留在屏上；所以这里无条件执行。
     /// ② 光 story.Stop() 不够：动画还在合成树上抢着 Opacity，本地赋的 0 会被盖回去。
-    ///    要 BeginAnimation(prop, null) 把属性交还给本地值，再写 0。
+    ///    要 BeginAnimation(prop, null) 把属性交还给本地值，再写 0——这套动作都在 <see cref="StopAnimation"/> 里。
     /// </summary>
     private void HideNow()
     {
         _bannerOn = false;
+        StopAnimation();
+        if (_live.Count == 0) Close();
+    }
+
+    /// <summary>
+    /// 停掉主戏与边框呼吸两条动画，把被它们在合成树上按住的 Opacity 交还本地并复位。
+    /// 先置空引用再 Stop：Stop 会触发 Completed，旧引用留着会让收尾流程（关窗、清动画）重跑一遍。
+    /// </summary>
+    private void StopAnimation()
+    {
         var story = _bannerStory;
         _bannerStory = null;
         story?.Stop();
-        foreach (var target in new FrameworkElement[] { Tape, EdgeGlow, EdgeLine })
-            target.BeginAnimation(OpacityProperty, null);
-        Tape.Opacity = EdgeGlow.Opacity = EdgeLine.Opacity = 0;
-        if (_live.Count == 0) Close();
+        var breath = _breathStory;
+        _breathStory = null;
+        breath?.Stop();
+        Tape.BeginAnimation(OpacityProperty, null);
+        Edge.BeginAnimation(OpacityProperty, null);
+        EdgePulse.BeginAnimation(OpacityProperty, null);
+        Tape.Opacity = Edge.Opacity = 0;
+        EdgePulse.Opacity = 1;   // 内层回到全亮：呼吸跑到暗端时被收起，下一轮开头不带旧值
     }
+
+    /// <summary>默认颜色：跟着主题强调色走，换肤后立即生效；资源缺失时退回中性灰。</summary>
+    private Brush Accent() => TryFindResource("AccentBrush") as Brush ?? Brushes.Gainsboro;
 
     /// <summary>
     /// 斜线画刷：一道 45° 斜笔平铺成瓦片，铺满整列——只贴着文字写四个斜杠不叫警告。
@@ -322,27 +419,98 @@ public sealed partial class EffectsWindow : Window
         };
     }
 
-    /// <summary>淡入 → 中间闪 blinks 下 → 淡掉。FillBehavior.Stop：动画结束后 Opacity 回到 XAML 里那个 0。</summary>
-    private static DoubleAnimationUsingKeyFrames Pulse(double seconds, int blinks)
+    /// <summary>
+    /// 三段时序：淡入 spec.FadeIn → 持续 spec.Hold（闪烁铺在这一段里）→ 淡出 spec.FadeOut，
+    /// 段长由指令各自给，关键帧百分比按总长换算。
+    /// FillBehavior.Stop：动画结束后 Opacity 回到 XAML 里那个 0。
+    /// </summary>
+    private static DoubleAnimationUsingKeyFrames Pulse(BannerSpec spec, double total)
     {
         var pulse = new DoubleAnimationUsingKeyFrames
         {
-            Duration = TimeSpan.FromSeconds(seconds),
+            Duration = TimeSpan.FromSeconds(total),
             FillBehavior = FillBehavior.Stop,
         };
-        const double fade = 0.09;               // 首尾各占这么一段比例做淡入淡出
-        pulse.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(0)));
-        pulse.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(fade)));
-        for (int i = 0; i < blinks; i++)
+        double fadeInAt = Math.Clamp(spec.FadeIn / total, 0, 1);                         // 淡入结束 = 持续段的起点
+        double holdEndAt = Math.Clamp((spec.FadeIn + spec.Hold) / total, fadeInAt, 1);   // 持续段终点 = 淡出的起点
+        int blinks = Math.Clamp(spec.Blinks, 1, 5);
+        if (fadeInAt > 0) pulse.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+        pulse.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(fadeInAt)));
+        if (holdEndAt > fadeInAt)
         {
-            // 最后一闪不在中间掉下去：否则只闪一下的场景会先黑半屏再亮，看着像闪崩
-            double dimAt = fade + (1 - 2 * fade) * (i + 0.5) / blinks;
-            double backAt = fade + (1 - 2 * fade) * (i + 1) / blinks;
-            if (i < blinks - 1) pulse.KeyFrames.Add(new EasingDoubleKeyFrame(0.15, KeyTime.FromPercent(dimAt)));
-            pulse.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(backAt)));
+            for (int i = 0; i < blinks; i++)
+            {
+                // 闪烁只占持续段，两端不碰：最后一闪也不中途掉下去（否则只闪一下的场景先黑半屏再亮，看着像闪崩）
+                double dimAt = fadeInAt + (holdEndAt - fadeInAt) * (i + 0.5) / blinks;
+                double backAt = fadeInAt + (holdEndAt - fadeInAt) * (i + 1) / blinks;
+                if (i < blinks - 1) pulse.KeyFrames.Add(new EasingDoubleKeyFrame(0.15, KeyTime.FromPercent(dimAt)));
+                pulse.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(backAt)));
+            }
         }
-        pulse.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(1)));
+        // 淡出为 0 时持续段直接顶到总长：末尾再放一帧 0 会和上一帧同时间点，跳过（释放动画时自然回 0）
+        if (holdEndAt < 1) pulse.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(1)));
         return pulse;
+    }
+
+    /// <summary>
+    /// 边框亮度呼吸：持续段里每 spec.BorderCycle 秒一圈，在内层 EdgePulse 的 Opacity 上于 1 与
+    /// <see cref="BreathLow"/> 之间循环——外层 Edge 已被主戏的淡入淡出占着，两条动画不能抢同一个属性。
+    /// 圈数只取持续段放得下的整圈：零头让边框亮着不动，收尾交给淡出。
+    /// </summary>
+    private void AddBreath(BannerSpec spec)
+    {
+        if (!spec.BorderOn || spec.BorderCycle <= 0 || spec.Hold <= 0) return;
+        double rounds = Math.Max(1, Math.Floor(spec.Hold / spec.BorderCycle));
+        var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
+        var breath = new DoubleAnimationUsingKeyFrames
+        {
+            BeginTime = TimeSpan.FromSeconds(spec.FadeIn),   // 等淡入完成再开始呼吸
+            Duration = TimeSpan.FromSeconds(spec.BorderCycle),
+            RepeatBehavior = new RepeatBehavior(rounds),
+        };
+        breath.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0), ease));
+        breath.KeyFrames.Add(new EasingDoubleKeyFrame(BreathLow, KeyTime.FromPercent(0.5), ease));
+        breath.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(1), ease));
+        Storyboard.SetTarget(breath, EdgePulse);
+        Storyboard.SetTargetProperty(breath, new PropertyPath(OpacityProperty));
+        _breathStory = new Storyboard { Children = { breath } };
+        _breathStory.Begin();
+    }
+
+    /// <summary>
+    /// 四边渐变带各铺一次：从屏边向内渐隐，总长 = 主带宽 + 淡出延伸带宽。
+    /// 四条各做一支按当前颜色现配透明度梯度的画刷（<see cref="Band"/>），换色时整条重铺。
+    /// </summary>
+    private void BuildBands(Brush accent, double width, double fade)
+    {
+        double span = width + fade;
+        EdgeTop.Height = EdgeBottom.Height = EdgeLeft.Width = EdgeRight.Width = span;
+        EdgeTop.Fill = Band(accent, width, fade, new Point(0, 0), new Point(0, 1));      // 上边：向下渐隐
+        EdgeBottom.Fill = Band(accent, width, fade, new Point(0, 1), new Point(0, 0));   // 下边：向上渐隐
+        EdgeLeft.Fill = Band(accent, width, fade, new Point(0, 0), new Point(1, 0));     // 左边：向右渐隐
+        EdgeRight.Fill = Band(accent, width, fade, new Point(1, 0), new Point(0, 0));    // 右边：向左渐隐
+    }
+
+    /// <summary>
+    /// 一条渐变带：屏边那道 0.85 透明度（全亮就成一条硬描边，不叫「淡化」），到主带宽处收到 0.3，
+    /// 再顺延伸带收到全透明；中点位置按主带占比算——-border 的两个宽度直接决定亮区与尾段的比例。
+    /// </summary>
+    private static LinearGradientBrush Band(Brush accent, double width, double fade, Point from, Point to)
+    {
+        double mid = width + fade <= 0 ? 1 : width / (width + fade);
+        var band = new LinearGradientBrush { StartPoint = from, EndPoint = to };
+        band.GradientStops.Add(new GradientStop(WithAlpha(accent, 0.85), 0));
+        band.GradientStops.Add(new GradientStop(WithAlpha(accent, 0.30), mid));
+        band.GradientStops.Add(new GradientStop(WithAlpha(accent, 0), 1));
+        band.Freeze();   // 只读化：四条带是一次性铺的，冻结后渲染线程直接复用
+        return band;
+    }
+
+    /// <summary>把一支画刷的颜色换个透明度重出一色；非纯色画刷（现有资源与解析器都不会给）退回中性灰。</summary>
+    private static Color WithAlpha(Brush brush, double alpha)
+    {
+        Color color = brush is SolidColorBrush solid ? solid.Color : Colors.Gainsboro;
+        return Color.FromArgb((byte)Math.Round(alpha * 255), color.R, color.G, color.B);
     }
 
     // ===== 渲染循环的挂与卸（CompositionTarget.Rendering 是静态事件，忘了退订就是常驻耗电）=====

@@ -39,7 +39,7 @@ TOOLS = [
                 "text": {"type": "string", "description": "要显示的一句话，最长 40 字"},
                 "tone": {"type": "string", "enum": list(TONES),
                          "description": "info=主题色（默认），warn=黄，error=红"},
-                "seconds": {"type": "number", "description": "显示时长秒数；不写用默认 2.4"},
+                "seconds": {"type": "number", "description": "显示时长秒数；不写用默认 7（淡入 1 + 持续 5 + 淡出 1）"},
                 "blinks": {"type": "integer", "description": "闪烁次数 1-5；不写用 1"},
             },
             "required": ["text"],

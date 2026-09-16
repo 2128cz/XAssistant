@@ -90,15 +90,51 @@
 
 ### 打字关键词彩蛋
 
-敲到 `white` / `black` 就切浅色 / 深色主题，`sunset` 这类还能把整张界面换成另一套配色（主题色是程序化控制的：色板叠在主题字典上，能改哪些画刷键列在 `ThemeManager.BrushKeys` 里）。敲到 `flower`、`cat` 这些词，顶部浮岛下方会落下图案（沿自己的方向直行，转着越飞越慢、停在半空，再缩小消失），同时屏幕中间出现一句大字、左右斜线铺到屏幕边、四边亮一圈辉光（它们算一个动作），那句话就是这条规则自定义的文案。词表在 `Assets/Keywords/keywords.json`：加词、改文案、换颜色不必改代码，条目支持 `word`、`glyph`（单色字形，彩色图放 `Assets/Keywords/images/` 再写 `image`）、`particles`（每次吐几颗，1 就够，上限 4）、`banner`、`theme` / `palette` / `colors`（换肤）等字段。只收英文词：中文输入法下拿到的是拼音字母。彩蛋换肤只在本次运行内有效，设置里两个主题按钮会把它抹回原色；开关与「试一次」（只掉粒子不动主题）在设置区。
+敲到 `white` / `black` 就切浅色 / 深色主题，`sunset` 这类还能把整张界面换成另一套配色（主题色是程序化控制的：色板叠在主题字典上，能改哪些画刷键列在 `ThemeManager.BrushKeys` 里）。敲到 `flower`、`cat` 这些词，顶部浮岛下方会落下图案（方向从半圆 180° 扇面里取：正右经正下到正左，沿自己的方向直行，转着越飞越慢、停在半空，再缩小消失），同时屏幕中间出现一句大字、左右斜线铺到屏幕边、四边亮一圈向内渐隐的渐变带（它们算一个动作），那句话就是这条规则自定义的文案。词表在 `Assets/Keywords/keywords.json`：加词、改文案、换颜色不必改代码，条目支持 `word`、`glyph`（单色字形，彩色图放 `Assets/Keywords/images/` 再写 `image`）、`particles`（每次吐几颗，1 就够，上限 4）、`banner`、`theme` / `palette` / `colors`（换肤）等字段。只收英文词：中文输入法下拿到的是拼音字母。彩蛋换肤只在本次运行内有效，设置里两个主题按钮会把它抹回原色；开关与「试一次」（只掉粒子不动主题）在设置区。
 
 ### 斜杠命令
 
-打字时直接喊一句上屏：`/warn 3 AI Computer Use`、`/e 1.5-3 编译失败`、`/i 跑完了`——三段是「类型 · 显示秒数-闪几下 · 正文」。类型对应颜色：`error`/`err`/`e`/`r` 红，`warn`/`warning`/`w` 黄，`info`/`log`/`i`/`l` 用当前主题色；只写一个数（`3`）就是闪 3 下、时长用默认（2.4 s）；再敲一个 `/` 就收起。词表是封闭的：斜杠后第一个词不在表里就整条跳过，收命令期间普通关键词匹配暂停，所以 `/info white` 不会中途换肤。
+打字时直接喊一句上屏：`/warn 3 AI Computer Use`、`/e 1.5-3 编译失败`、`/i 跑完了`——三段是「类型 · 显示秒数-闪几下 · 正文」。类型对应颜色：`error`/`err`/`e`/`r` 红，`warn`/`warning`/`w` 黄，`info`/`log`/`i`/`l` 用当前主题色；只写一个数（`3`）就是闪 3 下、时长用默认（淡入 1 s · 持续 5 s · 淡出 1 s，共 7 s）；再敲一个 `/` 就收起。词表是封闭的：斜杠后第一个词不在表里就整条跳过，收命令期间普通关键词匹配暂停，所以 `/info white` 不会中途换肤。
 
 ### 给脚本与 AI 用
 
-同一个 exe 还能无头调用——`XAssistant.exe --fx warn 3 "AI Computer Use"`、`--fx confetti`（撒花）、`--fx off`；这条路不建容器、不装钩子、不开主窗、不碰数据库，放完就退。`mcp/xassistant_fx_server.py` 是个纯标准库的 MCP 垫片，把 `xassistant_banner` / `xassistant_confetti` / `xassistant_off` 三个工具翻译成上面的命令；可执行文件位置读环境变量 `XASSISTANT_EXE`。
+同一个 exe 还能无头调用——不建容器、不装钩子、不开主窗、不碰数据库，放完就退。用 `register-xa.ps1` 把 `xa` 注册进 PATH（`deploy.ps1` 部署时会自动做，`-SkipXa` 可跳过），之后在 cmd / PowerShell / AI 工具里直接写一条效果命令：
+
+```
+xa -s <色|类型> [持续 [淡入 [淡出]]] [-border on|off [渐宽 [延伸 [周期]]]] [-lable on|off [字号] [文本…]]
+```
+
+例：`xa -s info 5 1 1 -border on 50 30 1 -lable on 24 "AI 接管中"`。`-s` 段给颜色——颜色名（`green`、`amber`、`#3B82F6` 等）或类型色（`info` / `warn` / `error` 及其缩写）——与三段节奏（默认 5 / 1 / 1 秒）；`-border` 是四边的淡化渐变带：两个数字分别是主带与淡出延伸带的宽度（px），第三个是亮度呼吸的循环周期（秒），总持续时间内自动在明暗之间循环，写 0 就静态亮着；`-lable` 段第一个数字永远是字号，剩下的是条带文案，写 `off` 或不给文案就只剩边框。`xa confetti` 撒花、`xa off` 收起。
+
+旧写法照旧兼容：`XAssistant.exe --fx warn 3 "AI Computer Use"`、`--fx confetti`、`--fx off`。`mcp/xassistant_fx_server.py` 是个纯标准库的 MCP 垫片，把 `xassistant_banner` / `xassistant_confetti` / `xassistant_off` 三个工具翻译成上面的命令；可执行文件位置读环境变量 `XASSISTANT_EXE`。
+
+带文字的命令除了全屏那几秒，还会在屏幕顶居中钉一张**持久消息卡片**（左侧色条是命令颜色，文案 + 时间戳，新消息插最前、旧的往下排着可回看，单条 ✕ 或清空全部，同屏最多 10 张）——全屏大字淡完就没了，但「AI 在等你」这件事不该凭空蒸发。卡片由常驻的 XAssistant 主程序钉住（命令经本机命名管道交给它，多个 xa 调用不会抢屏）；主程序没跑时全屏效果照放、卡片没人钉。
+
+### Qoder 对话状态提醒
+
+用 Qoder CN 写对话（尤其 Computer Use 接管屏幕）时，AI 卡在你这一侧往往没人提醒。`mcp/qoder-hooks/install-takeover-hooks.ps1` 把对话生命周期事件接进上面的 `xa`，三级分档：
+
+| 状态 | 触发事件 | 提醒 |
+|---|---|---|
+| 报错打断（红） | `PostToolUseFailure` | 全屏红带「工具执行失败：<报错摘要>」+ 四边渐变带 + 消息卡 |
+| 需人工接管（黄） | `PermissionRequest`、`Notification`（permission_prompt） | 黄带「等待授权 / AI 等待人工接管」+ 消息卡 |
+| 对话结束（普通） | `Stop` | info 色轻提醒「对话完成」，5 秒 |
+
+一键装 / 拆：
+
+```
+powershell -ExecutionPolicy Bypass -File mcp\qoder-hooks\install-takeover-hooks.ps1           # 装
+powershell -ExecutionPolicy Bypass -File mcp\qoder-hooks\install-takeover-hooks.ps1 -Remove  # 拆
+```
+
+脚本拷到 `~\.qoder-cn\hooks\qoder-status.ps1`，只往 `settings.json` 里合并 `hooks` 节点（其余配置原样保留、先备份 `.bak`）；**Qoder Hooks 不支持热重载，装完重启 IDE 生效**。每次触发都把原始事件 JSON 记进同目录 `qoder-status.log`，字段对不上时拿它校准。提醒脚本永远 `exit 0`，再坏也不会阻断对话。检测方法的实盘报告在 `mcp/qoder-cn-computeruse-takeover-detection.md`（接管遮罩的窗口类名、12 个 hook 事件对照表）。
+
+生效与排查：
+
+- **首次启用**：跑一次安装脚本 → 重启 IDE → 下一轮对话回复结束时就该闪出 info 色「对话完成」并钉一张顶部消息卡。没钉卡不代表没提醒——消息栈由常驻主程序钉，主程序没跑（且开机自启没开）时只有全屏效果。
+- **完全没反应**：看 `qoder-status.log` 有没有新行。没有 = hooks 配置没被读到，确认 `settings.json` 的 `hooks` 节点在位且 IDE 确实重启过；有行但没提醒 = 事件字段名与协议有出入（把 log 里的原始 JSON 对照脚本改一行即可）或 xa 没注册（跑 `register-xa.ps1`）。
+- **不想被打扰**：`install-takeover-hooks.ps1 -Remove` 拆下（只动指向本脚本的条目，你自己挂的别的 hooks 原样保留），重启 IDE 生效。临时静音也可以直接 `xa off` 收起当前全屏带（顶部卡片是历史，用它自己的「清空全部」）。
+- **手动试一把**（不需等真实事件）：`'{"hook_event_name":"Stop","stop_hook_active":false}' | powershell -File ~\.qoder-cn\hooks\qoder-status.ps1`，屏幕应闪「对话完成」。
 
 ### 悬浮键盘动画窗口
 

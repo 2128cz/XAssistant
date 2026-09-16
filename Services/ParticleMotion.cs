@@ -37,6 +37,13 @@ public static class ParticleMotion
     public const double ShrinkTail = 0.9;
 
     /// <summary>
+    /// 散射方向：unit ∈ [0,1] 映射到下半圆 180° 扇面里的一个弧度值。
+    /// 屏幕坐标 y 朝下：0 = 正右、π/2 = 正下、π = 正左——粒子从浮岛往整面半圆里洒，
+    /// 而不是原来 60° 窄锥里的一个斜角。
+    /// </summary>
+    public static double ScatterDirection(double unit) => Math.PI / 2 + (unit - 0.5) * Math.PI;
+
+    /// <summary>
     /// 按 dt 推进一格。指数衰减取闭式解（乘 <c>e^(-k·dt)</c>），不是一帧一帧乘固定系数——
     /// 后者会让帧率改变衰减快慢，掉帧时粒子会当场"冻住"，正是卡顿的观感来源。
     /// 位移与初速永远平行（每步乘同一个标量），所以轨迹是一条直线。

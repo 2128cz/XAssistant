@@ -1,0 +1,35 @@
+<Window
+  x:Class="XAssistant.Views.MessageStackWindow"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  Title="消息"
+  WindowStyle="None"
+  AllowsTransparency="True"
+  Background="Transparent"
+  Topmost="True"
+  ShowInTaskbar="False"
+  ShowActivated="False"
+  Focusable="False"
+  SizeToContent="WidthAndHeight">
+  <!-- 顶部持久消息栈：xa -s 带文字时每条钉一张卡片，全屏带淡完后历史还留在这里可回看。
+       壳与 ToastWindow 同款（不抢焦点、无边框、按内容定尺寸），卡片是代码拼的，这里只有容器。 -->
+  <Border
+    Background="{DynamicResource PanelBackground}"
+    BorderBrush="{DynamicResource ControlBorder}"
+    BorderThickness="1"
+    CornerRadius="6"
+    Padding="10,8">
+    <StackPanel Orientation="Vertical">
+      <StackPanel x:Name="Cards" Orientation="Vertical"/>
+      <TextBlock
+        x:Name="ClearButton"
+        Text="清空全部"
+        FontSize="11"
+        Foreground="{DynamicResource TextHint}"
+        HorizontalAlignment="Right"
+        Margin="0,6,0,0"
+        Cursor="Hand"
+        MouseLeftButtonUp="ClearButton_MouseLeftButtonUp"/>
+    </StackPanel>
+  </Border>
+</Window>
