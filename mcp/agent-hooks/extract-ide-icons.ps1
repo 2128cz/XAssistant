@@ -17,7 +17,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
-if (-not ('Probe.Win32' -as [type])) {
+if (-not ('Probe' -as [type])) {
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;

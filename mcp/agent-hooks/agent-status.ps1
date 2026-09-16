@@ -83,20 +83,30 @@ try {
     # 不是首句对话内容——拿内容当标题会把聊天原文晒到屏幕上，用户明确不要）。
     # vscdb 被 IDE 独占，用 FileShare.ReadWrite 开流拷出来查；Latin1 字节↔字符 1:1，IndexOf 秒级
     $project = if ($evt.cwd) { Split-Path $evt.cwd -Leaf } else { '' }
-    $DbPaths = @{
-        'qoder'      = Join-Path $env:APPDATA 'QoderCN\User\globalStorage\state.vscdb'
-        'trae'       = Join-Path $env:APPDATA 'Trae CN\User\globalStorage\state.vscdb'
-        'trae-intl'  = Join-Path $env:APPDATA 'Trae\User\globalStorage\state.vscdb'
+    # 装机目录名各家版本飘过好几个写法（本机实测 QoderCN，社区也见 Trae SOLO CN），候选全列——
+    # 拿不到 vscdb 只是标题缺失，不影响提醒本身
+    $DbAppDirs = @{
+        'qoder'      = @('QoderCN', 'Qoder CN')
+        'trae'       = @('Trae CN', 'TRAE SOLO CN')
+        'trae-intl'  = @('Trae')
     }
-    function Get-TaskTitle([string]$sessionId, [string]$db) {
-        if (-not $sessionId -or -not $db -or -not (Test-Path $db)) { return '' }
-        try {
-            $fs = [IO.File]::Open($db, 'Open', 'Read', 'ReadWrite')
-            $bytes = New-Object byte[] $fs.Length
-            [void]$fs.Read($bytes, 0, $bytes.Length)
-            $fs.Dispose()
-        } catch { return '' }
-        $latin = [Text.Encoding]::GetEncoding('ISO-8859-1').GetString($bytes)
+    function Get-TaskTitle([string]$sessionId, [string[]]$appDirs) {
+        if (-not $sessionId) { return '' }
+        $latin = $null
+        foreach ($app in $appDirs) {
+            $db = Join-Path $env:APPDATA (Join-Path $app 'User\globalStorage\state.vscdb')
+            if (-not (Test-Path $db)) { continue }
+            try {
+                $fs = [IO.File]::Open($db, 'Open', 'Read', 'ReadWrite')
+                $bytes = New-Object byte[] $fs.Length
+                [void]$fs.Read($bytes, 0, $bytes.Length)
+                $fs.Dispose()
+            } catch { continue }
+            # Latin1 字节↔字符 1:1，IndexOf 秒级；中文值后面还原字节再 UTF8 解码
+            $latin = [Text.Encoding]::GetEncoding('ISO-8859-1').GetString($bytes)
+            break
+        }
+        if (-not $latin) { return '' }
         $taskId = $sessionId -replace '\.session\..*$', ''
         $anchor = '"' + $taskId + '"'
         $i = $latin.IndexOf($anchor)
@@ -105,7 +115,6 @@ try {
             $seg = $latin.Substring($i, [Math]::Min(900, $latin.Length - $i))
             $m = [regex]::Match($seg, '"(?:name|title)":"([^"]{1,80})"')
             if ($m.Success) {
-                # 值里的中文是 UTF-8 字节被 Latin1 原样映射，还原字节再正确解码
                 $vb = [Text.Encoding]::GetEncoding('ISO-8859-1').GetBytes($m.Groups[1].Value)
                 $title = ([Text.Encoding]::UTF8.GetString($vb) -replace '[\r\n\t]+', ' ').Trim()
                 if ($title) { return $title }
@@ -114,7 +123,7 @@ try {
         }
         return ''
     }
-    $dialog = Get-TaskTitle ([string]$evt.session_id) $DbPaths[$Platform]
+    $dialog = Get-TaskTitle ([string]$evt.session_id) $DbAppDirs[$Platform]
 
     # 文案格式固定为「事件词 · 请求人类介入：项目 · “对话标题” · 细节」，缺哪段省哪段
     $who = @()

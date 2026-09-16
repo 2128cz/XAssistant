@@ -107,3 +107,9 @@ if (-not $SkipXa) {
 }
 
 Write-Host "`n部署成功！" -ForegroundColor Green
+
+# hooks 不随部署自动装：改 IDE 全局配置需要显式意愿（决策见 CLAUDE.md），这里只提示一行
+$hooksScript = Join-Path $scriptPath "mcp\agent-hooks\install-agent-hooks.ps1"
+if (Test-Path $hooksScript) {
+    Write-Host "提示：要让 Qoder / Trae 等 IDE 的对话状态弹全屏提醒，跑一次 $hooksScript -Platform qoder（装完重启 IDE）" -ForegroundColor Cyan
+}
