@@ -26,8 +26,14 @@ $ErrorActionPreference = 'Stop'
 
 $scriptSrc = Join-Path $PSScriptRoot 'agent-status.ps1'
 $scriptName = 'agent-status.ps1'
-# 与 agent-status.ps1 的分诊分支一一对应；这里挂多了没用，挂少了会漏档
-$events = @('Notification', 'PermissionRequest', 'PostToolUseFailure', 'Stop')
+# 事件集合按平台落地（Trae 官方只有 6 个事件，没有 PermissionRequest/PostToolUseFailure，
+# 报错走 PostToolUse 的结果字段；挂不存在的事件名永远不会触发，反而盖住真实问题）
+$EventsByKind = @{
+    'settings-hooks' = @('Notification', 'PermissionRequest', 'PostToolUseFailure', 'Stop')
+    'hooks-file'     = @('Notification', 'PostToolUse', 'Stop')
+}
+# 摘旧条目与结构识别用全集：历史上给 Trae 误挂过 PermissionRequest/PostToolUseFailure，升级时要能收回来
+$allEvents = @('Notification', 'PermissionRequest', 'PostToolUseFailure', 'Stop', 'PostToolUse')
 
 $Platforms = [ordered]@{
     'qoder'      = @{ Label = 'Qoder CN（桌面版 / IDE）'; Kind = 'settings-hooks'; File = 'settings.json'; Rel = ''; State = '已实测（QoderComputerUse 接管遮罩 + 12 事件）' }
@@ -109,7 +115,7 @@ function Write-JsonFile([string]$path, $obj, [bool]$dry) {
 function Resolve-Layout($obj) {
     if ($null -eq $obj) { return 'nested' }
     if ($obj.PSObject.Properties['hooks']) { return 'nested' }
-    foreach ($ev in $events) { if ($obj.PSObject.Properties[$ev]) { return 'flat' } }
+    foreach ($ev in $allEvents) { if ($obj.PSObject.Properties[$ev]) { return 'flat' } }
     if ($kind -eq 'hooks-file') { return 'nested' }
     return 'nested'
 }
@@ -136,9 +142,10 @@ $existing = Read-JsonFile $target
 $layout = Resolve-Layout $existing
 $obj = if ($existing) { $existing } else { [pscustomobject]@{} }
 $bag = Get-HookBag $obj $layout
+$events = $EventsByKind[$kind]
 
-# 第一步永远是摘旧条目：装两次不会重复挂（幂等），拆的时候它就是卸载
-foreach ($ev in $events) {
+# 第一步永远是摘旧条目（用全集，连历史误挂的一起收）：装两次不会重复挂（幂等），拆的时候它就是卸载
+foreach ($ev in $allEvents) {
     if (-not $bag.PSObject.Properties[$ev]) { continue }
     $kept = @(Strip-Ours $bag.$ev)
     if ($kept.Count -gt 0) { $bag.$ev = $kept } else { [void]$bag.PSObject.Properties.Remove($ev) }

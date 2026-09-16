@@ -48,12 +48,14 @@ Run-Installer @('-Platform', 'qoder', '-Root', $q) | Out-Null
 $j = Get-Content (Join-Path $q 'settings.json') -Raw | ConvertFrom-Json
 Check 'Stop 仍只有 1 条' (@($j.hooks.Stop).Count -eq 1) "实际 $(@($j.hooks.Stop).Count)"
 
-Write-Host "`n== 3. hooks-file 形态（Trae：独立 hooks.json）=="
+Write-Host "`n== 3. hooks-file 形态（Trae：独立 hooks.json，只挂它真实存在的 3 个事件）=="
 $t = Join-Path $root 'trae'
 Run-Installer @('-Platform', 'trae', '-Root', $t) | Out-Null
 $j = Get-Content (Join-Path $t 'hooks.json') -Raw | ConvertFrom-Json
 Check '写在独立 hooks.json 里' ($null -ne $j.hooks)
-Check '装了 4 个事件' (@($j.hooks.PSObject.Properties.Name).Count -eq 4)
+Check '装了 3 个事件' (@($j.hooks.PSObject.Properties.Name).Count -eq 3) "实际 $(@($j.hooks.PSObject.Properties.Name).Count)"
+Check '挂了 PostToolUse（Trae 的报错通道）' ($null -ne $j.hooks.PostToolUse)
+Check '没挂 Trae 不存在的 PermissionRequest' ($null -eq $j.hooks.PermissionRequest)
 
 Write-Host "`n== 4. flat 自适应：顶层直接是事件名，且用户自己的条目必须留着 =="
 $flat = Join-Path $root 'flat'
@@ -65,7 +67,7 @@ $j = Get-Content (Join-Path $flat 'hooks.json') -Raw | ConvertFrom-Json
 Check '沿用 flat 布局（没有多出一层 hooks）' ($null -eq $j.hooks)
 Check '用户自己的 Stop 条目还在' ((Get-Content (Join-Path $flat 'hooks.json') -Raw) -match 'echo mine')
 Check 'Stop 现在是 2 条（用户的 + 我们的）' (@($j.Stop).Count -eq 2) "实际 $(@($j.Stop).Count)"
-Check '其余 3 个事件也挂上了' (@($j.PSObject.Properties.Name).Count -eq 4)
+Check '其余 2 个事件也挂上了' (@($j.PSObject.Properties.Name).Count -eq 3) "实际 $(@($j.PSObject.Properties.Name).Count)"
 
 Write-Host "`n== 5. 拆卸 =="
 Run-Installer @('-Platform', 'qoder', '-Root', $q, '-Remove') | Out-Null
@@ -111,10 +113,10 @@ function Wait-Quiet([int]$quietMs = 400, [int]$maxMs = 6000) {
         Start-Sleep -Milliseconds 40
     }
 }
-function Fire([string]$json, [int]$expect = 1) {
+function Fire([string]$json, [int]$expect = 1, [string]$plat = 'trae') {
     Wait-Quiet
     Remove-Item $fakeLog -Force -ErrorAction SilentlyContinue
-    $json | powershell -NoProfile -ExecutionPolicy Bypass -File $status -Platform trae -LogDir $logDir | Out-Null
+    $json | powershell -NoProfile -ExecutionPolicy Bypass -File $status -Platform $plat -LogDir $logDir | Out-Null
     $code = $LASTEXITCODE
     if ($expect -gt 0) {
         $deadline = (Get-Date).AddSeconds(6)
@@ -145,8 +147,23 @@ Check 'Notification(提问) → 黄档 + 提问' ((LastEffect) -match '提问') 
 Fire '{"hook_event_name":"Notification","notification_type":"permission_prompt","title":"other"}' | Out-Null
 Check 'Notification(接管) → 黄档 + 接管' ((LastEffect) -match '接管') (LastEffect)
 
-Fire '{"hook_event_name":"Notification","notification_type":"idle"}' 0 | Out-Null
-Check '非 permission_prompt 的通知不打扰' ((LineCount) -eq 0) "写到 $(LineCount) 行"
+# Trae 官方只发 idle_prompt（等待确认与任务完成都是它）：按平台语义分流
+Fire '{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"智能体已完成任务"}' 0 | Out-Null
+Check 'Trae 的 idle_prompt 静默（Stop 已报完成，不重复）' ((LineCount) -eq 0) "写到 $(LineCount) 行"
+Fire '{"hook_event_name":"Notification","notification_type":"idle_prompt"}' 1 'claude' | Out-Null
+Check 'Claude 的 idle_prompt → 接管黄档（空闲等人输入）' ((LastEffect) -match '接管') (LastEffect)
+Fire '{"hook_event_name":"Notification","notification_type":"weird_type"}' | Out-Null
+Check '未知通知类型 → 宁可多报不漏接管' ((LastEffect) -match '接管') (LastEffect)
+Fire '{"hook_event_name":"Notification","notification_type":"auth_success"}' 0 | Out-Null
+Check 'auth_success 不打扰' ((LineCount) -eq 0) "写到 $(LineCount) 行"
+
+# Trae 没有 PostToolUseFailure：报错从 PostToolUse 的结果字段判
+Fire '{"hook_event_name":"PostToolUse","tool_name":"Shell","exit_code":1,"cwd":"D:\\repo"}' | Out-Null
+Check 'PostToolUse 退出码非 0 → 红档 + 故障' (((LastEffect) -match '-s error') -and ((LastEffect) -match '故障')) (LastEffect)
+Fire '{"hook_event_name":"PostToolUse","tool_response":{"is_error":true,"content":"boom-ish"}}' | Out-Null
+Check 'PostToolUse is_error → 红档带摘要' (((LastEffect) -match '-s error') -and ((LastEffect) -match 'boom-ish')) (LastEffect)
+Fire '{"hook_event_name":"PostToolUse","tool_response":{"content":"all good"}}' 0 | Out-Null
+Check 'PostToolUse 结果正常 → 静默' ((LineCount) -eq 0) "写到 $(LineCount) 行"
 
 Fire '{"hook_event_name":"Stop","cwd":"D:\\repo"}' | Out-Null
 $e = LastEffect

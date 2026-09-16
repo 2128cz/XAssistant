@@ -106,14 +106,38 @@ try {
             Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$head · 请求人类介入$ctx`""
         }
         'Notification' {
-            # title/message 带的是机器码（如 AskUserQuestion），映射到事件词；permission_prompt 才提醒
-            if ($evt.notification_type -eq 'permission_prompt') {
-                $t = (([string]$evt.title) + ([string]$evt.message))
-                if ($t -match 'ask.?user.?question') {
-                    Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"提问 · 请求人类介入$ctx`""
-                } else {
-                    Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"接管 · 请求人类介入$ctx`""
-                }
+            # notification_type 的取值集合各家不同（实踩的坑）：Claude/Qoder 给确认发 permission_prompt，
+            # Trae 官方只有 idle_prompt（「等待确认」与「任务完成」都走它）。因此不拿类型等值硬筛：
+            # 先认提问词，确认类关键词归黄；idle_prompt 按平台语义分流；未知类型宁可多报不漏接管
+            $type = [string]$evt.notification_type
+            $t = $type + ' ' + ([string]$evt.title) + ' ' + ([string]$evt.message)
+            if ($t -match 'ask.?user.?question') {
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"提问 · 请求人类介入$ctx`""
+            } elseif ($type -match 'auth_success') {
+                # 认证成功不是「需要人」，不打扰
+            } elseif ($type -eq 'idle_prompt' -and $Platform -like 'trae*') {
+                # Trae 的 idle_prompt 是「任务完成」，Stop 已经报过，不重复
+            } elseif ($type -match 'permission|confirm|await|elicitation|needs|input|prompt') {
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"接管 · 请求人类介入$ctx`""
+            } else {
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"接管 · 请求人类介入$ctx`""
+            }
+        }
+        'PostToolUse' {
+            # Trae 没有 PostToolUseFailure：报错走这个事件的结果字段（error/exit_code/tool_response.is_error），
+            # 结果正常就静默；挂了此事件的其他平台也不会误报
+            $why = Cut $evt.error 48
+            if (-not $why -and $null -ne $evt.tool_response) {
+                $tr = $evt.tool_response
+                if ($tr.PSObject.Properties['error']) { $why = Cut ([string]$tr.error) 48 }
+                elseif ($tr.PSObject.Properties['is_error'] -and $tr.is_error) { $why = Cut ([string]$tr.content) 40 }
+            }
+            $code = 0
+            if ($evt.PSObject.Properties['exit_code']) { $code = [int]$evt.exit_code }
+            if ($why -or $code -ne 0) {
+                $lead = if ($evt.is_interrupt) { '中断' } else { '故障' }
+                $detail = if ($why) { ' · ' + $why } elseif ($code -ne 0) { " · 退出码 $code" } else { '' }
+                Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$lead · 请求人类介入$ctx$detail`""
             }
         }
         'Stop' {
