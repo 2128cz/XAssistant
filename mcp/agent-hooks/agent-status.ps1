@@ -25,16 +25,29 @@ $log = Join-Path $LogDir 'agent-status.log'
 try {
     $raw = [Console]::In.ReadToEnd()
     if ([string]::IsNullOrWhiteSpace($raw)) { exit 0 }
-    $evt = $raw | ConvertFrom-Json
-    $name = [string]$evt.hook_event_name
 
     # 留一份原始 JSON：各平台字段名以文档协议为准，跑一轮后按这份日志校准。
-    # 前缀里带脚本所在目录名（`Platform@根目录`）：同一平台可能往多个候选位置装过配置，
+    # 前缀里带平台与脚本所在目录（`Platform@根目录`）：同一平台可能往多个候选位置装过配置，
     # 这一列能直接告诉你是哪个位置的配置被读到、进而被执行的。
     New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
     $origin = Split-Path (Split-Path $PSScriptRoot -Parent) -Leaf
+    $evt = $null
+    $name = '残缺事件'
+    try { $evt = $raw | ConvertFrom-Json; $name = [string]$evt.hook_event_name } catch { }
     "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') [$Platform@$origin] [$name] $(($raw -replace '[\r\n\t]+', ' ').Trim())" |
         Add-Content -Path $log -Encoding UTF8
+    if (-not $evt) {
+        # 事件 JSON 被拦腰截断（IDE 某些版本写 hook stdin 的新行为）：正则捞回事件名与 cwd，
+        # 报一条红提醒而不是静默吞掉——截断本身就是一种「对话意外中断」
+        $rescued = if ($raw -match '"hook_event_name"\s*:\s*"([^"]+)"') { $Matches[1] } else { '未知' }
+        $evt = [pscustomobject]@{ hook_event_name = 'BrokenEvent' }
+        if ($raw -match '"cwd"\s*:\s*"((?:[^"\\]|\\.)*)"') {
+            $cwd = $Matches[1] -replace '\\\\', '\'
+            $evt | Add-Member -NotePropertyName cwd -NotePropertyValue $cwd
+        }
+        $evt | Add-Member -NotePropertyName error_type -NotePropertyValue "数据截断($rescued)"
+        $name = 'BrokenEvent'
+    }
 
     # 找 xa：环境变量（自测/便携） → 注册垫片 → PATH → 仓库 Debug 产物
     $xa = $env:XASSISTANT_XA
@@ -85,6 +98,8 @@ try {
     $ctx = if ($who.Count -gt 0) { '：' + ($who -join ' · ') } else { '' }
 
     function Show-Effect([string]$argLine) {
+        # 来源标记进命令行：消息栈徽章拿它贴 IDE 图标；generic 不挂（没得认的就保持素条）
+        if ($Platform -and $Platform -ne 'generic') { $argLine += " -from $Platform" }
         if ($NoEffect) {
             "$(Get-Date -Format 'HH:mm:ss')  [dry-run] $xa $argLine" | Add-Content -Path $log -Encoding UTF8
             return
@@ -94,6 +109,17 @@ try {
     }
 
     switch ($name) {
+        'BrokenEvent' {
+            $detail = if ($evt.error_type) { ' · ' + (Cut ([string]$evt.error_type) 30) } else { '' }
+            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"提醒 · 请求人类介入：事件数据不完整$ctx$detail`""
+        }
+        'StopFailure' {
+            # 整轮回复被 API 错误打断（限流、配额溢出、过载…）：不是工具报错，是对话直接断了，同样归红
+            $why = Cut $evt.error_type 30
+            if (-not $why) { $why = Cut $evt.error 40 }
+            $detail = if ($why) { ' · ' + $why } else { '' }
+            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"中断 · 请求人类介入$ctx$detail`""
+        }
         'PostToolUseFailure' {
             $why = Cut $evt.error 48
             $lead = if ($evt.is_interrupt) { '中断' } else { '故障' }

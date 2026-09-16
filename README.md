@@ -101,14 +101,14 @@
 同一个 exe 还能无头调用——不建容器、不装钩子、不开主窗、不碰数据库，放完就退。用 `register-xa.ps1` 把 `xa` 注册进 PATH（`deploy.ps1` 部署时会自动做，`-SkipXa` 可跳过），之后在 cmd / PowerShell / AI 工具里直接写一条效果命令：
 
 ```
-xa -s <色|类型> [持续 [淡入 [淡出]]] [-border on|off [渐宽 [延伸 [周期]]]] [-lable on|off [字号] [文本…]]
+xa -s <色|类型> [持续 [淡入 [淡出]]] [-border on|off [渐宽 [延伸 [周期]]]] [-lable on|off [字号] [文本…]] [-from <平台>]
 ```
 
 例：`xa -s info 5 1 1 -border on 50 30 1 -lable on 24 "AI 接管中"`。`-s` 段给颜色——颜色名（`green`、`amber`、`#3B82F6` 等）或类型色（`info` / `warn` / `error` 及其缩写）——与三段节奏（默认 5 / 1 / 1 秒）；`-border` 是四边的淡化渐变带：两个数字分别是主带与淡出延伸带的宽度（px），第三个是亮度呼吸的循环周期（秒），总持续时间内自动在明暗之间循环，写 0 就静态亮着；`-lable` 段第一个数字永远是字号，剩下的是条带文案，写 `off` 或不给文案就只剩边框。`xa confetti` 撒花、`xa off` 收起。
 
 旧写法照旧兼容：`XAssistant.exe --fx warn 3 "AI Computer Use"`、`--fx confetti`、`--fx off`。`mcp/xassistant_fx_server.py` 是个纯标准库的 MCP 垫片，把 `xassistant_banner` / `xassistant_confetti` / `xassistant_off` 三个工具翻译成上面的命令；可执行文件位置读环境变量 `XASSISTANT_EXE`。
 
-带文字的命令除了全屏那几秒，还会在屏幕顶居中钉一张**持久消息卡片**（左侧色条是命令颜色，文案 + 时间戳，新消息插最前、旧的往下排着可回看，单条 ✕ 或清空全部，同屏最多 10 张）——全屏大字淡完就没了，但「AI 在等你」这件事不该凭空蒸发。卡片由常驻的 XAssistant 主程序钉住（命令经本机命名管道交给它，多个 xa 调用不会抢屏）；主程序没跑时全屏效果照放、卡片没人钉。
+带文字的命令除了全屏那几秒，还会在屏幕顶居中钉一张**持久消息卡片**（文案 + 时间戳，新消息插最前、旧的往下排着可回看，单条 ✕ 或清空全部，同屏最多 10 张）——全屏大字淡完就没了，但「AI 在等你」这件事不该凭空蒸发。写了 `-from <平台>` 的卡片头部是一枚**来源徽章**：IDE 图标（`Assets/IdeIcons/`，由 `mcp/agent-hooks/extract-ide-icons.ps1` 从各家 exe 抽 256px 高清帧）贴在淡化主题色的圆底上，没抽到图标的平台退首字母徽章，没写来源保持素色条。卡片由常驻的 XAssistant 主程序钉住（命令经本机命名管道交给它，多个 xa 调用不会抢屏）；主程序没跑时全屏效果照放、卡片没人钉。
 
 ### AI 编码代理的对话状态提醒
 
@@ -116,8 +116,8 @@ xa -s <色|类型> [持续 [淡入 [淡出]]] [-border on|off [渐宽 [延伸 [�
 
 | 状态 | 触发事件 | 提醒（机械式文案） |
 |---|---|---|
-| 报错打断（红） | `PostToolUseFailure`（Claude/Qoder）；Trae 无此事件，走 `PostToolUse` 的 exit_code / tool_response.is_error | 全屏红带「故障 / 中断 · 请求人类介入：项目 · “标题” · <报错>」+ 四边渐变带 + 消息卡 |
-| 需人工接管（黄） | `PermissionRequest`、`Notification`（确认/提问类通知） | 黄带「提问 / 接管 / 授权(工具) · 请求人类介入：项目 · “标题”」+ 消息卡 |
+| 报错打断（红） | `PostToolUseFailure`（Claude/Qoder）；`StopFailure`（整轮回复被限流/配额/API 错误打断，如 token limit）；Trae 无这两个事件，走 `PostToolUse` 的 exit_code / tool_response.is_error | 全屏红带「故障 / 中断 · 请求人类介入：项目 · “标题” · <报错>」+ 四边渐变带 + 消息卡 |
+| 需人工接管（黄） | `PermissionRequest`、`Notification`（确认/提问类通知，**未知类型宁可多报不漏**） | 黄带「提问 / 接管 / 授权(工具) · 请求人类介入：项目 · “标题”」+ 消息卡 |
 | 对话结束（普通） | `Stop` | info 色「回复 · 已完成：项目 · “标题”」，5 秒 |
 
 文案格式固定为「事件词 · 行动指令：上下文」：项目名取事件 `cwd` 的叶目录，对话标题读 `transcript_path` 会话文件的首条用户消息（截 24 字），多项目并行时一眼看出是哪场对话卡住了；事件自带的机器码文案（如 `AskUserQuestion`）映射到事件词，缺哪段省哪段。提醒文案里不写颜色词，颜色由效果本身表达。
@@ -134,7 +134,7 @@ powershell -ExecutionPolicy Bypass -File mcp\agent-hooks\install-agent-hooks.ps1
 powershell -ExecutionPolicy Bypass -File mcp\agent-hooks\install-agent-hooks.ps1 -Platform qoder -Remove           # 拆
 ```
 
-脚本拷到各配置根的 `hooks\agent-status.ps1`，只增删指向它的条目（你自己挂的别家 hooks 原样保留、先备份 `.bak`）。**Qoder / Claude Code 的 hooks 不支持热重载，装完重启 IDE 生效**（Trae 改完建议也重启一次）。每次触发都把原始事件 JSON 记进 `%LOCALAPPDATA%\XAssistant\agent-hooks\agent-status.log`，字段对不上时拿它校准。提醒脚本永远 `exit 0`，再坏也不会阻断对话。改完 `mcp/agent-hooks/` 里的脚本跑一次 `selftest.ps1`（38 项断言：装/幂等/结构自适应/拆卸不伤用户条目/各平台事件分诊与静默）。
+脚本拷到各配置根的 `hooks\agent-status.ps1`，只增删指向它的条目（你自己挂的别家 hooks 原样保留、先备份 `.bak`），命令自动带 `-from <平台>` 让消息卡认得出来源。**Qoder / Claude Code 的 hooks 不支持热重载，装完重启 IDE 生效**（Trae 改完建议也重启一次；IDE 自动更新可能把配置改旧或把主程序带走，更新后没提醒先重跑安装脚本并确认 XAssistant 在跑）。每次触发都把原始事件 JSON 记进 `%LOCALAPPDATA%\XAssistant\agent-hooks\agent-status.log`，字段对不上时拿它校准；**事件 JSON 被 IDE 写截断时会报一条红档「提醒 · 请求人类介入：事件数据不完整」而不是静默吞掉**。提醒脚本永远 `exit 0`，再坏也不会阻断对话。改完 `mcp/agent-hooks/` 里的脚本跑一次 `selftest.ps1`（42 项断言：装/幂等/结构自适应/拆卸不伤用户条目/各平台事件分诊与静默/来源标记）。新装 IDE 想上徽章：跑 `extract-ide-icons.ps1` 重抽一轮图标。
 
 生效与排查：
 

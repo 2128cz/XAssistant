@@ -17,6 +17,7 @@ namespace XAssistant.Services;
 ///   <c>-s &lt;色|类型&gt; [持续 [淡入 [淡出]]]</c>            默认 info / 5 / 1 / 1
 ///   <c>-border on|off [渐宽 [延伸 [周期]]]</c>               默认 on / 50 / 30 / 1（周期 0 = 不循环）
 ///   <c>-lable on|off [字号] [文本…]</c>                      文本写在段内；不给文本就不显示文字条带
+///   <c>-from &lt;词&gt;</c>                                  来源平台标记（hook 传 -Platform 名），消息栈卡片拿它配 IDE 图标徽章
 ///   <c>confetti</c> / <c>off</c>                            撒花 / 收起
 ///
 /// 语法（旧，保留兼容 <c>--fx</c> 与 MCP 垫片）：<c>warn 3 "AI Computer Use"</c>，走 <see cref="SlashParser"/>，
@@ -63,6 +64,9 @@ public sealed record EffectCommand
     /// <summary>条带文字字号（DIP）；斜线高度按字号推，二者始终等高。</summary>
     public double FontSize { get; set; } = 46;
 
+    /// <summary>来源平台标记（<c>-from qoder</c>）：消息栈徽章用它配 IDE 图标；自由词不校验，没写就不贴徽章。</summary>
+    public string? Source { get; set; }
+
     /// <summary>数字参数缺省值（与上面的属性默认值一一对应，改一处要同步另一处）。</summary>
     private static readonly double[] ShowDefaults = [5, 1, 1];
     private static readonly double[] BorderDefaults = [50, 30, 1];
@@ -85,7 +89,7 @@ public sealed record EffectCommand
     private static readonly string[] ConfettiWords = ["confetti", "celebrate", "花"];
 
     /// <summary>新语法的段开关。任一个出现就走新解析，否则整条按旧语法读。</summary>
-    private static readonly string[] SectionSwitches = ["-s", "-border", "-lable", "-label"];
+    private static readonly string[] SectionSwitches = ["-s", "-border", "-lable", "-label", "-from"];
 
     /// <summary>
     /// 解析一整行命令。返回 false = 不是已知指令（整条跳过，不猜、不弹、不报错），
@@ -133,6 +137,7 @@ public sealed record EffectCommand
         var show = new List<string>();
         var border = new List<string>();
         var label = new List<string>();
+        var from = new List<string>();
         List<string>? current = null;
         foreach (string token in tokens)
         {
@@ -141,12 +146,14 @@ public sealed record EffectCommand
                 case "-s": current = show; break;
                 case "-border": current = border; break;
                 case "-lable" or "-label": current = label; break;
+                case "-from": current = from; break;
                 default:
                     if (current is null) return false;   // 段开关之外的裸内容：不是已知语法
                     current.Add(token);
                     break;
             }
         }
+        if (from.Count > 0) command.Source = from[0].ToLowerInvariant();   // 多写只认第一个：平台名就一个词
         return ParseShow(show, command) && ParseBorder(border, command) && ParseLabel(label, command);
     }
 

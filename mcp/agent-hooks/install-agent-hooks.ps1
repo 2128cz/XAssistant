@@ -27,13 +27,14 @@ $ErrorActionPreference = 'Stop'
 $scriptSrc = Join-Path $PSScriptRoot 'agent-status.ps1'
 $scriptName = 'agent-status.ps1'
 # 事件集合按平台落地（Trae 官方只有 6 个事件，没有 PermissionRequest/PostToolUseFailure，
-# 报错走 PostToolUse 的结果字段；挂不存在的事件名永远不会触发，反而盖住真实问题）
+# 报错走 PostToolUse 的结果字段；挂不存在的事件名永远不会触发，反而盖住真实问题）。
+# StopFailure = 整轮回复被 API 错误打断（限流/配额溢出），Claude 系有此事件，归红
 $EventsByKind = @{
-    'settings-hooks' = @('Notification', 'PermissionRequest', 'PostToolUseFailure', 'Stop')
+    'settings-hooks' = @('Notification', 'PermissionRequest', 'PostToolUseFailure', 'StopFailure', 'Stop')
     'hooks-file'     = @('Notification', 'PostToolUse', 'Stop')
 }
 # 摘旧条目与结构识别用全集：历史上给 Trae 误挂过 PermissionRequest/PostToolUseFailure，升级时要能收回来
-$allEvents = @('Notification', 'PermissionRequest', 'PostToolUseFailure', 'Stop', 'PostToolUse')
+$allEvents = @('Notification', 'PermissionRequest', 'PostToolUseFailure', 'StopFailure', 'Stop', 'PostToolUse')
 
 $Platforms = [ordered]@{
     'qoder'      = @{ Label = 'Qoder CN（桌面版 / IDE）'; Kind = 'settings-hooks'; File = 'settings.json'; Rel = ''; State = '已实测（QoderComputerUse 接管遮罩 + 12 事件）' }

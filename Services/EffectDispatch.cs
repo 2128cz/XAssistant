@@ -27,8 +27,9 @@ public static class EffectDispatch
         if (command.Confetti) { EffectsWindow.Confetti(ConfettiCount); return ConfettiSeconds; }
         EffectsWindow.ShowCommand(command);
         // 全屏那条大字淡完就没了；同一句话钉进消息栈，事后抬眼就能回看（只有边框没文字的指令不入栈）
+        // -from 的平台标记跟着进栏：徽章贴 IDE 图标，多平台聚合也能认出是谁发的
         if (command.Text is { Length: > 0 } text)
-            MessageStackWindow.Push(text, EffectCommand.BrushOf(command.Color) ?? Accent());
+            Views.MessageStackWindow.Push(text, EffectCommand.BrushOf(command.Color) ?? Accent(), command.Source);
         return command.FadeIn + command.Hold + command.FadeOut;
     }
 

@@ -37,8 +37,9 @@ Write-Host "`n== 1. settings-hooks 形态（Qoder / Claude Code）=="
 $q = Join-Path $root 'qoder'
 Run-Installer @('-Platform', 'qoder', '-Root', $q) | Out-Null
 $j = Get-Content (Join-Path $q 'settings.json') -Raw | ConvertFrom-Json
-Check '装了 4 个事件' (@($j.hooks.PSObject.Properties.Name).Count -eq 4) "实际 $(@($j.hooks.PSObject.Properties.Name).Count)"
+Check '装了 5 个事件' (@($j.hooks.PSObject.Properties.Name).Count -eq 5) "实际 $(@($j.hooks.PSObject.Properties.Name).Count)"
 Check 'hooks 挂在 hooks 节点下' ($null -ne $j.hooks.Stop)
+Check '挂了 StopFailure（API 打断通道）' ($null -ne $j.hooks.StopFailure)
 Check '指向 agent-status.ps1' ((Get-Content (Join-Path $q 'settings.json') -Raw) -match 'agent-status\.ps1')
 $bom = [System.IO.File]::ReadAllBytes((Join-Path $q 'hooks\agent-status.ps1'))[0..2] | ForEach-Object { $_.ToString('X2') }
 Check '落盘脚本带 UTF8-BOM' (($bom -join ' ') -eq 'EF BB BF') ($bom -join ' ')
@@ -134,6 +135,13 @@ function Fire([string]$json, [int]$expect = 1, [string]$plat = 'trae') {
 Check 'PermissionRequest 正常退出' ((Fire '{"hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"D:\\repo"}') -eq 0)
 $e = LastEffect
 Check 'PermissionRequest → 黄档 + 授权(工具) + 项目名' (($e -match '-s warn') -and ($e -match '授权\(Bash\)') -and ($e -match 'repo')) $e
+Check '命令行带 -from 来源标记（消息栈徽章靠它）' ($e -match '-from trae') $e
+
+Fire '{"hook_event_name":"StopFailure","error_type":"ratelimit","cwd":"D:\\repo"}' | Out-Null
+Check 'StopFailure（限流/配额打断）→ 红档 + 中断 + 错误型' (((LastEffect) -match '-s error') -and ((LastEffect) -match '中断') -and ((LastEffect) -match 'ratelimit')) (LastEffect)
+
+Fire '{"hook_event_name":"Notification","notification_' | Out-Null
+Check '截断的事件 JSON → 红档「事件数据不完整」而非静默吞' (((LastEffect) -match '-s error') -and ((LastEffect) -match '事件数据不完整')) (LastEffect)
 
 Fire '{"hook_event_name":"PostToolUseFailure","error":"boom","cwd":"D:\\repo"}' | Out-Null
 $e = LastEffect

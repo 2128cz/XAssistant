@@ -24,6 +24,11 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
+    <!-- IdeIcons：消息栈来源徽章的 IDE 图标（mcp/agent-hooks/extract-ide-icons.ps1 从各 IDE 的 exe 抽取） -->
+    <Content Include="Assets\IdeIcons\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
