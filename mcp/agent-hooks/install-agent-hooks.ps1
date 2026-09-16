@@ -141,7 +141,15 @@ function Strip-Ours($arr) {
 
 $existing = Read-JsonFile $target
 $layout = Resolve-Layout $existing
-$obj = if ($existing) { $existing } else { [pscustomobject]@{} }
+# Trae 的独立 hooks.json 官方 schema 第一字段就是 "version": 1（docs.trae.cn Hook 配置详解）——
+# 缺了它整份文件可能被判无效直接不读，这个实锤过一轮：没 version 时 Trae 零触发
+$obj = if ($existing) { $existing } elseif ($kind -eq 'hooks-file') { [pscustomobject]@{ version = 1 } } else { [pscustomobject]@{} }
+if ($kind -eq 'hooks-file' -and -not $obj.PSObject.Properties['version']) {
+    # 已存在的文件排在最前补 version：PowerShell 没有插头的 API，重建一个把 version 摆第位
+    $withVersion = [pscustomobject]@{ version = 1 }
+    foreach ($prop in $obj.PSObject.Properties) { if ($prop.Name -ne 'version') { $withVersion | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value } }
+    $obj = $withVersion
+}
 $bag = Get-HookBag $obj $layout
 $events = $EventsByKind[$kind]
 

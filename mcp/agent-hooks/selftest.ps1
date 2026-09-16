@@ -54,6 +54,7 @@ $t = Join-Path $root 'trae'
 Run-Installer @('-Platform', 'trae', '-Root', $t) | Out-Null
 $j = Get-Content (Join-Path $t 'hooks.json') -Raw | ConvertFrom-Json
 Check '写在独立 hooks.json 里' ($null -ne $j.hooks)
+Check '带官方要求的 version: 1 字段' ([int]$j.version -eq 1) "实得 $($j.version)"
 Check '装了 3 个事件' (@($j.hooks.PSObject.Properties.Name).Count -eq 3) "实际 $(@($j.hooks.PSObject.Properties.Name).Count)"
 Check '挂了 PostToolUse（Trae 的报错通道）' ($null -ne $j.hooks.PostToolUse)
 Check '没挂 Trae 不存在的 PermissionRequest' ($null -eq $j.hooks.PermissionRequest)
@@ -68,7 +69,7 @@ $j = Get-Content (Join-Path $flat 'hooks.json') -Raw | ConvertFrom-Json
 Check '沿用 flat 布局（没有多出一层 hooks）' ($null -eq $j.hooks)
 Check '用户自己的 Stop 条目还在' ((Get-Content (Join-Path $flat 'hooks.json') -Raw) -match 'echo mine')
 Check 'Stop 现在是 2 条（用户的 + 我们的）' (@($j.Stop).Count -eq 2) "实际 $(@($j.Stop).Count)"
-Check '其余 2 个事件也挂上了' (@($j.PSObject.Properties.Name).Count -eq 3) "实际 $(@($j.PSObject.Properties.Name).Count)"
+Check '其余 2 个事件也挂上了' (@($j.PSObject.Properties.Name | Where-Object { $_ -ne 'version' }).Count -eq 3) "实得 $(@($j.PSObject.Properties.Name | Where-Object { $_ -ne 'version' }).Count)"
 
 Write-Host "`n== 5. 拆卸 =="
 Run-Installer @('-Platform', 'qoder', '-Root', $q, '-Remove') | Out-Null
@@ -78,7 +79,7 @@ $j = Get-Content (Join-Path $flat 'hooks.json') -Raw | ConvertFrom-Json
 Check '混合文件保留下来' (Test-Path (Join-Path $flat 'hooks.json'))
 Check '只摘掉我们的条目（剩用户那 1 条）' (@($j.Stop).Count -eq 1) "实际 $(@($j.Stop).Count)"
 Check '用户的条目原样保留' ((Get-Content (Join-Path $flat 'hooks.json') -Raw) -match 'echo mine')
-Check '我们挂的其余事件也摘干净了' (@($j.PSObject.Properties.Name).Count -eq 1)
+Check '我们挂的其余事件也摘干净了' (@($j.PSObject.Properties.Name | Where-Object { $_ -notin 'version', 'hooks' }).Count -eq 1) "实得 $(@($j.PSObject.Properties.Name | Where-Object { $_ -notin 'version', 'hooks' }).Count)"
 
 Write-Host "`n== 6. 未校准的平台默认拒写 =="
 $code = Run-Installer @('-Platform', 'cursor', '-Root', (Join-Path $root 'cursor'))
