@@ -110,33 +110,46 @@ xa -s <色|类型> [持续 [淡入 [淡出]]] [-border on|off [渐宽 [延伸 [�
 
 带文字的命令除了全屏那几秒，还会在屏幕顶居中钉一张**持久消息卡片**（左侧色条是命令颜色，文案 + 时间戳，新消息插最前、旧的往下排着可回看，单条 ✕ 或清空全部，同屏最多 10 张）——全屏大字淡完就没了，但「AI 在等你」这件事不该凭空蒸发。卡片由常驻的 XAssistant 主程序钉住（命令经本机命名管道交给它，多个 xa 调用不会抢屏）；主程序没跑时全屏效果照放、卡片没人钉。
 
-### Qoder 对话状态提醒
+### AI 编码代理的对话状态提醒
 
-用 Qoder CN 写对话（尤其 Computer Use 接管屏幕）时，AI 卡在你这一侧往往没人提醒。`mcp/qoder-hooks/install-takeover-hooks.ps1` 把对话生命周期事件接进上面的 `xa`，三级分档：
+用 AI 编码代理写对话（尤其它接管屏幕、Computer Use 自己点鼠标时），AI 卡在你这一侧往往没人提醒。`mcp/agent-hooks/install-agent-hooks.ps1` 把各家的对话生命周期事件接进上面的 `xa`，三级分档：
 
 | 状态 | 触发事件 | 提醒（机械式文案） |
 |---|---|---|
-| 报错打断（红） | `PostToolUseFailure` | 全屏红带「故障 · 请求人类介入：项目 · “标题” · <报错>」+ 四边渐变带 + 消息卡 |
+| 报错打断（红） | `PostToolUseFailure` | 全屏红带「故障 / 中断 · 请求人类介入：项目 · “标题” · <报错>」+ 四边渐变带 + 消息卡 |
 | 需人工接管（黄） | `PermissionRequest`、`Notification`（permission_prompt） | 黄带「提问 / 接管 / 授权(工具) · 请求人类介入：项目 · “标题”」+ 消息卡 |
 | 对话结束（普通） | `Stop` | info 色「回复 · 已完成：项目 · “标题”」，5 秒 |
 
-文案格式固定为「事件词 · 行动指令：上下文」：上下文是「项目 · “对话标题”」——项目名取事件 `cwd` 的叶目录，对话标题读 `transcript_path` 会话文件的首条用户消息（截 24 字），多项目并行时一眼看出是哪场对话卡住了；事件自带的机器码文案（如 `AskUserQuestion`）映射到事件词，缺哪段省哪段。
+文案格式固定为「事件词 · 行动指令：上下文」：上下文是「项目 · “对话标题”」——项目名取事件 `cwd` 的叶目录，对话标题读 `transcript_path` 会话文件的首条用户消息（截 24 字），多项目并行时一眼看出是哪场对话卡住了；事件自带的机器码文案（如 `AskUserQuestion`）映射到事件词，缺哪段省哪段。提醒文案里不写颜色词，颜色由效果本身表达。
+
+Claude Code 定下的那套 hooks 协议已是跨厂商事实标准——同一批 PascalCase 事件名 + stdin 收 JSON + exit code 表态——所以**一份状态脚本服务所有平台**，差别只在配置写到哪个文件：
+
+| 平台 | 配置落点 | 装法 |
+|---|---|---|
+| Qoder CN | `~/.qoder-cn/settings.json` 的 `hooks` 节点 | `-Platform qoder` |
+| Claude Code | `~/.claude/settings.json` 的 `hooks` 节点 | `-Platform claude` |
+| Trae CN | **独立文件** `~/.trae-cn/hooks.json`（项目级 `<repo>/.trae/hooks.json`） | `-Platform trae [-ProjectPath <仓库>]` |
+| Trae（国际版） | `~/.trae/hooks.json` | `-Platform trae-intl` |
 
 一键装 / 拆：
 
 ```
-powershell -ExecutionPolicy Bypass -File mcp\qoder-hooks\install-takeover-hooks.ps1           # 装
-powershell -ExecutionPolicy Bypass -File mcp\qoder-hooks\install-takeover-hooks.ps1 -Remove  # 拆
+powershell -ExecutionPolicy Bypass -File mcp\agent-hooks\install-agent-hooks.ps1 -List                 # 看平台表与验证状态
+powershell -ExecutionPolicy Bypass -File mcp\agent-hooks\install-agent-hooks.ps1 -Platform qoder      # 装
+powershell -ExecutionPolicy Bypass -File mcp\agent-hooks\install-agent-hooks.ps1 -Platform trae -DryRun  # 只看会写什么
+powershell -ExecutionPolicy Bypass -File mcp\agent-hooks\install-agent-hooks.ps1 -Platform qoder -Remove # 拆
 ```
 
-脚本拷到 `~\.qoder-cn\hooks\qoder-status.ps1`，只往 `settings.json` 里合并 `hooks` 节点（其余配置原样保留、先备份 `.bak`）；**Qoder Hooks 不支持热重载，装完重启 IDE 生效**。每次触发都把原始事件 JSON 记进同目录 `qoder-status.log`，字段对不上时拿它校准。提醒脚本永远 `exit 0`，再坏也不会阻断对话。检测方法的实盘报告在 `mcp/qoder-cn-computeruse-takeover-detection.md`（接管遮罩的窗口类名、12 个 hook 事件对照表）。
+脚本拷到 `<配置根>\hooks\agent-status.ps1`，只增删指向它的条目（你自己挂的别家 hooks 原样保留、先备份 `.bak`）。**Qoder / Claude Code 的 hooks 不支持热重载，装完重启 IDE 生效**。Trae 的配置结构还没有可对照的官方模板，安装器会**按目标文件已有的结构**来写（外层带 `hooks` 就写里层，顶层直接是事件名就写顶层），拿不准时先 `-DryRun` 看它准备写什么，或先在 Trae 自己的 Hooks 面板里加一条再让安装器沿用那个结构。每次触发都把原始事件 JSON 记进 `%LOCALAPPDATA%\XAssistant\agent-hooks\agent-status.log`，字段对不上时拿它校准。提醒脚本永远 `exit 0`，再坏也不会阻断对话。
 
 生效与排查：
 
 - **首次启用**：跑一次安装脚本 → 重启 IDE → 下一轮对话回复结束时就该闪出 info 色「对话完成」并钉一张顶部消息卡。没钉卡不代表没提醒——消息栈由常驻主程序钉，主程序没跑（且开机自启没开）时只有全屏效果。
-- **完全没反应**：看 `qoder-status.log` 有没有新行。没有 = hooks 配置没被读到，确认 `settings.json` 的 `hooks` 节点在位且 IDE 确实重启过；有行但没提醒 = 事件字段名与协议有出入（把 log 里的原始 JSON 对照脚本改一行即可）或 xa 没注册（跑 `register-xa.ps1`）。
-- **不想被打扰**：`install-takeover-hooks.ps1 -Remove` 拆下（只动指向本脚本的条目，你自己挂的别的 hooks 原样保留），重启 IDE 生效。临时静音也可以直接 `xa off` 收起当前全屏带（顶部卡片是历史，用它自己的「清空全部」）。
-- **手动试一把**（不需等真实事件）：`'{"hook_event_name":"Stop","stop_hook_active":false}' | powershell -File ~\.qoder-cn\hooks\qoder-status.ps1`，屏幕应闪「对话完成」。
+- **完全没反应**：看 `agent-status.log` 有没有新行。没有 = hooks 配置没被读到，确认配置文件在位且 IDE 确实重启过；有行但没提醒 = 事件字段名与协议有出入（把 log 里的原始 JSON 对照脚本改一行即可）或 xa 没注册（跑 `register-xa.ps1`）。
+- **不想被打扰**：加 `-Remove` 拆下（只动指向本脚本的条目，你自己挂的别的 hooks 原样保留），重启 IDE 生效。临时静音也可以直接 `xa off` 收起当前全屏带（顶部卡片是历史，用它自己的「清空全部」）。
+- **手动试一把**（不必等真实事件）：`'{"hook_event_name":"Stop","stop_hook_active":false}' | powershell -File ~\.qoder-cn\hooks\agent-status.ps1 -Platform qoder`，屏幕应闪「回复 · 已完成」。
+
+改完这两个脚本跑一次 `mcp\agent-hooks\selftest.ps1`：30 项断言盖上装 / 幂等 / 结构自适应 / 拆卸不伤用户自己的条目 / 事件分诊文案与静默。方法与实盘报告在 `mcp/qoder-cn-computeruse-takeover-detection.md`（Qoder CN 接管遮罩窗口类名、12 个 hook 事件表）与 `mcp/ide-hooks-takeover-detection.md`（跨平台横向验证，含内核差异结论）。
 
 ### 悬浮键盘动画窗口
 

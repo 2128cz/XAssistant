@@ -1,12 +1,26 @@
-﻿# qoder-status.ps1 —— Qoder CN 对话状态 → xa 全屏提醒（由 IDE Hooks 在事件触发时调用）
-# 事件 JSON 从 stdin 传入（Claude Code hooks 协议兼容）。三级分档：
-#   PostToolUseFailure        红：报错打断，需要人去查看
-#   PermissionRequest         黄：等授权/补充信息，对话卡在人这一侧
-#   Notification(permission_prompt)  黄：同上，通知型
-#   Stop                      普通：这轮回复完成（stop_hook_active 时跳过，防死循环）
-# 铁律：永远 exit 0——提醒脚本再坏也不许把对话流阻断。
+﻿# agent-status.ps1 —— AI 编码代理的会话状态 → xa 全屏提醒（多平台通用）
+#
+# 由各平台的 hooks 在事件触发时调用，事件 JSON 从 stdin 传入。
+# 各平台（Claude Code / Qoder CN / Trae …）用的都是同一套 PascalCase 事件名与
+# 「stdin 收 JSON + exit code 表达决定」协议，分诊逻辑因此完全一致：
+# 一份脚本服务所有平台，平台差异只剩日志里那一列与安装器写的配置路径。
+#
+#   powershell -NoProfile -ExecutionPolicy Bypass -File agent-status.ps1 -Platform qoder
+#
+# 分档（与 qoder-status.ps1 的文案一脉相承，改了会连累已装机的用户习惯）：
+#   PostToolUseFailure               红：报错打断，需要人去查看
+#   PermissionRequest                黄：等授权，对话卡在人这一侧
+#   Notification(permission_prompt)  黄：同上（提问 / 接管）
+#   Stop                             普通：这轮回复完成（stop_hook_active 时静默，防死循环）
+# 铁律：永远 exit 0 —— 提醒脚本再坏也不许把对话流阻断。
+param(
+    [string]$Platform = 'generic',
+    [string]$LogDir = (Join-Path $env:LOCALAPPDATA 'XAssistant\agent-hooks'),
+    [switch]$NoEffect          # 自测用：只记日志，不拉 xa
+)
 
 $ErrorActionPreference = 'Continue'
+$log = Join-Path $LogDir 'agent-status.log'
 
 try {
     $raw = [Console]::In.ReadToEnd()
@@ -14,25 +28,31 @@ try {
     $evt = $raw | ConvertFrom-Json
     $name = [string]$evt.hook_event_name
 
-    # 留一份原始 JSON：首版字段名以文档协议为准，真实 IDE 跑一轮后按这份日志校准
-    $hookDir = Join-Path $env:USERPROFILE '.qoder-cn\hooks'
-    New-Item -ItemType Directory -Force -Path $hookDir | Out-Null
-    $log = Join-Path $hookDir 'qoder-status.log'
-    "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') [$name] $(($raw -replace '[\r\n\t]+', ' ').Trim())" |
+    # 留一份原始 JSON：各平台字段名以文档协议为准，跑一轮后按这份日志校准。
+    # 前缀里带脚本所在目录名（`Platform@根目录`）：同一平台可能往多个候选位置装过配置，
+    # 这一列能直接告诉你是哪个位置的配置被读到、进而被执行的。
+    New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+    $origin = Split-Path (Split-Path $PSScriptRoot -Parent) -Leaf
+    "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') [$Platform@$origin] [$name] $(($raw -replace '[\r\n\t]+', ' ').Trim())" |
         Add-Content -Path $log -Encoding UTF8
 
-    # 找 xa：注册垫片 → PATH → 仓库 Debug 产物（register-xa.ps1 维护的那条链）
-    $xa = Join-Path $env:LOCALAPPDATA 'XAssistant\bin\xa.cmd'
-    if (-not (Test-Path $xa)) {
-        $cmd = Get-Command xa -ErrorAction SilentlyContinue
-        if ($cmd) {
-            $xa = $cmd.Source
+    # 找 xa：环境变量（自测/便携） → 注册垫片 → PATH → 仓库 Debug 产物
+    $xa = $env:XASSISTANT_XA
+    if (-not $xa -or -not (Test-Path $xa)) {
+        $candidate = Join-Path $env:LOCALAPPDATA 'XAssistant\bin\xa.cmd'
+        if (Test-Path $candidate) {
+            $xa = $candidate
         } else {
-            $xa = Join-Path $PSScriptRoot '..\..\bin\Debug\net8.0-windows\XAssistant.exe'
+            $cmd = Get-Command xa -ErrorAction SilentlyContinue
+            if ($cmd) {
+                $xa = $cmd.Source
+            } else {
+                $xa = Join-Path $PSScriptRoot '..\..\bin\Debug\net8.0-windows\XAssistant.exe'
+            }
         }
     }
 
-    # 控制字符与引会打乱命令行，统一清掉；超长截断
+    # 控制字符与引号会打乱命令行，统一清掉；超长截断
     function Clean([string]$s) {
         if ([string]::IsNullOrWhiteSpace($s)) { return '' }
         ($s -replace '[\r\n\t]+', ' ' -replace '["“”]', '').Trim()
@@ -41,6 +61,7 @@ try {
         $s = Clean $s
         if ($s.Length -gt $n) { $s.Substring(0, $n) + '…' } else { $s }
     }
+
     # 事件带来的上下文：cwd 叶名是项目，transcript 首条用户消息就是对话标题（流式只读前几行）
     $project = if ($evt.cwd) { Split-Path $evt.cwd -Leaf } else { '' }
     function Get-SessionTitle([string]$path) {
@@ -56,12 +77,18 @@ try {
         return ''
     }
     $dialog = Get-SessionTitle ([string]$evt.transcript_path)
-    # 文案格式固定为「事件词 · 行动指令：项目 · “对话标题” · 细节」，缺哪段省哪段
+
+    # 文案格式固定为「事件词 · 请求人类介入：项目 · “对话标题” · 细节」，缺哪段省哪段
     $who = @()
     if ($project) { $who += $project }
     if ($dialog) { $who += ('“' + $dialog + '”') }
     $ctx = if ($who.Count -gt 0) { '：' + ($who -join ' · ') } else { '' }
+
     function Show-Effect([string]$argLine) {
+        if ($NoEffect) {
+            "$(Get-Date -Format 'HH:mm:ss')  [dry-run] $xa $argLine" | Add-Content -Path $log -Encoding UTF8
+            return
+        }
         # Start-Process 不等 xa：hook 脚本毫秒级交差，动画与消息栈由 XAssistant 自己放
         Start-Process -FilePath $xa -ArgumentList $argLine -WindowStyle Hidden
     }
