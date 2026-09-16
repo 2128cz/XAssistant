@@ -116,9 +116,11 @@ xa -s <色|类型> [持续 [淡入 [淡出]]] [-border on|off [渐宽 [延伸 [�
 
 | 状态 | 触发事件 | 提醒 |
 |---|---|---|
-| 报错打断（红） | `PostToolUseFailure` | 全屏红带「工具执行失败：<报错摘要>」+ 四边渐变带 + 消息卡 |
-| 需人工接管（黄） | `PermissionRequest`、`Notification`（permission_prompt） | 黄带「等待授权 / AI 等待人工接管」+ 消息卡 |
+| 报错打断（红） | `PostToolUseFailure` | 全屏红带「工具执行失败 : <报错摘要>」+ 四边渐变带 + 消息卡 |
+| 需人工接管（黄） | `PermissionRequest`、`Notification`（permission_prompt） | 黄带「等待授权 <工具>」/「AI 在提问，等你回答」+ 消息卡 |
 | 对话结束（普通） | `Stop` | info 色轻提醒「对话完成」，5 秒 |
+
+文案自动带上事件上下文：每条尾巴是「· 项目名 · “对话标题”」——项目名取事件 `cwd` 的叶目录，对话标题读 `transcript_path` 会话文件的首条用户消息（截 24 字），多项目并行时一眼看出是哪场对话卡住了；事件自带的机器码文案（如 `AskUserQuestion`）会翻成人话，缺哪段省哪段。
 
 一键装 / 拆：
 
