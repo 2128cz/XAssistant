@@ -56,12 +56,11 @@ try {
         return ''
     }
     $dialog = Get-SessionTitle ([string]$evt.transcript_path)
-    # 主体后缀：「项目 · “对话标题”」，缺哪段省哪段。
-    # 全角引号用单引号串拼：PS 分词器把 “” 也当字符串定界符，混在双引号串里会解析歧义
+    # 文案格式固定为「事件词 · 行动指令：项目 · “对话标题” · 细节」，缺哪段省哪段
     $who = @()
     if ($project) { $who += $project }
     if ($dialog) { $who += ('“' + $dialog + '”') }
-    $suffix = if ($who.Count -gt 0) { ' · ' + ($who -join ' · ') } else { '' }
+    $ctx = if ($who.Count -gt 0) { '：' + ($who -join ' · ') } else { '' }
     function Show-Effect([string]$argLine) {
         # Start-Process 不等 xa：hook 脚本毫秒级交差，动画与消息栈由 XAssistant 自己放
         Start-Process -FilePath $xa -ArgumentList $argLine -WindowStyle Hidden
@@ -70,31 +69,30 @@ try {
     switch ($name) {
         'PostToolUseFailure' {
             $why = Cut $evt.error 48
-            if (-not $why) { $why = Cut $evt.tool_name 40 }
-            $lead = if ($evt.is_interrupt) { '工具被打断' } else { '工具执行失败' }
-            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$lead : $why$suffix`""
+            $lead = if ($evt.is_interrupt) { '中断' } else { '故障' }
+            $detail = if ($why) { ' · ' + $why } else { '' }
+            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$lead · 请求人类介入$ctx$detail`""
         }
         'PermissionRequest' {
             $tool = Cut $evt.tool_name 30
-            Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"等待授权 $tool$suffix`""
+            $head = if ($tool) { "授权($tool)" } else { '授权' }
+            Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$head · 请求人类介入$ctx`""
         }
         'Notification' {
-            # 通知有多种类型，只有 permission_prompt 意味着「AI 在人这一侧等」；
-            # title/message 带的是机器码（如 AskUserQuestion），翻成人话再拼上下文
+            # title/message 带的是机器码（如 AskUserQuestion），映射到事件词；permission_prompt 才提醒
             if ($evt.notification_type -eq 'permission_prompt') {
                 $t = (([string]$evt.title) + ([string]$evt.message))
                 if ($t -match 'ask.?user.?question') {
-                    Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"AI 在提问，等你回答$suffix`""
+                    Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"提问 · 请求人类介入$ctx`""
                 } else {
-                    $msg = Cut $evt.message 36
-                    Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"需要人工接管 $msg$suffix`""
+                    Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"接管 · 请求人类介入$ctx`""
                 }
             }
         }
         'Stop' {
             # 本轮 Stop 若正是这个 hook 自己引发的，必须静默——否则 Stop→xa→Stop 无限循环
             if (-not $evt.stop_hook_active) {
-                Show-Effect "-s info 5 1 1 -border on 40 20 1 -lable on 22 `"对话完成$suffix`""
+                Show-Effect "-s info 5 1 1 -border on 40 20 1 -lable on 22 `"回复 · 已完成$ctx`""
             }
         }
     }
