@@ -23,7 +23,11 @@ $ErrorActionPreference = 'Continue'
 $log = Join-Path $LogDir 'agent-status.log'
 
 try {
-    $raw = [Console]::In.ReadToEnd()
+    # 用 UTF-8 直读 stdin 字节流：[Console]::In 会按系统码页（GBK）解码 IDE 写来的 UTF-8，
+    # 事件里的中文（如 Stop 的 last_assistant_message）一花，JSON 结构就被咬断、解析必挂——
+    # 这条实踩过的坑：当时误判成「IDE 写截断」，其实是我自己读坏
+    $reader = New-Object System.IO.StreamReader([Console]::OpenStandardInput(), [System.Text.Encoding]::UTF8)
+    $raw = $reader.ReadToEnd()
     if ([string]::IsNullOrWhiteSpace($raw)) { exit 0 }
 
     # 留一份原始 JSON：各平台字段名以文档协议为准，跑一轮后按这份日志校准。

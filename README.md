@@ -134,7 +134,7 @@ powershell -ExecutionPolicy Bypass -File mcp\agent-hooks\install-agent-hooks.ps1
 powershell -ExecutionPolicy Bypass -File mcp\agent-hooks\install-agent-hooks.ps1 -Platform qoder -Remove           # 拆
 ```
 
-脚本拷到各配置根的 `hooks\agent-status.ps1`，只增删指向它的条目（你自己挂的别家 hooks 原样保留、先备份 `.bak`），命令自动带 `-from <平台>` 让消息卡认得出来源。**Qoder / Claude Code 的 hooks 不支持热重载，装完重启 IDE 生效**（Trae 改完建议也重启一次；IDE 自动更新可能把配置改旧或把主程序带走，更新后没提醒先重跑安装脚本并确认 XAssistant 在跑）。每次触发都把原始事件 JSON 记进 `%LOCALAPPDATA%\XAssistant\agent-hooks\agent-status.log`，字段对不上时拿它校准；**事件 JSON 被 IDE 写截断时会报一条红档「提醒 · 请求人类介入：事件数据不完整」而不是静默吞掉**。提醒脚本永远 `exit 0`，再坏也不会阻断对话。改完 `mcp/agent-hooks/` 里的脚本跑一次 `selftest.ps1`（42 项断言：装/幂等/结构自适应/拆卸不伤用户条目/各平台事件分诊与静默/来源标记）。新装 IDE 想上徽章：跑 `extract-ide-icons.ps1` 重抽一轮图标。
+脚本拷到各配置根的 `hooks\agent-status.ps1`，只增删指向它的条目（你自己挂的别家 hooks 原样保留、先备份 `.bak`），命令自动带 `-from <平台>` 让消息卡认得出来源。**Qoder / Claude Code 的 hooks 不支持热重载，装完重启 IDE 生效**（Trae 改完建议也重启一次；IDE 自动更新可能把配置改旧或把主程序带走，更新后没提醒先重跑安装脚本并确认 XAssistant 在跑）。每次触发都把原始事件 JSON 记进 `%LOCALAPPDATA%\XAssistant\agent-hooks\agent-status.log`，字段对不上时拿它校准；脚本按 **UTF-8 直读 stdin**（PowerShell 控制台默认拿系统 GBK 码页解码，而 Stop 事件带着回复全文 `last_assistant_message`——中文一花 JSON 结构就碎，曾把正常结束误报成红档「事件数据不完整」），真遇到截断时也是正则捞回事件名报红而非静默吞。提醒脚本永远 `exit 0`，再坏也不会阻断对话。改完 `mcp/agent-hooks/` 里的脚本跑一次 `selftest.ps1`（42 项断言：装/幂等/结构自适应/拆卸不伤用户条目/各平台事件分诊与静默/来源标记）。新装 IDE 想上徽章：跑 `extract-ide-icons.ps1` 重抽一轮图标。
 
 生效与排查：
 

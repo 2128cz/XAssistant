@@ -117,7 +117,12 @@ function Wait-Quiet([int]$quietMs = 400, [int]$maxMs = 6000) {
 function Fire([string]$json, [int]$expect = 1, [string]$plat = 'trae') {
     Wait-Quiet
     Remove-Item $fakeLog -Force -ErrorAction SilentlyContinue
-    $json | powershell -NoProfile -ExecutionPolicy Bypass -File $status -Platform $plat -LogDir $logDir | Out-Null
+    # 管道给原生命令默认走 $OutputEncoding（控制台码页 GBK）：脚本现在按 UTF-8 直读 stdin，
+    # 这里必须同步喂 UTF-8 字节，否则中文事件在自测里反而是坏的
+    $prevOut = $global:OutputEncoding
+    $global:OutputEncoding = New-Object System.Text.UTF8Encoding $false
+    try { $json | powershell -NoProfile -ExecutionPolicy Bypass -File $status -Platform $plat -LogDir $logDir | Out-Null }
+    finally { $global:OutputEncoding = $prevOut }
     $code = $LASTEXITCODE
     if ($expect -gt 0) {
         $deadline = (Get-Date).AddSeconds(6)
@@ -176,6 +181,11 @@ Check 'PostToolUse 结果正常 → 静默' ((LineCount) -eq 0) "写到 $(LineCo
 Fire '{"hook_event_name":"Stop","cwd":"D:\\repo"}' | Out-Null
 $e = LastEffect
 Check 'Stop → info 档 + 已完成' (($e -match '-s info') -and ($e -match '已完成')) $e
+
+# 真实回归：Qoder 的 Stop 带中文 last_assistant_message，GBK/UTF-8 错配时解析挂→误报红档；修好后必须走 info
+Fire '{"hook_event_name":"Stop","cwd":"D:\\repo","last_assistant_message":"没有需要提交的内容，徽章已全部上屏。"}' | Out-Null
+$e = LastEffect
+Check '含中文长回复的 Stop → info 档而非红档「数据不完整」' (($e -match '-s info') -and ($e -notmatch '数据不完整')) $e
 
 Fire '{"hook_event_name":"Stop","stop_hook_active":true}' 0 | Out-Null
 Check 'stop_hook_active 的 Stop 静默（防死循环）' ((LineCount) -eq 0) "写到 $(LineCount) 行"
