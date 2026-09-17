@@ -274,5 +274,7 @@
     </Grid>
    </StackPanel>
   </Border>
+  <!-- ================= 消息与播放队列：头顶浮窗关掉后，这里仍能看见哪条在重播、并能把它停掉 ================= -->
+  <controls:MessageQueuePanel DataContext="{Binding Messages}"/>
  </StackPanel>
 </UserControl>

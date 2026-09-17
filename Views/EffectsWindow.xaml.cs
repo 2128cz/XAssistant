@@ -17,6 +17,7 @@ using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
 using Pen = System.Windows.Media.Pen;
 using Point = System.Windows.Point;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using FontFamily = System.Windows.Media.FontFamily;
 
 namespace XAssistant.Views;
@@ -66,7 +67,8 @@ public sealed partial class EffectsWindow : Window
     /// </summary>
     private readonly record struct BannerSpec(
         string? Text, Brush Color, double Hold, double FadeIn, double FadeOut, int Blinks,
-        bool BorderOn, double BorderWidth, double BorderFade, double BorderCycle, double FontSize);
+        bool BorderOn, double BorderWidth, double BorderFade, double BorderCycle, double FontSize,
+        bool Urgent);
 
     /// <summary>边框呼吸的暗端（亮端是 1）：只收 45%，看着是「亮暗之间循环」，不是「闪灭」。</summary>
     private const double BreathLow = 0.55;
@@ -155,7 +157,8 @@ public sealed partial class EffectsWindow : Window
                 BorderWidth: 50,
                 BorderFade: 30,
                 BorderCycle: 0,
-                FontSize: 46));
+                FontSize: 46,
+                Urgent: false));
         });
     }
 
@@ -184,7 +187,8 @@ public sealed partial class EffectsWindow : Window
                 BorderWidth: command.BorderWidth,
                 BorderFade: command.BorderFade,
                 BorderCycle: command.BorderCycle,
-                FontSize: command.FontSize));
+                FontSize: command.FontSize,
+                Urgent: command.Urgent));
         });
     }
     
@@ -325,6 +329,10 @@ public sealed partial class EffectsWindow : Window
             double height = spec.FontSize * 1.25;
             SlashLeft.Height = SlashRight.Height = height;
             SlashLeft.Background = SlashRight.Background = Hatch(accent, height);
+            // 紧急档在两道斜线的内端各加一个三角感叹号。两侧必须各建一份：
+            // 一个 Visual 不能同时有两个父级，复用会在第二个 Border 上报错
+            SlashLeft.Child = spec.Urgent ? BuildWarning(accent, height, HorizontalAlignment.Right) : null;
+            SlashRight.Child = spec.Urgent ? BuildWarning(accent, height, HorizontalAlignment.Left) : null;
         }
 
         // 四边渐变带：关了边框就整层收起，不再铺画刷
@@ -393,6 +401,61 @@ public sealed partial class EffectsWindow : Window
         EdgePulse.BeginAnimation(OpacityProperty, null);
         Tape.Opacity = Edge.Opacity = 0;
         EdgePulse.Opacity = 1;   // 内层回到全亮：呼吸跑到暗端时被收起，下一轮开头不带旧值
+    }
+
+    /// <summary>
+    /// 自绘警告三角：一圈描边三角 + 一根短柱 + 一颗点。不贴 ⚠ 字形是因为
+    /// WPF 渲不出彩色 emoji、缺字体的机器还会掉成方框，而画形状能跟着效果色走，
+    /// 还能被整段淡入淡出带着一起呼吸。高度由字号推，所以它与斜线、正文粗细始终等高。
+    /// </summary>
+    private static UIElement BuildWarning(Brush accent, double height, HorizontalAlignment side)
+    {
+        double stroke = Math.Max(2, height * 0.08);
+        var canvas = new Canvas
+        {
+            Width = height,
+            Height = height,
+            HorizontalAlignment = side,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = side == HorizontalAlignment.Right ? new Thickness(0, 0, 16, 0) : new Thickness(16, 0, 0, 0),
+        };
+        var triangle = new System.Windows.Shapes.Polygon
+        {
+            Points = new PointCollection
+            {
+                new Point(height / 2, stroke * 0.7),
+                new Point(stroke * 0.45, height - stroke * 0.45),
+                new Point(height - stroke * 0.45, height - stroke * 0.45),
+            },
+            Stroke = accent,
+            StrokeThickness = stroke,
+            StrokeLineJoin = PenLineJoin.Round,
+            // 淡底：同色只给 18% 透明度，不让它把正文顶出一块白
+            Fill = new SolidColorBrush(WithAlpha(accent, 0.18)),
+            StrokeDashCap = PenLineCap.Round,
+        };
+        var bar = new System.Windows.Shapes.Rectangle
+        {
+            Width = Math.Max(2, height * 0.085),
+            Height = height * 0.33,
+            RadiusX = 1.5,
+            RadiusY = 1.5,
+            Fill = accent,
+        };
+        Canvas.SetLeft(bar, height / 2 - bar.Width / 2);
+        Canvas.SetTop(bar, height * 0.31);
+        var dot = new System.Windows.Shapes.Ellipse
+        {
+            Width = Math.Max(3, height * 0.10),
+            Height = Math.Max(3, height * 0.10),
+            Fill = accent,
+        };
+        Canvas.SetLeft(dot, height / 2 - dot.Width / 2);
+        Canvas.SetTop(dot, height * 0.72);
+        canvas.Children.Add(triangle);
+        canvas.Children.Add(bar);
+        canvas.Children.Add(dot);
+        return canvas;
     }
 
     /// <summary>默认颜色：跟着主题强调色走，换肤后立即生效；资源缺失时退回中性灰。</summary>

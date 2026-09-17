@@ -77,6 +77,10 @@ public partial class App : System.Windows.Application
         });
         services.AddSingleton<DashboardViewModel>();
         services.AddSingleton<InputEventDispatcher>();
+        // 播放队列与它的宿主面板：屏幕只有一份，所以调度器是个静态单例，
+        // 这里只是把同一个对象交给 DI——无头实例走不到这一步，它自己拿静态那份
+        services.AddSingleton(_ => EffectQueue.Shared);
+        services.AddSingleton<MessageQueueViewModel>();
         services.AddSingleton<IMouseClickHookService, MouseClickHookService>();
         services.AddSingleton<IClickDatabaseService, ClickDatabaseService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -148,6 +152,8 @@ public partial class App : System.Windows.Application
 
         // xa 命令的接手方：无头实例与本程序同时在跑时，整条命令交给这里执行——
         // 效果窗与顶部持久消息栈只归一份，而持久窗只有常驻进程养得住（见 NotificationPipe）
+        // 常驻主程序在跑，重播定时器才有人续——无头实例挂上重播时会当成被挤掉记进历史（见 EffectQueue）
+        EffectQueue.Hosted = true;
         _notifyPipe = new NotificationPipeServer();
         _notifyPipe.LineReceived += line => Dispatcher.Invoke(() => EffectDispatch.OnLine(line));
         if (!_notifyPipe.TryStart())
