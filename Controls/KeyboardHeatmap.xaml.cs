@@ -241,8 +241,37 @@ public partial class KeyboardHeatmap : UserControl
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(RequestRefresh)); return; }
         if (_refreshPending || !IsInitialized) return;
         _refreshPending = true;
-        Dispatcher.BeginInvoke(DispatcherPriority.DataBind, new Action(() => { _refreshPending = false; Refresh(); }));
+        // 连打时每次按键至少两三个键帽的 Count 变、每帧都能排进一次 Refresh；
+        // 色阶与计数不值得 60fps 刷新，150 ms 一道闸门把风暴压成每秒几次
+        double due = RefreshMinIntervalMs - (DateTime.UtcNow - _lastRefreshAt).TotalMilliseconds;
+        if (due <= 0)
+            Dispatcher.BeginInvoke(DispatcherPriority.DataBind, new Action(RunRefresh));
+        else
+        {
+            _refreshTimer ??= BuildRefreshTimer();
+            _refreshTimer.Start();
+        }
     }
+
+    private void RunRefresh()
+    {
+        _refreshTimer?.Stop();
+        _lastRefreshAt = DateTime.UtcNow;
+        _refreshPending = false;
+        Refresh();
+    }
+
+    private DispatcherTimer BuildRefreshTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(RefreshMinIntervalMs) };
+        timer.Tick += (_, _) => RunRefresh();
+        return timer;
+    }
+
+    /// <summary>热力图数据刷新的最小间隔（ms）：数字与色阶的刷新频率用不上渲染帧率。</summary>
+    private const double RefreshMinIntervalMs = 150;
+    private DateTime _lastRefreshAt = DateTime.MinValue;
+    private DispatcherTimer? _refreshTimer;
 
     private void Refresh()
     {
@@ -303,6 +332,14 @@ public partial class KeyboardHeatmap : UserControl
         key = string.Empty;
         count = 0;
         if (item is null) return false;
+        // 生产数据全是 KeyCountItem：直读属性；反射只给鸭子类型的测试源兜底，
+        // 否则每次刷新要对几百条目做反射取值 + 字符串往返，纯浪费
+        if (item is XAssistant.ViewModels.KeyCountItem direct)
+        {
+            key = direct.Key;
+            count = direct.Count;
+            return key.Length > 0 && count >= 0;
+        }
         var type = item.GetType();
         if (!ItemProperties.TryGetValue(type, out var properties))
         {
@@ -395,7 +432,6 @@ public partial class KeyboardHeatmap : UserControl
 
         internal void Update(long count, long minimum, long maximum, bool recent, List<string>? sourceNames)
         {
-            Count = count;
             // 最少/最多次数归一化：本时段有记录的键铺满整个色阶，按得最多的始终是最亮
             double intensity = count <= 0
                 ? 0
@@ -404,6 +440,13 @@ public partial class KeyboardHeatmap : UserControl
                     : PressedFloor
                         + (1 - PressedFloor)
                         * ((double)(count - minimum) / (maximum - minimum));
+            // 强度量化到 256 级再比对：连打时 max 每轮都在动，未受影响的键的 intensity
+            // 只会漂小数——不量化就全部算「变了」，闸门白设
+            int intensityQ = (int)Math.Round(Math.Clamp(intensity, 0, 1) * 255);
+            // 变更闸门：144 个键帽每轮都被扫，绝大多数这轮什么都没变——直接返回，
+            // 不换刷、不拼 tooltip、不广播整键绑定失效；否则连打几秒 UI 就崩
+            if (count == _shownCount && intensityQ == _shownIntensityQ && recent == _shownRecent) return;
+            Count = count;
             HeatBrush = HeatColor(intensity);
             LabelBrush = intensity >= 0.72 ? MakeBrush(0x20, 0x31, 0x1A) : MakeBrush(0xDA, 0xE7, 0xDD);
             CountBrush = intensity >= 0.72 ? MakeBrush(0x43, 0x65, 0x28) : MakeBrush(0x98, 0xB4, 0xA7);
@@ -414,7 +457,15 @@ public partial class KeyboardHeatmap : UserControl
             if (Id is "RSHIFT" or "RCTRL" or "RALT") identity = "右 " + Label;
             Tooltip = $"{identity} · {Count:N0} 次" + (sourceNames is { Count: > 0 } ? "\n" + string.Join("\n", sourceNames) : "\n此时间段无对应记录");
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
+            _shownCount = count;
+            _shownIntensityQ = intensityQ;
+            _shownRecent = recent;
         }
+
+        // 上一轮真正显示出去的三要素：只有它们变了才值得换刷与广播
+        private long _shownCount = -1;
+        private int _shownIntensityQ = -1;
+        private bool _shownRecent;
     }
 
     /// <summary>把归一化强度 [0,1] 映射到色阶上的颜色，与 <see cref="BuildRampBrush"/> 同源。</summary>
@@ -431,15 +482,27 @@ public partial class KeyboardHeatmap : UserControl
 
     private static Brush HeatColor(double intensity)
     {
-        var brush = new SolidColorBrush(RampColor(intensity));
-        brush.Freeze();
-        return brush;
+        var c = RampColor(intensity);
+        return CachedBrush(0xFF000000u | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B);
     }
 
-    private static Brush MakeBrush(byte r, byte g, byte b, byte a = 255)
+    private static Brush MakeBrush(byte r, byte g, byte b, byte a = 255) =>
+        CachedBrush(((uint)a << 24) | ((uint)r << 16) | ((uint)g << 8) | b);
+
+    /// <summary>
+    /// 按 ARGB 缓存冻结画刷：144 个键帽每轮刷新都要配刷，不缓存就是每秒几万个
+    /// SolidColorBrush 对象的 GC 风暴；颜色取值空间只有几千种，缓存几乎满命中。
+    /// </summary>
+    private static readonly Dictionary<uint, Brush> BrushCache = new();
+
+    private static Brush CachedBrush(uint argb)
     {
-        var brush = new SolidColorBrush(Color.FromArgb(a, r, g, b));
+        if (BrushCache.TryGetValue(argb, out var hit)) return hit;
+        // WPF Color 没有 FromUInt32：拆回字节走 FromArgb（System.Drawing 同名类型的 API，别记混）
+        var brush = new SolidColorBrush(Color.FromArgb(
+            (byte)(argb >> 24), (byte)(argb >> 16), (byte)(argb >> 8), (byte)argb));
         brush.Freeze();
+        BrushCache[argb] = brush;
         return brush;
     }
 

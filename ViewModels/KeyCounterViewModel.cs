@@ -137,9 +137,8 @@ public partial class KeyCounterViewModel : ViewModelBase, IDisposable
                 // 更新今天
                 UpdateCollection(TodayKeyCounts, key);
 
-                // 集合变化后通知聚合属性
-                OnPropertyChanged(nameof(KeyTodayPresses));
-                OnPropertyChanged(nameof(KeyTotalPresses));
+                // 聚合属性（KeyTodayPresses/KeyTotalPresses）不在这里通知：它们的 getter
+                // 要 Sum 扫整个集合，连打时每键一次纯浪费——每秒的 UpdateRateMetrics 统一报，数字最多晚一秒
 
                 // 更新实时节奏（速率 / 顺序 / 时间差）
                 UpdateCadence(key);
@@ -200,12 +199,14 @@ public partial class KeyCounterViewModel : ViewModelBase, IDisposable
         return Math.Round(totalMs / (times.Length - 1), 1);
     }
 
-    /// <summary>定时刷新：仅清理过期时间点并重算速率（停止按键后速率会自然回落）</summary>
+    /// <summary>定时刷新：清理过期时间点、重算速率，并统一报聚合计数（每键一次的 Sum 通知在这里降频成每秒一次）</summary>
     private void UpdateRateMetrics()
     {
         PruneRateWindow(DateTime.Now);
         KeysPerMinute = _recentKeyTimes.Count;
         AverageKeyIntervalMs = ComputeAverageInterval();
+        OnPropertyChanged(nameof(KeyTodayPresses));
+        OnPropertyChanged(nameof(KeyTotalPresses));
         UpdateTodayAverage();
     }
 
