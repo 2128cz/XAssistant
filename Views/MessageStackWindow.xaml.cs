@@ -6,9 +6,12 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Animation;
+using XAssistant.Services;
 // 主工程开了 UseWindowsForms，隐式 using 里的 System.Drawing.Brush / Point 会跟 WPF 的撞名
 using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using Orientation = System.Windows.Controls.Orientation;
 
 namespace XAssistant.Views;
 
@@ -51,10 +54,11 @@ public sealed partial class MessageStackWindow : Window
     }
 
     /// <summary>
-    /// 钉一条消息：tint 是这条命令的颜色（徽章圆底与描边），source 是 `-from` 的平台标记。
+    /// 钉一条消息：tint 是这条命令的颜色（小圆牌底与描边），source 是 `-from` 的平台标记，
+    /// urgent 会在行首多画一颗自绘警告三角（不用 ⚠ 字形：单色、不可控尺寸、缺字体就掉方框）。
     /// 空文本不入栈——只亮边框的指令没话可留。任意线程可调，内部调度回 UI 线程。
     /// </summary>
-    public static void Push(string? text, Brush tint, string? source = null)
+    public static void Push(string? text, Brush tint, string? source = null, bool urgent = false)
     {
         var app = System.Windows.Application.Current;
         if (app is null || string.IsNullOrWhiteSpace(text)) return;
@@ -62,7 +66,7 @@ public sealed partial class MessageStackWindow : Window
         {
             _shared ??= new MessageStackWindow();
             if (!_shared.IsVisible) _shared.Show();
-            _shared.AddCard(text.Trim(), tint, source);
+            _shared.AddCard(text.Trim(), tint, source, urgent);
         });
     }
 
@@ -74,18 +78,18 @@ public sealed partial class MessageStackWindow : Window
         app.Dispatcher.Invoke(() => _shared?.Close());
     }
 
-    private void AddCard(string text, Brush tint, string? source)
+    private void AddCard(string text, Brush tint, string? source, bool urgent)
     {
         while (Cards.Children.Count >= MaxCards)
             Cards.Children.RemoveAt(Cards.Children.Count - 1);   // 尾端是最旧的
-        var card = BuildCard(text, tint, source);
+        var card = BuildCard(text, tint, source, urgent);
         Cards.Children.Insert(0, card);                          // 新消息插最前
         card.BeginAnimation(OpacityProperty,
             new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));   // 与 Toast 同款淡入
     }
 
     /// <summary>一张卡片：来源徽章（或纯色条）+ 消息文本 + HH:mm 时间戳 + 单条 ✕。</summary>
-    private Border BuildCard(string text, Brush tint, string? source)
+    private Border BuildCard(string text, Brush tint, string? source, bool urgent)
     {
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -93,7 +97,7 @@ public sealed partial class MessageStackWindow : Window
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var lead = BuildBadge(tint, source);
+        var lead = BuildBadge(tint, source, urgent);
         Grid.SetColumn(lead, 0);
         grid.Children.Add(lead);
 
@@ -136,7 +140,19 @@ public sealed partial class MessageStackWindow : Window
     /// 卡片头部：有来源标记就贴「淡化 tint 圆底 + IDE 图标」徽章（没图标退首字母），
     /// 没来源（打字彩蛋、手写 xa）保持原来的 3px 色条。
     /// </summary>
-    private static FrameworkElement BuildBadge(Brush tint, string? source)
+    private static FrameworkElement BuildBadge(Brush tint, string? source, bool urgent)
+    {
+        FrameworkElement core = BuildCore(tint, source);
+        if (!urgent) return core;
+        // 行首挂一颗自绘小三角：只靠颜色分不出“要命”与“知会”，而字形警告符不可控
+        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        row.Children.Add(WarningGlyph.Build(tint, 22, HorizontalAlignment.Left));
+        ((FrameworkElement)core).Margin = new Thickness(6, 1, 8, 1);
+        row.Children.Add(core);
+        return row;
+    }
+
+    private static FrameworkElement BuildCore(Brush tint, string? source)
     {
         if (string.IsNullOrWhiteSpace(source))
             return new System.Windows.Shapes.Rectangle

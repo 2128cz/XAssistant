@@ -17,6 +17,7 @@ using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
 using Pen = System.Windows.Media.Pen;
 using Point = System.Windows.Point;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using FontFamily = System.Windows.Media.FontFamily;
 
 namespace XAssistant.Views;
@@ -66,7 +67,8 @@ public sealed partial class EffectsWindow : Window
     /// </summary>
     private readonly record struct BannerSpec(
         string? Text, Brush Color, double Hold, double FadeIn, double FadeOut, int Blinks,
-        bool BorderOn, double BorderWidth, double BorderFade, double BorderCycle, double FontSize);
+        bool BorderOn, double BorderWidth, double BorderFade, double BorderCycle, double FontSize,
+        bool Urgent);
 
     /// <summary>边框呼吸的暗端（亮端是 1）：只收 45%，看着是「亮暗之间循环」，不是「闪灭」。</summary>
     private const double BreathLow = 0.55;
@@ -155,7 +157,8 @@ public sealed partial class EffectsWindow : Window
                 BorderWidth: 50,
                 BorderFade: 30,
                 BorderCycle: 0,
-                FontSize: 46));
+                FontSize: 46,
+                Urgent: false));
         });
     }
 
@@ -184,7 +187,8 @@ public sealed partial class EffectsWindow : Window
                 BorderWidth: command.BorderWidth,
                 BorderFade: command.BorderFade,
                 BorderCycle: command.BorderCycle,
-                FontSize: command.FontSize));
+                FontSize: command.FontSize,
+                Urgent: command.Urgent));
         });
     }
     
@@ -325,6 +329,10 @@ public sealed partial class EffectsWindow : Window
             double height = spec.FontSize * 1.25;
             SlashLeft.Height = SlashRight.Height = height;
             SlashLeft.Background = SlashRight.Background = Hatch(accent, height);
+            // 紧急档不在文字两边夹小三角，而是上下四颗巨型的（见 BuildCorners）：
+            // 警告程度要从余光里就能看见，藏在正文旁边等于没提醒
+            SlashLeft.Child = SlashRight.Child = null;
+            BuildCorners(spec, accent, height);
         }
 
         // 四边渐变带：关了边框就整层收起，不再铺画刷
@@ -338,9 +346,10 @@ public sealed partial class EffectsWindow : Window
         AttachLoop();
 
         double total = Math.Max(0.1, spec.FadeIn + spec.Hold + spec.FadeOut);
-        // 中间这句与屏幕四边一起淡入淡出：两个目标各一份动画实例（SetTarget 存在动画对象上，共用会互相踩）
+        // 中间这句、屏幕四边、四颗警告三角一起淡入淡出：三个目标各一份动画实例
+        // （SetTarget 存在动画对象上，共用会互相踩）
         var story = new Storyboard();
-        foreach (var target in new FrameworkElement[] { Tape, Edge })
+        foreach (var target in new FrameworkElement[] { Tape, Edge, Corners })
         {
             var pulse = Pulse(spec, total);
             Storyboard.SetTarget(pulse, target);
@@ -390,9 +399,34 @@ public sealed partial class EffectsWindow : Window
         breath?.Stop();
         Tape.BeginAnimation(OpacityProperty, null);
         Edge.BeginAnimation(OpacityProperty, null);
+        Corners.BeginAnimation(OpacityProperty, null);
         EdgePulse.BeginAnimation(OpacityProperty, null);
-        Tape.Opacity = Edge.Opacity = 0;
+        Tape.Opacity = Edge.Opacity = Corners.Opacity = 0;
         EdgePulse.Opacity = 1;   // 内层回到全亮：呼吸跑到暗端时被收起，下一轮开头不带旧值
+    }
+
+    /// <summary>
+    /// 四颗巨型警告三角：上下各两颗，分列屏宽 1/4 与 3/4 处（你那张示意图就是这个布局）。
+    /// 尺寸按屏高算并夹在 140–340 DIP：再小压不住整屏，再大就顶到正文。
+    /// 每一颗都得单独建一份——一个 Visual 不能同时挂在两个父级下。
+    /// </summary>
+    private void BuildCorners(BannerSpec spec, Brush accent, double bandHeight)
+    {
+        Corners.Children.Clear();
+        if (!spec.Urgent || spec.Text is not { Length: > 0 }) return;
+        double size = Math.Clamp(Height * 0.2, 140, 340);
+        double centerY = Height / 2;
+        double edge = bandHeight / 2 + 12;
+        for (int i = 0; i < 4; i++)
+        {
+            double x = Width * (i % 2 == 0 ? 0.25 : 0.75) - size / 2;
+            double y = i < 2 ? centerY - edge - size - 12 : centerY + edge + 12;
+            y = Math.Clamp(y, 8, Math.Max(8, Height - size - 8));
+            var glyph = WarningGlyph.Build(accent, size);
+            Canvas.SetLeft(glyph, x);
+            Canvas.SetTop(glyph, y);
+            Corners.Children.Add(glyph);
+        }
     }
 
     /// <summary>默认颜色：跟着主题强调色走，换肤后立即生效；资源缺失时退回中性灰。</summary>

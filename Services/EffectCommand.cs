@@ -64,8 +64,38 @@ public sealed record EffectCommand
     /// <summary>条带文字字号（DIP）；斜线高度按字号推，二者始终等高。</summary>
     public double FontSize { get; set; } = 46;
 
-    /// <summary>来源平台标记（<c>-from qoder</c>）：消息栈徽章用它配 IDE 图标；自由词不校验，没写就不贴徽章。</summary>
+    /// <summary>来源平台标记（<c>-from qoder</c>）：消息栈的小圆牌用它配 IDE 图标；自由词不校验，没写就不贴牌。</summary>
     public string? Source { get; set; }
+    
+    /// <summary>
+    /// 识别符（<c>-tag ups-loss</c>）：重播警告得能被找回来。<see cref="Kill"/> 就靠它精确杀，
+    /// 没写 tag 时退到用 <c>-any</c> 在正文里做子串匹配。
+    /// </summary>
+    public string? Tag { get; set; }
+    
+    /// <summary>紧急档（<c>-s emergency</c> 或单独的 <c>-emergency</c>）：走紧急通道、画自绘三角感叹号。</summary>
+    public bool Urgent { get; set; }
+    
+    /// <summary>重播间隔秒（<c>-replay 3 3</c> 的第一个数）；0 = 不重播。</summary>
+    public double ReplayInterval { get; set; }
+    
+    /// <summary>
+    /// 重播次数（<c>-replay 3 3</c> 的第二个数）。没写就是无限（<see cref="InfiniteReplay"/>），
+    /// 直到被 <c>xa -k</c> 杀下来——无限重播只该出现在“人不来处理就不会停”的告警上。
+    /// </summary>
+    public int ReplayTimes { get; set; }
+    
+    /// <summary>无限重播的哨兵值。</summary>
+    public const int InfiniteReplay = -1;
+    
+    /// <summary>杀除动词（<c>-k</c> / <c>-kill</c>）：按 tag、通道、正文子串挑目标停止。</summary>
+    public bool Kill { get; set; }
+    
+    /// <summary><c>-any</c> 后面那段：kill 时在正文里找的子串（没给选择条件就是“全停”）。</summary>
+    public string? MatchAny { get; set; }
+    
+    /// <summary>本条效果占屏多久（秒）：队列拿它算“什么时候可以播下一条”。</summary>
+    public double ScreenSeconds => FadeIn + Hold + FadeOut;
 
     /// <summary>数字参数缺省值（与上面的属性默认值一一对应，改一处要同步另一处）。</summary>
     private static readonly double[] ShowDefaults = [5, 1, 1];
@@ -85,11 +115,18 @@ public sealed record EffectCommand
     /// <summary>收起用的词：与 <see cref="SlashParser.IsHide"/> 同一张表。</summary>
     private static readonly string[] HideWords = ["off", "hide", "stop", "clear", "close", "x"];
 
+    /// <summary>紧急档的词：颜色走 danger，通道走紧急，两侧多画一个三角感叹号。</summary>
+    private static readonly string[] UrgentWords = ["emergency", "emerg", "urgent", "紧急"];
+
     /// <summary>撒花用的词。</summary>
     private static readonly string[] ConfettiWords = ["confetti", "celebrate", "花"];
 
+    /// <summary>杀除动词的词。</summary>
+    private static readonly string[] KillWords = ["-k", "-kill", "kill"];
+
     /// <summary>新语法的段开关。任一个出现就走新解析，否则整条按旧语法读。</summary>
-    private static readonly string[] SectionSwitches = ["-s", "-border", "-lable", "-label", "-from"];
+    private static readonly string[] SectionSwitches =
+        ["-s", "-border", "-lable", "-label", "-from", "-tag", "-replay", "-any", "-emergency", "-urgent", "-k", "-kill"];
 
     /// <summary>
     /// 解析一整行命令。返回 false = 不是已知指令（整条跳过，不猜、不弹、不报错），
@@ -107,6 +144,12 @@ public sealed record EffectCommand
 
         if (HideWords.Contains(tokens[0], StringComparer.OrdinalIgnoreCase)) { command.Hide = true; return true; }
         if (ConfettiWords.Contains(tokens[0], StringComparer.OrdinalIgnoreCase)) { command.Confetti = true; return true; }
+        // 裸词 kill 也能起头：`xa kill -tag ups-loss` 与 `xa -k -tag ups-loss` 同义
+        if (KillWords.Contains(tokens[0], StringComparer.OrdinalIgnoreCase))
+        {
+            command.Kill = true;
+            return tokens.Length == 1 || ParseSections(tokens[1..], command);
+        }
 
         // 有段开关就是新语法；否则按旧语法（<类型> <时间-次数> <正文>）读，旧行为一字不改
         if (tokens.Any(IsSectionSwitch))
@@ -138,6 +181,9 @@ public sealed record EffectCommand
         var border = new List<string>();
         var label = new List<string>();
         var from = new List<string>();
+        var tag = new List<string>();
+        var replay = new List<string>();
+        var any = new List<string>();
         List<string>? current = null;
         foreach (string token in tokens)
         {
@@ -147,6 +193,12 @@ public sealed record EffectCommand
                 case "-border": current = border; break;
                 case "-lable" or "-label": current = label; break;
                 case "-from": current = from; break;
+                case "-tag": current = tag; break;
+                case "-replay": current = replay; break;
+                case "-any": current = any; break;
+                // 无参开关：紧急档既能在 -s 里用颜色词表达，也能这样单独挂上（kill 的选择器靠它限定通道）
+                case "-emergency" or "-urgent": command.Urgent = true; current = null; break;
+                case "-k" or "-kill": command.Kill = true; current = null; break;
                 default:
                     if (current is null) return false;   // 段开关之外的裸内容：不是已知语法
                     current.Add(token);
@@ -154,7 +206,28 @@ public sealed record EffectCommand
             }
         }
         if (from.Count > 0) command.Source = from[0].ToLowerInvariant();   // 多写只认第一个：平台名就一个词
-        return ParseShow(show, command) && ParseBorder(border, command) && ParseLabel(label, command);
+        if (tag.Count > 0) command.Tag = tag[0];                           // tag 是个词，多写也只认第一个
+        if (any.Count > 0) command.MatchAny = string.Join(" ", any);
+        // -k 一条不需要节奏/带宽：给不出正文也不当错（“全停”就是合法命令）
+        if (command.Kill) { command.Text = any.Count > 0 ? string.Join(" ", any) : null; return true; }
+        return ParseReplay(replay, command)
+            && ParseShow(show, command) && ParseBorder(border, command) && ParseLabel(label, command);
+    }
+
+    /// <summary>
+    /// <c>-replay &lt;间隔秒&gt; [次数]</c>。只给间隔就是无限重播（靠 <c>xa -k</c> 收）；
+    /// 间隔限在 0.5–3600 秒，次数限在 1–999——没意思的 0 次和一万次都不如不写。
+    /// </summary>
+    private static bool ParseReplay(List<string> args, EffectCommand command)
+    {
+        if (args.Count == 0) return true;
+        if (!TryNumber(args[0], out double interval) || interval <= 0) return false;
+        command.ReplayInterval = Math.Clamp(interval, 0.5, 3600);
+        if (args.Count == 1) { command.ReplayTimes = InfiniteReplay; return true; }
+        // 重播次数始为整数；写 0 等于不重播
+        if (args.Count > 2 || !int.TryParse(args[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int times)) return false;
+        command.ReplayTimes = times <= 0 ? 0 : Math.Clamp(times, 1, 999);
+        return true;
     }
 
     /// <summary><c>-s &lt;色&gt; [持续 [淡入 [淡出]]]</c>。首个词是颜色就吃颜色，剩下的按位置读时间。</summary>
@@ -163,10 +236,21 @@ public sealed record EffectCommand
         int at = 0;
         if (at < args.Count && !IsNumber(args[at]))
         {
-            if (!IsKnownColor(args[at])) return false;
-            command.Color = NormalizeColor(args[at]);
-            at++;
+            // emergency 不是色名而是档位：接住它，颜色固定走 danger，同时开紧急档
+            if (UrgentWords.Contains(args[at], StringComparer.OrdinalIgnoreCase))
+            {
+                command.Urgent = true;
+                command.Color = "error";
+                at++;
+            }
+            else
+            {
+                if (!IsKnownColor(args[at])) return false;
+                command.Color = NormalizeColor(args[at]);
+                at++;
+            }
         }
+        if (command.Urgent && at == 0) command.Color = "error";   // 只写了 -emergency 没写 -s 时也是红
         double[] slots = (double[])ShowDefaults.Clone();
         for (int slot = 0; at < args.Count; slot++, at++)
         {

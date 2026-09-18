@@ -52,6 +52,12 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     public PracticeViewModel Practice { get; }
     public WordFrequencyViewModel? WordFrequency { get; }
 
+    /// <summary>工作台底部的消息与播放队列面板。xa 命令与 AI hooks 的排队、重播、停止都在这一份里。</summary>
+    public MessageQueueViewModel? Messages { get; }
+
+    /// <summary>监视模块面板（UPS 等）：卡片与参数行全由模块自己注册出来。</summary>
+    public WatchModulesViewModel? Modules { get; }
+
     private readonly Services.Interfaces.IConfigurationService _config;
 
     /// <summary>
@@ -349,7 +355,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         KeyCounterViewModel keyboard,
         UsageViewModel usage,
         AppUsageViewModel apps,
-        SettingsViewModel settings, Services.Interfaces.IConfigurationService config, PracticeViewModel practice, WordFrequencyViewModel? wordFrequency = null)
+        SettingsViewModel settings, Services.Interfaces.IConfigurationService config, PracticeViewModel practice, WordFrequencyViewModel? wordFrequency = null,
+        MessageQueueViewModel? messages = null, WatchModulesViewModel? modules = null)
     {
         Mouse = mouse;
         Keyboard = keyboard;
@@ -358,6 +365,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         Settings = settings;
         Practice = practice;
         WordFrequency = wordFrequency;
+        Messages = messages;
+        Modules = modules;
         _config = config;
 
         // 读取持久化的排布档位走字段，不走属性：避免启动时又把同一份值写回配置
@@ -829,6 +838,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         _timer.Stop();
         _timer.Tick -= OnTimerTick;
         System.Windows.SystemParameters.StaticPropertyChanged -= OnSystemParametersChanged;
+        Messages?.Dispose();
+        Modules?.Dispose();
         // 鼠标里程靠定时落库，退出前让它的最后一次冲刷把不足 1 秒的尾数写进去
         Mouse.Dispose();
         Mouse.PropertyChanged -= OnMousePropertyChanged;
