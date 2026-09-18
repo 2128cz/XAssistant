@@ -20,7 +20,6 @@ public partial class App : System.Windows.Application
     private QuickNoteCaptureService? _quickNoteCapture;
     private GlobalHotkeyService? _globalHotkey;
     private NotificationPipeServer? _notifyPipe;
-    private AgentErrorWatch? _agentWatch;
     internal static bool IsShuttingDown { get; private set; }
 
     /// <summary>这轮进程只是来放一个效果的（--fx）：不建容器、不装钩子、不开主窗。</summary>
@@ -169,9 +168,9 @@ public partial class App : System.Windows.Application
         if (!_notifyPipe.TryStart())
             _appLogger.LogInformation("xa 转发管道已被别的实例占着：命令将由发起方本地执行");
 
-        // 对话报错哨兵：quota/限流这类模型层错误不在任何 hook 事件流里，只能盯 IDE 自己写的
-        // agent.log 状态机迁移（prompting -> error）——报成红档，免得对话卡在异地的报错屏上没人知道
-        _agentWatch = new AgentErrorWatch();
+        // （对话报错监视已搬进监视模块：Services/Modules/QoderWatchModule —— quota/限流这类
+        //  模型层错误不在 hook 事件流里，由该模块尾随 agent.log 状态机行报红档，
+        //  开关与参数在面板「PART 4 / MODULES」里管，启动时由上面的 WatchModuleRegistry.Start() 拉起）
 
         // 关键词引擎订阅钩子：只订事件，装钩子仍是键盘记录自己的事
         provider.GetRequiredService<KeywordWatcher>()
@@ -321,7 +320,6 @@ public partial class App : System.Windows.Application
         Services.GetRequiredService<WordFrequencyViewModel>().Dispose();
         Services.GetRequiredService<PracticeViewModel>().Dispose();
         Services.GetRequiredService<KeywordWatcher>().Dispose();
-        _agentWatch?.Dispose();
         _notifyPipe?.Dispose();
         _globalHotkey?.Dispose();
         _notifyIcon?.Dispose();

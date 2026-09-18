@@ -151,7 +151,7 @@ xa -k -emergency -any 供电中断
 
 **各平台的事件集合不一样，装错了等于没装**：Claude Code / Qoder 挂全套 4 事件；Trae 官方只有 6 个事件（没有 `PermissionRequest`/`PostToolUseFailure`，挂上去永不触发），它的「等待确认」与「任务完成」都用 `Notification(idle_prompt)` 发——所以安装器按平台落地不同事件集，`agent-status.ps1` 里 `idle_prompt` 也按平台分流（Trae 当完成静默交给 Stop，其他平台当空闲等人归黄）。
 
-**hooks 盖不到的一类：模型层报错（quota 超限/限流）**——这种错误发生在「Qoder 向百炼发请求」这一层，不在任何 hook 事件流里（Qoder 没实现 `StopFailure`，transcript 也不落），且各家策略不同：Qoder CN 自动重试（每分钟限流，等一会自愈），国际版可能直接卡住等人工点重试。为此主程序内置了**对话报错哨兵**（`Services/AgentErrorWatch.cs`）：每 3 秒 tail 各 Qoder 最近一次启动会话的 `agent.log`，盯状态机迁移行 `prompting -> error`（同行带 code），命中就报红档「中断 · 请求人类介入：对话被 API 错误打断 · code 100400」+ 顶部卡片；同一平台同一错误码 2 分钟只报一次（压掉自动重试期间的连刷）。依赖主程序常驻；Trae 的日志形态尚未实锤，拿到样本后往平台表加一行即可。
+**hooks 盖不到的一类：模型层报错（quota 超限/限流）**——这种错误发生在「Qoder 向百炼发请求」这一层，不在任何 hook 事件流里（Qoder 没实现 `StopFailure`，transcript 也不落），且各家策略不同：Qoder CN 自动重试（每分钟限流，等一会自愈），国际版可能直接卡住等人工点重试。为此做成了一块**监视模块**（`Services/Modules/QoderWatchModule.cs`，面板「PART 4 / MODULES」里开关与调参）：尾随各 Qoder 最近一次启动会话的 `agent.log`，盯状态机迁移行 `prompting -> error`（同行带 code），命中就发红档命令「中断 · 请求人类介入：对话被 API 错误打断 · code 100400」；同一平台同一错误码 2 分钟只报一次（压掉自动重试期间的连刷），**首见日志只记游标、不回放历史旧错**；带「试弹一次红档」按钮。依赖主程序常驻；Trae / Codex / ZCode 等同类监视以后各写各的模块（共享的 `LogTailer` 尾随件在 `Services/Modules/LogTailWatch.cs`）。
 
 一键装 / 拆：
 
