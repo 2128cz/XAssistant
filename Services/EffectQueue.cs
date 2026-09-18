@@ -131,9 +131,8 @@ public sealed class EffectQueue
         // 重播不重复钉卡：一条无限重播每轮都往顶上叠一张一模一样的话，十张上限转眼就被它刷满，
         // 反而把别的提醒挤下去。第一张卡已经代表“这件事需要人来看”。
         if (job.Plays > 0 || command.Text is not { Length: > 0 } text) return;
-        // 顶栏那一张只靠颜色分不出“要命”和“知会”，紧急档在文案上再补一道
-        MessageStackWindow.Push(command.Urgent ? "⚠ " + text : text,
-            EffectCommand.BrushOf(command.Color) ?? Accent(), command.Source);
+        // 紧急档不往文案里贴 ⚠ 字形：卡片自己画一颗警告三角（urgent 参数），尺寸与颜色才能控制
+        MessageStackWindow.Push(text, EffectCommand.BrushOf(command.Color) ?? Accent(), command.Source, command.Urgent);
     }
 
     /// <summary>调度器报上来的结局：进历史，顺带处理「重播没人接管」这种必须说一声的情况。</summary>

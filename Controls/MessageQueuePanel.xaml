@@ -23,8 +23,10 @@
        </Grid.ColumnDefinitions>
        <TextBlock Text="{Binding State}" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"/>
        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-        <TextBlock Text="⚠" FontFamily="Segoe UI Symbol" FontSize="13" Foreground="{DynamicResource DangerBrush}" Margin="0,0,3,0"
-                   Visibility="{Binding Urgent, Converter={StaticResource TrueToVisible}}"/>
+        <Path Data="M 8,0.8 L 15.2,14.4 L 0.8,14.4 Z" Stroke="{DynamicResource DangerBrush}" StrokeThickness="1.9"
+              StrokeLineJoin="Round" Fill="Transparent" Width="16" Height="15" Stretch="Uniform"
+              Margin="0,0,4,0" VerticalAlignment="Center" ToolTip="紧急通道：首轮能抢屏"
+              Visibility="{Binding Urgent, Converter={StaticResource TrueToVisible}}"/>
         <TextBlock Text="{Binding Channel}" FontSize="11" Foreground="{DynamicResource TextHint}"/>
        </StackPanel>
        <TextBlock Grid.Column="2" Text="{Binding Text}" FontSize="13" Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"

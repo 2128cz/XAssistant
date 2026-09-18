@@ -6,6 +6,7 @@ using Serilog;
 using XAssistant.Services;
 using XAssistant.Services.Interfaces;
 using XAssistant.Services.Keywords;
+using XAssistant.Services.Modules;
 using XAssistant.Services.QuickNote;
 using XAssistant.ViewModels;
 using XAssistant.Views;
@@ -81,6 +82,9 @@ public partial class App : System.Windows.Application
         // 这里只是把同一个对象交给 DI——无头实例走不到这一步，它自己拿静态那份
         services.AddSingleton(_ => EffectQueue.Shared);
         services.AddSingleton<MessageQueueViewModel>();
+        // 监视模块（UPS 等）：同一个注册表实例交给 DI，面板与宿主拿的是同一份
+        services.AddSingleton(_ => WatchModuleRegistry.Shared);
+        services.AddSingleton<WatchModulesViewModel>();
         services.AddSingleton<IMouseClickHookService, MouseClickHookService>();
         services.AddSingleton<IClickDatabaseService, ClickDatabaseService>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -149,6 +153,11 @@ public partial class App : System.Windows.Application
         var configService = provider.GetRequiredService<IConfigurationService>();
         ThemeManager.Apply(configService.GetTheme());
         _appLogger.LogInformation("已应用界面主题：{Theme}", ThemeManager.Current);
+
+        // 监视模块：反射发现本程序集里的 IWatchModule，读回上次的激活态与参数，
+        // 对已激活的各走一次 OnActivate（协议要求启动时检查激活并直接执行一次）
+        WatchModuleRegistry.Shared.AttachLog(message => _appLogger.LogInformation(message));
+        WatchModuleRegistry.Shared.Start();
 
         // xa 命令的接手方：无头实例与本程序同时在跑时，整条命令交给这里执行——
         // 效果窗与顶部持久消息栈只归一份，而持久窗只有常驻进程养得住（见 NotificationPipe）
@@ -302,6 +311,8 @@ public partial class App : System.Windows.Application
         try { (Services.GetRequiredService<IClickDatabaseService>() as IDisposable)?.Dispose(); }
         catch (Exception error) { _appLogger?.LogError(error, "Mouse database flush failed"); }
         Services.GetRequiredService<MainWindowViewModel>().Dispose();
+        Services.GetRequiredService<WatchModulesViewModel>().Dispose();
+        WatchModuleRegistry.Shared.Dispose();   // 对所有激活中的模块各走一次 OnDeactivate
         Services.GetRequiredService<WordFrequencyViewModel>().Dispose();
         Services.GetRequiredService<PracticeViewModel>().Dispose();
         Services.GetRequiredService<KeywordWatcher>().Dispose();

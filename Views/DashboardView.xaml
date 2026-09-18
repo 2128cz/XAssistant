@@ -276,5 +276,17 @@
   </Border>
   <!-- ================= 消息与播放队列：头顶浮窗关掉后，这里仍能看见哪条在重播、并能把它停掉 ================= -->
   <controls:MessageQueuePanel DataContext="{Binding Messages}"/>
+  <!-- ================= 板 4 · 监视模块：卡片与参数行由各模块自己注册，宿主不认识任何具体模块 ================= -->
+  <Border x:Name="ModulePart" Style="{StaticResource Board}" Margin="0,20,0,0">
+   <StackPanel>
+    <DockPanel Style="{StaticResource BoardHead}">
+     <TextBlock Text="UPS 等外部状态监视：继承 IWatchModule 就自动上架，行由值类型与元数据生成" Style="{StaticResource QuietText}" FontSize="11" VerticalAlignment="Center"/>
+     <TextBlock Text="PART 4 / MODULES · 监视模块" Style="{StaticResource PartHeading}"/>
+     <Border Style="{StaticResource PartRule}" Margin="12,0,20,0"/>
+    </DockPanel>
+    <Border Style="{StaticResource BoardRule}"/>
+    <controls:WatchModulesPanel DataContext="{Binding Modules}" Margin="0,12,0,0"/>
+   </StackPanel>
+  </Border>
  </StackPanel>
 </UserControl>

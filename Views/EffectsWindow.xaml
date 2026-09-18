@@ -40,5 +40,8 @@
       <Border x:Name="SlashRight" Grid.Column="2" VerticalAlignment="Center" Margin="22,0,0,0"/>
     </Grid>
     <Canvas x:Name="Stage" IsHitTestVisible="False" ClipToBounds="True"/>
+    <!--  紧急档的四颗巨大警告三角：上下各两颗，分列屏宽 1/4 与 3/4 处（用户给的那张示意图就是这个布局）。
+          放在 Tape 之外、窗口根上，才能拿到整屏尺寸；淡入淡出与 Tape 共用同一段动画。  -->
+    <Canvas x:Name="Corners" IsHitTestVisible="False" ClipToBounds="False" Opacity="0"/>
   </Grid>
 </Window>

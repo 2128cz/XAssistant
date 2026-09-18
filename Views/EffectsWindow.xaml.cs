@@ -329,10 +329,10 @@ public sealed partial class EffectsWindow : Window
             double height = spec.FontSize * 1.25;
             SlashLeft.Height = SlashRight.Height = height;
             SlashLeft.Background = SlashRight.Background = Hatch(accent, height);
-            // 紧急档在两道斜线的内端各加一个三角感叹号。两侧必须各建一份：
-            // 一个 Visual 不能同时有两个父级，复用会在第二个 Border 上报错
-            SlashLeft.Child = spec.Urgent ? BuildWarning(accent, height, HorizontalAlignment.Right) : null;
-            SlashRight.Child = spec.Urgent ? BuildWarning(accent, height, HorizontalAlignment.Left) : null;
+            // 紧急档不在文字两边夹小三角，而是上下四颗巨型的（见 BuildCorners）：
+            // 警告程度要从余光里就能看见，藏在正文旁边等于没提醒
+            SlashLeft.Child = SlashRight.Child = null;
+            BuildCorners(spec, accent, height);
         }
 
         // 四边渐变带：关了边框就整层收起，不再铺画刷
@@ -346,9 +346,10 @@ public sealed partial class EffectsWindow : Window
         AttachLoop();
 
         double total = Math.Max(0.1, spec.FadeIn + spec.Hold + spec.FadeOut);
-        // 中间这句与屏幕四边一起淡入淡出：两个目标各一份动画实例（SetTarget 存在动画对象上，共用会互相踩）
+        // 中间这句、屏幕四边、四颗警告三角一起淡入淡出：三个目标各一份动画实例
+        // （SetTarget 存在动画对象上，共用会互相踩）
         var story = new Storyboard();
-        foreach (var target in new FrameworkElement[] { Tape, Edge })
+        foreach (var target in new FrameworkElement[] { Tape, Edge, Corners })
         {
             var pulse = Pulse(spec, total);
             Storyboard.SetTarget(pulse, target);
@@ -398,64 +399,34 @@ public sealed partial class EffectsWindow : Window
         breath?.Stop();
         Tape.BeginAnimation(OpacityProperty, null);
         Edge.BeginAnimation(OpacityProperty, null);
+        Corners.BeginAnimation(OpacityProperty, null);
         EdgePulse.BeginAnimation(OpacityProperty, null);
-        Tape.Opacity = Edge.Opacity = 0;
+        Tape.Opacity = Edge.Opacity = Corners.Opacity = 0;
         EdgePulse.Opacity = 1;   // 内层回到全亮：呼吸跑到暗端时被收起，下一轮开头不带旧值
     }
 
     /// <summary>
-    /// 自绘警告三角：一圈描边三角 + 一根短柱 + 一颗点。不贴 ⚠ 字形是因为
-    /// WPF 渲不出彩色 emoji、缺字体的机器还会掉成方框，而画形状能跟着效果色走，
-    /// 还能被整段淡入淡出带着一起呼吸。高度由字号推，所以它与斜线、正文粗细始终等高。
+    /// 四颗巨型警告三角：上下各两颗，分列屏宽 1/4 与 3/4 处（你那张示意图就是这个布局）。
+    /// 尺寸按屏高算并夹在 140–340 DIP：再小压不住整屏，再大就顶到正文。
+    /// 每一颗都得单独建一份——一个 Visual 不能同时挂在两个父级下。
     /// </summary>
-    private static UIElement BuildWarning(Brush accent, double height, HorizontalAlignment side)
+    private void BuildCorners(BannerSpec spec, Brush accent, double bandHeight)
     {
-        double stroke = Math.Max(2, height * 0.08);
-        var canvas = new Canvas
+        Corners.Children.Clear();
+        if (!spec.Urgent || spec.Text is not { Length: > 0 }) return;
+        double size = Math.Clamp(Height * 0.2, 140, 340);
+        double centerY = Height / 2;
+        double edge = bandHeight / 2 + 12;
+        for (int i = 0; i < 4; i++)
         {
-            Width = height,
-            Height = height,
-            HorizontalAlignment = side,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = side == HorizontalAlignment.Right ? new Thickness(0, 0, 16, 0) : new Thickness(16, 0, 0, 0),
-        };
-        var triangle = new System.Windows.Shapes.Polygon
-        {
-            Points = new PointCollection
-            {
-                new Point(height / 2, stroke * 0.7),
-                new Point(stroke * 0.45, height - stroke * 0.45),
-                new Point(height - stroke * 0.45, height - stroke * 0.45),
-            },
-            Stroke = accent,
-            StrokeThickness = stroke,
-            StrokeLineJoin = PenLineJoin.Round,
-            // 淡底：同色只给 18% 透明度，不让它把正文顶出一块白
-            Fill = new SolidColorBrush(WithAlpha(accent, 0.18)),
-            StrokeDashCap = PenLineCap.Round,
-        };
-        var bar = new System.Windows.Shapes.Rectangle
-        {
-            Width = Math.Max(2, height * 0.085),
-            Height = height * 0.33,
-            RadiusX = 1.5,
-            RadiusY = 1.5,
-            Fill = accent,
-        };
-        Canvas.SetLeft(bar, height / 2 - bar.Width / 2);
-        Canvas.SetTop(bar, height * 0.31);
-        var dot = new System.Windows.Shapes.Ellipse
-        {
-            Width = Math.Max(3, height * 0.10),
-            Height = Math.Max(3, height * 0.10),
-            Fill = accent,
-        };
-        Canvas.SetLeft(dot, height / 2 - dot.Width / 2);
-        Canvas.SetTop(dot, height * 0.72);
-        canvas.Children.Add(triangle);
-        canvas.Children.Add(bar);
-        canvas.Children.Add(dot);
-        return canvas;
+            double x = Width * (i % 2 == 0 ? 0.25 : 0.75) - size / 2;
+            double y = i < 2 ? centerY - edge - size - 12 : centerY + edge + 12;
+            y = Math.Clamp(y, 8, Math.Max(8, Height - size - 8));
+            var glyph = WarningGlyph.Build(accent, size);
+            Canvas.SetLeft(glyph, x);
+            Canvas.SetTop(glyph, y);
+            Corners.Children.Add(glyph);
+        }
     }
 
     /// <summary>默认颜色：跟着主题强调色走，换肤后立即生效；资源缺失时退回中性灰。</summary>
