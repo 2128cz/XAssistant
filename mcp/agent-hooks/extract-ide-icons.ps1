@@ -45,6 +45,7 @@ function Find-Exe([string[]]$names, [string[]]$dirHints) {
 $Platforms = [ordered]@{
     'qoder'      = @{ Names = @('Qoder CN IDE', 'QoderCN'); Dirs = @("$env:LOCALAPPDATA\Programs\Qoder CN\Qoder CN.exe") }
     'trae'       = @{ Names = @('Trae CN', 'Trae'); Dirs = @("$env:LOCALAPPDATA\Programs\Trae CN\Trae CN.exe") }
+    'dsh'        = @{ Names = @('DeepSeek Harness', 'deepseek-harness'); Dirs = @() }
     'xassistant' = @{ Names = @('XAssistant'); Dirs = @() }
 }
 

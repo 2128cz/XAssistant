@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 $root = Join-Path $env:TEMP 'xassistant-agent-hooks-selftest'
 $installer = Join-Path $PSScriptRoot 'install-agent-hooks.ps1'
 $status = Join-Path $PSScriptRoot 'agent-status.ps1'
+$dshPluginTest = Join-Path $PSScriptRoot 'dsh-status-plugin.selftest.mjs'
 $fail = 0
 $pass = 0
 
@@ -81,12 +82,33 @@ Check '只摘掉我们的条目（剩用户那 1 条）' (@($j.Stop).Count -eq 1
 Check '用户的条目原样保留' ((Get-Content (Join-Path $flat 'hooks.json') -Raw) -match 'echo mine')
 Check '我们挂的其余事件也摘干净了' (@($j.PSObject.Properties.Name | Where-Object { $_ -notin 'version', 'hooks' }).Count -eq 1) "实得 $(@($j.PSObject.Properties.Name | Where-Object { $_ -notin 'version', 'hooks' }).Count)"
 
-Write-Host "`n== 6. 未校准的平台默认拒写 =="
+Write-Host "`n== 6. DSH 原生 Cordis 插件：保留用户 YAML、幂等安装与拆卸 =="
+$dsh = Join-Path $root 'dsh-home'
+$dshProfile = Join-Path $dsh 'profiles\web'
+New-Item -ItemType Directory -Force -Path $dshProfile | Out-Null
+@'
+- id: user-row
+  disabled: true
+'@ | Set-Content (Join-Path $dshProfile 'cordis.patch.yml') -Encoding UTF8
+Run-Installer @('-Platform', 'dsh', '-Root', $dsh, '-Profile', 'web') | Out-Null
+$dshPatch = Get-Content (Join-Path $dshProfile 'cordis.patch.yml') -Raw
+Check 'DSH patch 保留用户原有条目' ($dshPatch -match 'id: user-row')
+Check 'DSH patch 装入带标记的原生插件行' (($dshPatch -match 'xassistant-agent-hooks:dsh begin') -and ($dshPatch -match 'id: xassistant-dsh-status')) $dshPatch
+Check 'DSH 插件与状态脚本复制到 profile' ((Test-Path (Join-Path $dshProfile 'xassistant-agent-hooks\dsh-status-plugin.mjs')) -and (Test-Path (Join-Path $dshProfile 'xassistant-agent-hooks\agent-status.ps1')))
+Run-Installer @('-Platform', 'dsh', '-Root', $dsh, '-Profile', 'web') | Out-Null
+$dshPatch = Get-Content (Join-Path $dshProfile 'cordis.patch.yml') -Raw
+Check 'DSH 重复安装只有一个托管块' (([regex]::Matches($dshPatch, 'xassistant-agent-hooks:dsh begin')).Count -eq 1)
+Run-Installer @('-Platform', 'dsh', '-Root', $dsh, '-Profile', 'web', '-Remove') | Out-Null
+$dshPatch = Get-Content (Join-Path $dshProfile 'cordis.patch.yml') -Raw
+Check 'DSH 拆卸只摘托管块并保留用户 YAML' (($dshPatch -match 'id: user-row') -and ($dshPatch -notmatch 'xassistant-dsh-status')) $dshPatch
+Check 'DSH 拆卸删除复制的插件文件' (-not (Test-Path (Join-Path $dshProfile 'xassistant-agent-hooks\dsh-status-plugin.mjs')))
+
+Write-Host "`n== 7. 未校准的平台默认拒写 =="
 $code = Run-Installer @('-Platform', 'cursor', '-Root', (Join-Path $root 'cursor'))
 Check '拒绝并以非 0 退出' ($code -ne 0) "退出码 $code"
 Check '没写出任何文件' (-not (Test-Path (Join-Path $root 'cursor')))
 
-Write-Host "`n== 7. agent-status.ps1 的事件分诊（假 xa 记录参数）=="
+Write-Host "`n== 8. agent-status.ps1 的事件分诊（假 xa 记录参数）=="
 $logDir = Join-Path $root 'statuslog'
 $fake = Join-Path $root 'fake-xa.cmd'
 $fakeLog = Join-Path $root 'fake-xa.log'
@@ -143,6 +165,11 @@ $e = LastEffect
 Check 'PermissionRequest → 黄档 + 授权(工具) + 项目名' (($e -match '-s warn') -and ($e -match '授权\(Bash\)') -and ($e -match 'repo')) $e
 Check '命令行带 -from 来源标记（消息栈徽章靠它）' ($e -match '-from trae') $e
 
+Fire '{"hook_event_name":"Warning","warning_type":"token-limit","message":"输出达到 token 上限","cwd":"D:\\repo","session_title":"检查 DSH 通知"}' 1 'dsh' | Out-Null
+$e = LastEffect
+Check 'DSH Warning → 黄档 + 警告 + 会话标题' (($e -match '-s warn') -and ($e -match '警告') -and ($e -match '检查 DSH 通知')) $e
+Check 'DSH 命令带 -from dsh（图标徽章）' ($e -match '-from dsh') $e
+
 Fire '{"hook_event_name":"StopFailure","error_type":"ratelimit","cwd":"D:\\repo"}' | Out-Null
 Check 'StopFailure（限流/配额打断）→ 红档 + 中断 + 错误型' (((LastEffect) -match '-s error') -and ((LastEffect) -match '中断') -and ((LastEffect) -match 'ratelimit')) (LastEffect)
 
@@ -152,6 +179,13 @@ Check '截断的事件 JSON → 红档「事件数据不完整」而非静默吞
 Fire '{"hook_event_name":"PostToolUseFailure","error":"boom","cwd":"D:\\repo"}' | Out-Null
 $e = LastEffect
 Check 'PostToolUseFailure → 红档 + 故障 + 错误摘要' (($e -match '-s error') -and ($e -match '故障') -and ($e -match 'boom')) $e
+
+# 真机回归：子进程按 GBK 写 stderr、上层按 UTF-8 解码时，错误原文只剩 U+FFFD 这类不可逆替换符。
+# 这种文本读不懂也晒不得——丢掉整段，退回工具名，卡片上不再成串出现乱码。
+$garbled = 'Out-File : ' + [string][char]0xFFFD + [char]0xFFFD + [char]0xFFFD + ' '
+Fire ('{"hook_event_name":"PostToolUseFailure","error":"' + $garbled + '","tool_name":"Bash","cwd":"D:\\repo"}') | Out-Null
+$e = LastEffect
+Check '乱码错误 → 退回工具名，不晒替换符' (($e -match 'Bash') -and ($e -notmatch 'Out-File')) $e
 
 Fire '{"hook_event_name":"PostToolUseFailure","is_interrupt":true,"cwd":"D:\\repo"}' | Out-Null
 Check '中断的失败 → 文案写「中断」' ((LastEffect) -match '中断') (LastEffect)
@@ -195,6 +229,9 @@ Check 'stop_hook_active 的 Stop 静默（防死循环）' ((LineCount) -eq 0) "
 Check '空 stdin 不报错' ((Fire '' 0) -eq 0)
 Check '坏 JSON 也不阻断（永远 exit 0）' ((Fire 'not json at all' 0) -eq 0)
 Check '记了原始事件日志' (Test-Path (Join-Path $logDir 'agent-status.log'))
+
+$nodeOutput = & node $dshPluginTest 2>&1
+Check 'DSH 原生插件事件映射自测通过' ($LASTEXITCODE -eq 0) ($nodeOutput -join ' ')
 
 Remove-Item Env:\XASSISTANT_XA -ErrorAction SilentlyContinue
 Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue

@@ -139,12 +139,12 @@ VS Code         （无 hooks，只能写扩展）                       —
 
 - `agent-status.ps1` —— 平台无关的状态脚本：stdin 收事件 JSON → 分诊 → 异步拉 `xa`（文案与颜色档跟 Qoder 版那套一致），脚本自身永远 `exit 0`；
 - `install-agent-hooks.ps1` —— 多平台安装器：`-List` / `-Platform <名字>` / `-ProjectPath`（Trae 的项目级）/ `-Remove` / `-DryRun`，按目标文件的**已有结构自适应**（带 `hooks` 层就写里层，顶层直接是事件名就写顶层），只摘自己挂的条目；
-- `selftest.ps1` —— 30 项离屏断言（装 / 幂等 / flat 自适应 / 拆卸不伤用户自己的条目 / 拒写未校准平台 / 事件分诊文案与静默）。
+- `selftest.ps1` —— 离屏断言（JSON hooks / DSH profile 标记块 / 幂等 / flat 自适应 / 拆卸不伤用户配置 / 未校准平台拒写 / 事件分诊与 DSH 映射）。
 
 **监听器两条腿的现状**：
 
 1. 遮罩窗口腿：`SetWinEventHook(EVENT_OBJECT_SHOW/HIDE)` + 类名/进程过滤（qoder 报告 §2.2 方案 A）——**目前只有 Qoder 一家有得吃**（Trae 没有独立遮罩，安装目录里也没有第二个进程）；
-2. hooks 腿：共享 `agent-status.ps1`——已覆盖 Qoder / Claude Code / Trae（+ 待校准的 Cursor / Windsurf / Codex）。
+2. 生命周期腿：外部 IDE 走共享 `agent-status.ps1`；DSH 由同目录原生 Cordis 插件把 typed events 转成同一份状态 JSON——已覆盖 Qoder / Claude Code / Trae / DSH（+ 待校准的 Cursor / Windsurf / Codex）。
 
 ---
 
@@ -156,7 +156,7 @@ VS Code         （无 hooks，只能写扩展）                       —
 - [x] **Trae 的 hooks 落在哪** —— 独立 `hooks.json`（项目级 `.trae/hooks.json`、全局 `~/.trae-cn/hooks.json`）
 - [x] **Trae 的事件集** —— `PreToolUse` / `Notification` / `Stop` / `PermissionRequest` 与 Claude Code 同构（安装包字符串实证）
 - [x] **Trae 有没有独立遮罩** —— 没有：无独立进程、无独立窗口，CU 追踪在 icube 模块内部
-- [x] **统一产出的雏形落地** —— `mcp/agent-hooks/`（状态脚本 + 多平台安装器 + 30 项自测）
+- [x] **统一产出落地** —— `mcp/agent-hooks/`（状态脚本 + 多平台安装器 + DSH 原生插件 + 离屏自测）
 
 **还需要真实运行才能定的**：
 

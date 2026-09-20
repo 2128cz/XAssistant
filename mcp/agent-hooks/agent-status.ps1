@@ -78,6 +78,14 @@ try {
         $s = Clean $s
         if ($s.Length -gt $n) { $s.Substring(0, $n) + '…' } else { $s }
     }
+    # 子进程按系统码页（GBK）写 stderr、上层按 UTF-8 解码时，错误原文里会留下 U+FFFD 这类不可逆
+    # 替换符（实踩：PowerShell 中文报错上屏成一片乱码）。这种文本读不懂也晒不得：出现两个以上
+    # 就当整段不可信，丢掉后由调用方退回错误码 / 工具名，卡片上不再成串晒乱码。
+    function Trustworthy([string]$s) {
+        if ([string]::IsNullOrEmpty($s)) { return '' }
+        if (([regex]::Matches($s, '\uFFFD')).Count -ge 2) { return '' }
+        return ($s -replace '\uFFFD', '')
+    }
 
     # 事件带来的上下文：cwd 叶名是项目；对话标题读 IDE 的 state.vscdb（tasks 里 id→name 的真实任务名，
     # 不是首句对话内容——拿内容当标题会把聊天原文晒到屏幕上，用户明确不要）。
@@ -123,7 +131,8 @@ try {
         }
         return ''
     }
-    $dialog = Get-TaskTitle ([string]$evt.session_id) $DbAppDirs[$Platform]
+    $dialog = Cut ([string]$evt.session_title) 80
+    if (-not $dialog) { $dialog = Get-TaskTitle ([string]$evt.session_id) $DbAppDirs[$Platform] }
 
     # 文案格式固定为「事件词 · 请求人类介入：项目 · “对话标题” · 细节」，缺哪段省哪段
     $who = @()
@@ -147,16 +156,23 @@ try {
             $detail = if ($evt.error_type) { ' · ' + (Cut ([string]$evt.error_type) 30) } else { '' }
             Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"提醒 · 请求人类介入：事件数据不完整$ctx$detail`""
         }
+        'Warning' {
+            # DSH 原生插件把 token 上限、策略阻断等非崩溃异常归到黄档，正文只留短摘要。
+            $why = Cut (Trustworthy ([string]$evt.message)) 48
+            if (-not $why) { $why = Cut ([string]$evt.warning_type) 30 }
+            $detail = if ($why) { ' · ' + $why } else { '' }
+            Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"警告 · 请求人类介入$ctx$detail`""
+        }
         'StopFailure' {
             # 整轮回复被 API 错误打断（限流、配额溢出、过载…）：不是工具报错，是对话直接断了，同样归红
             $why = Cut $evt.error_type 30
-            if (-not $why) { $why = Cut $evt.error 40 }
+            if (-not $why) { $why = Cut (Trustworthy ([string]$evt.error)) 40 }
             $detail = if ($why) { ' · ' + $why } else { '' }
             Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"中断 · 请求人类介入$ctx$detail`""
         }
         'PostToolUseFailure' {
             # 报错只留定位信息：code = NNNNN 优先（IDE 错误都带这个码），其次错误首句——回复/详情原文不上屏
-            $errText = Clean ([string]$evt.error)
+            $errText = Trustworthy (Clean ([string]$evt.error))
             $code = if ($errText -match 'code\s*=\s*(\d+)') { 'code ' + $Matches[1] } elseif ($errText) { Cut $errText 40 } else { '' }
             if (-not $code) { $code = Cut $evt.tool_name 30 }
             $lead = if ($evt.is_interrupt) { '中断' } else { '故障' }
@@ -189,11 +205,11 @@ try {
         'PostToolUse' {
             # Trae 没有 PostToolUseFailure：报错走这个事件的结果字段（error/exit_code/tool_response.is_error），
             # 结果正常就静默；挂了此事件的其他平台也不会误报
-            $why = Cut $evt.error 48
+            $why = Cut (Trustworthy ([string]$evt.error)) 48
             if (-not $why -and $null -ne $evt.tool_response) {
                 $tr = $evt.tool_response
-                if ($tr.PSObject.Properties['error']) { $why = Cut ([string]$tr.error) 48 }
-                elseif ($tr.PSObject.Properties['is_error'] -and $tr.is_error) { $why = Cut ([string]$tr.content) 40 }
+                if ($tr.PSObject.Properties['error']) { $why = Cut (Trustworthy ([string]$tr.error)) 48 }
+                elseif ($tr.PSObject.Properties['is_error'] -and $tr.is_error) { $why = Cut (Trustworthy ([string]$tr.content)) 40 }
             }
             $code = 0
             if ($evt.PSObject.Properties['exit_code']) { $code = [int]$evt.exit_code }

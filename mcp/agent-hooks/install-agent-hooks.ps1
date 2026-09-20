@@ -17,6 +17,7 @@ param(
     [string]$Platform,
     [string]$Root,
     [string]$ProjectPath,
+    [string]$Profile = 'web',
     [switch]$Remove,
     [switch]$DryRun,
     [switch]$Force,
@@ -25,6 +26,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $scriptSrc = Join-Path $PSScriptRoot 'agent-status.ps1'
+$pluginSrc = Join-Path $PSScriptRoot 'dsh-status-plugin.mjs'
 $scriptName = 'agent-status.ps1'
 # 事件集合按平台落地（Trae 官方只有 6 个事件，没有 PermissionRequest/PostToolUseFailure，
 # 报错走 PostToolUse 的结果字段；挂不存在的事件名永远不会触发，反而盖住真实问题）。
@@ -41,6 +43,7 @@ $Platforms = [ordered]@{
     'claude'     = @{ Label = 'Claude Code'; Kind = 'settings-hooks'; File = 'settings.json'; Rel = ''; State = '协议源头，结构同 Qoder，未本机实测' }
     'trae'       = @{ Label = 'Trae CN'; Kind = 'hooks-file'; File = 'hooks.json'; Rel = ''; State = '路径与事件名已确证，schema 待用 Trae 的 Hooks 面板核对' }
     'trae-intl'  = @{ Label = 'Trae（国际版）'; Kind = 'hooks-file'; File = 'hooks.json'; Rel = ''; State = '同 trae' }
+    'dsh'        = @{ Label = 'DeepSeek Harness'; Kind = 'dsh-plugin'; File = 'cordis.patch.yml'; Rel = ''; State = '原生 Cordis 事件插件：完成 / 错误 / token 上限 / 工具失败 / 授权 / 提问' }
     'cursor'     = @{ Label = 'Cursor'; Kind = 'unknown'; File = 'hooks.json'; Rel = ''; State = '待校准：先照官方 hooks 文档在 UI 里配一条，再回来装' }
     'windsurf'   = @{ Label = 'Windsurf（Cascade）'; Kind = 'unknown'; File = 'hooks.json'; Rel = ''; State = '待校准' }
     'codex'      = @{ Label = 'Codex CLI'; Kind = 'unknown'; File = 'hooks.json'; Rel = ''; State = '待校准' }
@@ -50,6 +53,7 @@ $DefaultRoots = @{
     'claude'    = Join-Path $env:USERPROFILE '.claude'
     'trae'      = Join-Path $env:USERPROFILE '.trae-cn'
     'trae-intl' = Join-Path $env:USERPROFILE '.trae'
+    'dsh'       = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
     'cursor'    = Join-Path $env:USERPROFILE '.cursor'
     'windsurf'  = Join-Path $env:USERPROFILE '.codeium\windsurf'
     'codex'     = Join-Path $env:USERPROFILE '.codex'
@@ -79,6 +83,96 @@ if ($kind -eq 'unknown' -and -not $Force -and -not $Remove) {
 先在它的官方 UI / 文档里配一条指向任意命令的 hook，把生成的文件与结构确认下来，
 再回来跑 -Root 指到那个目录；确认无误后可以加 -Force 直接写。
 "@
+}
+
+# DSH 不走外部 IDE 的 hooks.json：它本身就是 Cordis 运行时，装一个原生事件插件更完整。
+# 只维护 cordis.patch.yml 里带标记的一小段，用户其余 YAML 原文不解析、不重排。
+if ($kind -eq 'dsh-plugin') {
+    if ($ProjectPath) { throw 'DSH 安装请用 -Root 指 DSH_HOME；-ProjectPath 只用于 Trae 项目级 hooks。' }
+    if (-not $Profile) { throw 'DSH 的 -Profile 不能为空。' }
+
+    $dshHome = if ($Root) { $Root } else { $DefaultRoots['dsh'] }
+    $profileDir = Join-Path (Join-Path $dshHome 'profiles') $Profile
+    $target = Join-Path $profileDir 'cordis.patch.yml'
+    $installDir = Join-Path $profileDir 'xassistant-agent-hooks'
+    $scriptDst = Join-Path $installDir $scriptName
+    $pluginDst = Join-Path $installDir 'dsh-status-plugin.mjs'
+    $begin = '# xassistant-agent-hooks:dsh begin'
+    $end = '# xassistant-agent-hooks:dsh end'
+
+    function Strip-DshBlock([string]$text) {
+        if ([string]::IsNullOrWhiteSpace($text)) { return '' }
+        $pattern = '(?ms)^\s*# xassistant-agent-hooks:dsh begin\r?\n.*?^# xassistant-agent-hooks:dsh end\s*\r?\n?'
+        return ([regex]::Replace($text, $pattern, '')).TrimEnd()
+    }
+    function Quote-Yaml([string]$text) { return "'" + ($text -replace "'", "''") + "'" }
+    function Write-Utf8NoBom([string]$path, [string]$text) {
+        New-Item -ItemType Directory -Force -Path (Split-Path $path -Parent) | Out-Null
+        [System.IO.File]::WriteAllText($path, $text, (New-Object System.Text.UTF8Encoding $false))
+    }
+
+    $existing = if (Test-Path $target) { [System.IO.File]::ReadAllText($target) } else { '' }
+    $clean = Strip-DshBlock $existing
+
+    if ($Remove) {
+        $next = if ([string]::IsNullOrWhiteSpace($clean)) { "[]`r`n" } else { $clean + "`r`n" }
+        if ($DryRun) {
+            Write-Host "`n--- 将写入 $target ---" -ForegroundColor Cyan
+            Write-Host $next
+        } else {
+            if (Test-Path $target) { Copy-Item $target "$target.bak" -Force }
+            Write-Utf8NoBom $target $next
+            Remove-Item $scriptDst, $pluginDst -Force -ErrorAction SilentlyContinue
+            if ((Test-Path $installDir) -and @((Get-ChildItem $installDir -Force)).Count -eq 0) {
+                Remove-Item $installDir -Force
+            }
+        }
+        Write-Host "已拆下 DeepSeek Harness 的 XAssistant 状态提醒（profile: $Profile）。" -ForegroundColor Green
+        exit 0
+    }
+
+    if (-not (Test-Path $scriptSrc)) { throw "找不到 $scriptSrc" }
+    if (-not (Test-Path $pluginSrc)) { throw "找不到 $pluginSrc" }
+
+    $pluginUri = ([System.Uri]$pluginDst).AbsoluteUri
+    $block = @(
+        $begin,
+        '- insert:',
+        '    - id: xassistant-dsh-status',
+        ('      name: ' + (Quote-Yaml $pluginUri)),
+        '      config:',
+        ('        statusScript: ' + (Quote-Yaml $scriptDst)),
+        '        includeSubagents: false',
+        $end
+    ) -join "`r`n"
+    $next = if ([string]::IsNullOrWhiteSpace($clean) -or $clean.Trim() -eq '[]') {
+        $block + "`r`n"
+    } else {
+        $clean + "`r`n`r`n" + $block + "`r`n"
+    }
+
+    if ($DryRun) {
+        Write-Host "`n--- 将写入 $target ---" -ForegroundColor Cyan
+        Write-Host $next
+        Write-Host "`n[dry-run] 插件与状态脚本将复制到 $installDir" -ForegroundColor Yellow
+        exit 0
+    }
+
+    New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+    Copy-Item $pluginSrc $pluginDst -Force
+    Copy-Item $scriptSrc $scriptDst -Force
+    # Windows PowerShell 5.1 读取含中文的状态脚本必须有 BOM；mjs 与 YAML 保持无 BOM。
+    $statusText = [System.IO.File]::ReadAllText($scriptDst, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($scriptDst, $statusText, (New-Object System.Text.UTF8Encoding $true))
+    if (Test-Path $target) { Copy-Item $target "$target.bak" -Force }
+    Write-Utf8NoBom $target $next
+
+    Write-Host "已安装 DeepSeek Harness 的 XAssistant 状态提醒（profile: $Profile）：" -ForegroundColor Green
+    Write-Host "  完成 / 会话错误 / token 上限 / 工具失败 / 授权 / 提问 -> agent-status.ps1 -Platform dsh" -ForegroundColor DarkGray
+    Write-Host "  配置：$target" -ForegroundColor DarkGray
+    Write-Host "  插件：$pluginDst" -ForegroundColor DarkGray
+    Write-Host 'DSH 的用户 patch 支持热重载；若当前进程未加载，请重启 dsh web。' -ForegroundColor Yellow
+    exit 0
 }
 
 # 目标文件：项目级（Trae 的 .trae/hooks.json）优先于全局
