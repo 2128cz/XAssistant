@@ -68,6 +68,17 @@ Qoder / Claude / Trae 安装时，安装器会把 `agent-status.ps1` 拷到 `<�
 
 DSH 例外：它现有的 Claude/Codex 兼容桥只暴露 `Stop` / `PostToolUse` 等子集，拿不到 DSH 原生的 `approval/asked`、结构化提问和完整失败结果。安装器因此把 `dsh-status-plugin.mjs` 与状态脚本复制到目标 profile，并只在 `cordis.patch.yml` 里维护 `# xassistant-agent-hooks:dsh begin/end` 标记块；用户已有 YAML 不解析、不重排。插件默认只提醒顶层对话，子代理静默，避免一项任务扇出十几条完成卡。
 
+### DSH 插件的发布仓库（找不到插件时看这里）
+
+- 独立仓库：**http://192.168.1.111:3000/AI/DSH-XAssistant-AIHook.git** （`main` 分支：插件 + 映射自测 + 面向 DSH 用户的装/验/拆说明）
+- 装好后的落点：`$DSH_HOME/profiles/<profile>/xassistant-agent-hooks/`（`dsh-status-plugin.mjs` + `agent-status.ps1`），
+  profile 的 `cordis.patch.yml` 里是那段带 `begin/end` 的标记块；`DSH_HOME` 默认 `~\.dsh`。
+- **开发处仍是本仓库 `mcp/agent-hooks/`**：插件仓库是发布镜像，改逻辑改这里再同步过去；状态脚本
+  （分档、文案、来源徽章、乱码过滤）不在插件仓库复制第二份，避免两套判据漂移。
+- 方向是**单向推**：插件自己 spawn `agent-status.ps1 -Platform dsh`，XAssistant 侧不需要为 DSH 写任何
+  监听或轮询；工作台「PART 4 / MODULES」的 **DSH 接入状态**卡（`Services/Modules/DshStatusModule.cs`）
+  只如实报「profile 装没装、patch 有没有标记块、插件文件在不在位、最近一条真机事件」。
+
 ## 验证
 
 1. 装完**重启对应 IDE**（Qoder / Claude Code 的 hooks 不支持热重载）。
