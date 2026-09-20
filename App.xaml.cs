@@ -168,6 +168,10 @@ public partial class App : System.Windows.Application
         if (!_notifyPipe.TryStart())
             _appLogger.LogInformation("xa 转发管道已被别的实例占着：命令将由发起方本地执行");
 
+        // （对话报错监视已搬进监视模块：Services/Modules/QoderWatchModule —— quota/限流这类
+        //  模型层错误不在 hook 事件流里，由该模块尾随 agent.log 状态机行报红档，
+        //  开关与参数在面板「PART 4 / MODULES」里管，启动时由上面的 WatchModuleRegistry.Start() 拉起）
+
         // 关键词引擎订阅钩子：只订事件，装钩子仍是键盘记录自己的事
         provider.GetRequiredService<KeywordWatcher>()
             .ConnectKeyboard(provider.GetRequiredService<IKeyboardHookService>());

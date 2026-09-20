@@ -135,6 +135,8 @@ xa -k -emergency -any 供电中断
 
 带文字的命令除了全屏那几秒，还会在屏幕顶居中钉一张**持久消息卡片**（文案 + 时间戳，新消息插最前、旧的往下排着可回看，单条 ✕ 或清空全部，同屏最多 10 张）——全屏大字淡完就没了，但「AI 在等你」这件事不该凭空蒸发。写了 `-from <平台>` 的卡片头部是一枚**来源徽章**：IDE 图标（`Assets/IdeIcons/`，由 `mcp/agent-hooks/extract-ide-icons.ps1` 从各家 exe 抽 256px 高清帧）贴在淡化主题色的圆底上，没抽到图标的平台退首字母徽章，没写来源保持素色条。卡片由常驻的 XAssistant 主程序钉住（命令经本机命名管道交给它，多个 xa 调用不会抢屏）；主程序没跑时全屏效果照放、卡片没人钉。
 
+**全屏效果不要求 XAssistant 在后台跑**：主程序没开时，`xa` 自己起一个临时进程本地放效果（不建容器、不开主窗），淡出走完自动退出，不留后台；主程序在跑时整条命令经命名管道交给它统一放（画面无区别，只是多个 xa 调用不抢屏）。唯一依赖常驻的是顶部持久消息卡——它不自动消失，放完就退的临时进程养不住它。hook 接管提醒建议让主程序常驻（默认开机自启），否则提醒只有全屏那几秒，淡出后查无此迹。
+
 ### AI 编码代理的对话状态提醒
 
 用 AI 编码代理写对话（尤其它接管屏幕、自己点鼠标时），AI 卡在你这一侧往往没人提醒。`mcp/agent-hooks/install-agent-hooks.ps1` 把各家的对话生命周期事件接进上面的 `xa`，三级分档：
@@ -148,6 +150,10 @@ xa -k -emergency -any 供电中断
 文案格式固定为「事件词 · 行动指令：上下文」：项目名取事件 `cwd` 的叶目录；对话标题拿事件 `session_id` 去 IDE 的 `state.vscdb` 查真实任务名（就是对话列表里显示的那个名字，vscdb 被 IDE 独占所以用 FileShare.ReadWrite 开流拷字节查；查不到就整段省略）——**不把对话内容晒上屏**，曾拿 transcript 首句当标题把聊天原文弹到了桌面上，这是明确要避免的；报错只留定位信息（`code = 40441` 这类错误码优先，其次错误首句截断）。多项目并行时一眼看出是哪场对话卡住了；事件自带的机器码文案（如 `AskUserQuestion`）映射到事件词，缺哪段省哪段。提醒文案里不写颜色词，颜色由效果本身表达。
 
 **各平台的事件集合不一样，装错了等于没装**：Claude Code / Qoder 挂全套事件；Trae 官方只有 6 个事件（没有 `PermissionRequest`/`PostToolUseFailure`，挂上去永不触发），它的「等待确认」与「任务完成」都用 `Notification(idle_prompt)` 发——所以安装器按平台落地不同事件集，`agent-status.ps1` 里 `idle_prompt` 也按平台分流（Trae 当完成静默交给 Stop，其他平台当空闲等人归黄）。DSH 不走兼容 hooks 子集：安装器向目标 profile 挂一个原生 Cordis 插件，直接监听 `turn/end`、工具结果、授权审计和 `ask_user_question`，所以完成、模型/API 错误、token 上限、策略阻断、工具失败、授权与结构化提问都能覆盖；默认不提醒子代理，避免扇出任务刷屏。
+
+**hooks 盖不到的一类：模型层报错（quota 超限/限流）**——这种错误发生在「Qoder 向百炼发请求」这一层，不在任何 hook 事件流里（Qoder 没实现 `StopFailure`，transcript 也不落），且各家策略不同：Qoder CN 自动重试（每分钟限流，等一会自愈），国际版可能直接卡住等人工点重试。为此做成了一块**监视模块**（`Services/Modules/QoderWatchModule.cs`，面板「PART 4 / MODULES」里开关与调参）：尾随各 Qoder 最近一次启动会话的 `agent.log`，盯状态机迁移行 `prompting -> error`（同行带 code），命中就发红档命令「中断 · 请求人类介入：对话被 API 错误打断 · code 100400」；同一平台同一错误码 2 分钟只报一次（压掉自动重试期间的连刷），**首见日志只记游标、不回放历史旧错**；带「试弹一次红档」按钮。依赖主程序常驻；Trae / Codex / ZCode 等同类监视以后各写各的模块（共享的 `LogTailer` 尾随件在 `Services/Modules/LogTailWatch.cs`）。
+
+各平台的**接入状态卡**：Trae / ZCode / Codex / VS Code 各有一块（`Services/Modules/*WatchModule.cs`，基类 `IdeStatusModule` + 探测件 `IdeProbe`），只读如实读出「目标程序（跑着/装着/没找到）、对话数据、hooks 部署没有、最近一条真实事件」——Qoder 那种扫日志告警的前提（能拿到对话数据 + 格式已校准）在这上面一目了然；未接入的平台（Codex 本机未装、VS Code 无官方 hooks）用占位模块如实说明可行路径，不装样子；每块卡带「立即刷新」。
 
 一键装 / 拆：
 
