@@ -79,6 +79,32 @@ DSH 例外：它现有的 Claude/Codex 兼容桥只暴露 `Stop` / `PostToolUse`
   监听或轮询；工作台「PART 4 / MODULES」的 **DSH 接入状态**卡（`Services/Modules/DshStatusModule.cs`）
   只如实报「profile 装没装、patch 有没有标记块、插件文件在不在位、最近一条真机事件」。
 
+## 来源段：主对话还是子代理
+
+Qoder 的事件里带 `agent_id` + `agent_type` 的就是**子代理**，主对话没有这两个字段（本机 1.1.57 实测）。
+`agent_id` 还能直接对上 IDE 落盘的子代理档案：
+
+```
+~\.qoder-cn\projects\<slug>\<会话>\subagents\agent-<agent_id>.meta.json
+{"agentType":"Explore","toolUseId":"call_…","description":"盘点前端数据需求","invocationName":"Explore","color":"cyan"}
+```
+
+布局注意：`<会话>.jsonl` 与同名**目录**平级，档案在目录里的 `subagents/` 下，所以脚本按
+`dirname(transcript)/basename(去扩展)/subagents/` 找，再退回 `dirname/subagents/`（兼容 transcript 指到会话目录本身）。
+
+文案因此多一段来源，效果是「项目 · “任务名” · 来源 · 细节」：
+
+```
+故障 · 请求人类介入：AI · 子代理 general-purpose：Probe NAS-adjacent hosts · Exit code 1 Traceback…
+回复 · 已完成：HotRollingDigitalTwin · “1. 现在后端dev” · 主对话
+```
+
+`color` 只有内置类型带（本机 59 份档案里 16 份有，全是 `Explore`；`general-purpose` 一律没有），
+所以**没拿它参与配色**——屏幕颜色由档位表达（红=要人看、黄=等人回、info=完成）。
+项目级的小图标 / 颜色本机拿不到：global state 里 `"color":"…"` 零命中，`questWorkspaceHistory` 只有
+`uri/label/normalizedPath/lastOpenedAt/workspaceKind`，8 个 `workspaceStorage` 也没有——真在项目上打了标记后
+再扫一次才能定位。
+
 ## 验证
 
 1. 装完**重启对应 IDE**（Qoder / Claude Code 的 hooks 不支持热重载）。

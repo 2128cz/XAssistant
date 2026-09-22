@@ -12,6 +12,10 @@
 #   PermissionRequest                黄：等授权，对话卡在人这一侧
 #   Notification(permission_prompt)  黄：同上（提问 / 接管）
 #   Stop                             普通：这轮回复完成（stop_hook_active 时静默，防死循环）
+# 来源段：Qoder 事件带 agent_id / agent_type 的就是**子代理**——拿 agent_id 去 IDE 落盘的
+#   `<projects>\<slug>\<会话>\subagents\agent-<agent_id>.meta.json` 取 invocationName（这次调用叫什么）、
+#   description（派下去干什么）、color（IDE 给这个子代理配的颜色）；主对话没有这两个字段，标「主对话」。
+#   文案因此变成「项目 · “任务名” · 来源 · 细节」，并行跑子代理时一眼看出该回哪一路。
 # 铁律：永远 exit 0 —— 提醒脚本再坏也不许把对话流阻断。
 param(
     [string]$Platform = 'generic',
@@ -87,6 +91,34 @@ try {
         return ($s -replace '\uFFFD', '')
     }
 
+    # 主对话还是子代理：Qoder / Claude 系在事件里带 agent_id + agent_type，**主对话没有这两个字段**
+    # （本机 1.1.57 实测：agent_type 见到 general-purpose / Explore）。agent_id 还能直接对上 IDE 落盘的
+    # 子代理档案 `agent-<agent_id>.meta.json`，里面有 invocationName（这次调用叫什么）、description
+    # （派下去干什么）、color（IDE 给这个子代理配的颜色，内置类型才有）。
+    # 实测布局：<projects>\<slug>\<会话>.jsonl 与同名目录 <projects>\<slug>\<会话>\subagents\ 平级，
+    # 所以两个候选位置都要试（transcript_path 指到会话目录本身的版本也吃得下）。
+    function Get-AgentMeta([string]$agentId, [string]$transcript) {
+        if (-not $agentId -or -not $transcript) { return $null }
+        try {
+            $dir = Split-Path $transcript -Parent
+            $leaf = Split-Path $transcript -Leaf
+            $file = if ($leaf -like '*.jsonl') {
+                # Split-Path -LeafBase 是 PS 6+ 才有的，Windows PowerShell 5.1 只能用 .NET 取；
+                # 命令模式下方法调用必须整体加括号，否则被当成两个错位参数（异常会被下面的 catch 静默吞掉）
+                $sessionDir = Join-Path $dir ([IO.Path]::GetFileNameWithoutExtension($leaf))
+                Join-Path (Join-Path $sessionDir 'subagents') "agent-$agentId.meta.json"
+            } else {
+                Join-Path $dir "subagents\agent-$agentId.meta.json"
+            }
+            if (-not (Test-Path $file)) {
+                $alt = Join-Path $dir "subagents\agent-$agentId.meta.json"
+                if (-not (Test-Path $alt)) { return $null }
+                $file = $alt
+            }
+            return (Get-Content $file -Raw -Encoding UTF8 | ConvertFrom-Json)
+        } catch { return $null }   # 档案读不到只少一段说明，不影响提醒
+    }
+
     # 事件带来的上下文：cwd 叶名是项目；对话标题读 IDE 的 state.vscdb（tasks 里 id→name 的真实任务名，
     # 不是首句对话内容——拿内容当标题会把聊天原文晒到屏幕上，用户明确不要）。
     # vscdb 被 IDE 独占，用 FileShare.ReadWrite 开流拷出来查；Latin1 字节↔字符 1:1，IndexOf 秒级
@@ -132,12 +164,35 @@ try {
         return ''
     }
     $dialog = Cut ([string]$evt.session_title) 80
+    if (-not $dialog) {
+        # Qoder 的 Stop 直接带 parent_business_info.name（就是这轮任务名），比读 vscdb 便宜且不受独占影响
+        $pbi = $evt.parent_business_info
+        if ($pbi) { $dialog = Cut ([string]$pbi.name) 80 }
+    }
     if (-not $dialog) { $dialog = Get-TaskTitle ([string]$evt.session_id) $DbAppDirs[$Platform] }
 
-    # 文案格式固定为「事件词 · 请求人类介入：项目 · “对话标题” · 细节」，缺哪段省哪段
+    # 文案格式固定为「事件词 · 请求人类介入：项目 · “对话标题” · 来源 · 细节」，缺哪段省哪段。
+    # 来源段专治「不知道该去看哪场对话」：并行跑子代理时，完成卡与报错卡混在一起，
+    # 不标出来就分不清是人该回的还是子代理返回的。
     $who = @()
     if ($project) { $who += $project }
     if ($dialog) { $who += ('“' + $dialog + '”') }
+    $agentId = [string]$evt.agent_id
+    $agentType = Cut ([string]$evt.agent_type) 24
+    if ($agentId -or $agentType) {
+        # 带 agent 字段就是子代理：名字优先 IDE 的 invocationName（同类型并发也分得开），退回类型；
+        # description 是「派下去干什么」，比工具名更能指认是哪一路
+        $meta = Get-AgentMeta $agentId ([string]$evt.transcript_path)
+        $label = Cut ([string]$meta.invocationName) 24
+        if (-not $label) { $label = $agentType }
+        $job = Cut ([string]$meta.description) 30
+        $seg = if ($label) { "子代理 $label" } else { '子代理' }
+        if ($job) { $seg += "：$job" }
+        $who += $seg
+    } elseif ($Platform -eq 'qoder') {
+        # 只有 Qoder 实测确认「主对话事件不带 agent 字段」，别的平台不拿缺字段当证据（Claude 未验证）
+        $who += '主对话'
+    }
     $ctx = if ($who.Count -gt 0) { '：' + ($who -join ' · ') } else { '' }
 
     function Show-Effect([string]$argLine) {

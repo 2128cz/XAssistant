@@ -187,6 +187,24 @@ Fire ('{"hook_event_name":"PostToolUseFailure","error":"' + $garbled + '","tool_
 $e = LastEffect
 Check '乱码错误 → 退回工具名，不晒替换符' (($e -match 'Bash') -and ($e -notmatch 'Out-File')) $e
 
+# 主对话 / 子代理：Qoder 事件带 agent_id 就是子代理，档案（IDE 落在会话目录 subagents/agent-<id>.meta.json，
+# 该目录与同名 jsonl 平级）给 invocationName 与 description；没带字段的主对话必须明说「主对话」，
+# 否则并行跑子代理时两张卡分不出该回哪一路
+$projDir = Join-Path $root 'projects\g--demo'
+New-Item -ItemType Directory -Force -Path (Join-Path $projDir 'sess-1\subagents') | Out-Null
+'{"agentType":"Explore","toolUseId":"call_1","description":"盘点前端数据需求","invocationName":"Explore","color":"cyan"}' |
+    Set-Content (Join-Path $projDir 'sess-1\subagents\agent-aExplore-123.meta.json') -Encoding UTF8
+$tp = ($projDir -replace '\\', '\\') + '\\sess-1.jsonl'
+Fire ('{"hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"D:\\repo","agent_id":"aExplore-123","agent_type":"Explore","transcript_path":"' + $tp + '"}') 1 'qoder' | Out-Null
+$e = LastEffect
+Check '子代理 → 标出子代理与调用名' (($e -match '子代理 Explore') -and ($e -match '盘点前端数据需求')) $e
+Check '子代理事件不误标主对话' (-not ($e -match '主对话')) $e
+Fire ('{"hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"D:\\repo"}') 1 'qoder' | Out-Null
+Check '主对话 → 明标主对话' ((LastEffect) -match '主对话') (LastEffect)
+Fire ('{"hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"D:\\repo","agent_id":"aMissing-999","agent_type":"general-purpose"}') 1 'qoder' | Out-Null
+$e = LastEffect
+Check '档案读不到 → 退回 agent_type，不崩' (($e -match '子代理 general-purpose') -and -not ($e -match '盘点')) $e
+
 Fire '{"hook_event_name":"PostToolUseFailure","is_interrupt":true,"cwd":"D:\\repo"}' | Out-Null
 Check '中断的失败 → 文案写「中断」' ((LastEffect) -match '中断') (LastEffect)
 
