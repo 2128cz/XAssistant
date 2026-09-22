@@ -114,7 +114,10 @@ xa -k [-emergency] [-tag <识别符>] [-any <正文片段>]          # 杀除；
 （是过渡，不是直接盖一层新颜色）；
 不写 `-group`/`-tag`/`-from` 就不成组，照旧一条播完才播下一条。`-icon` 指定这一条垫在背后的 IDE 立绘
 （不写按 `-from` 取 `Assets/IdeIcons/<平台>.png`；图标自己的 alpha 当遮罩、颜色跟着档位走，不需要白色图，
-尺寸位置与不透明度在「警告背景立绘」卡片里调）。`xa confetti` 撒花、`xa off` 收起。
+尺寸位置与不透明度在「警告背景立绘」卡片里调）；**太干净或太满的图一律不垫**——全透明的图当遮罩等于
+什么都不画，几乎不透明的当遮罩就是一块实心方砖，只有真带形状的剪影才上屏。
+正文限宽屏宽八成，超了自己换行，左右两道斜线带跟着正文的实际高度往下**重复**（不拉伸、不改字号）。
+`xa confetti` 撒花、`xa off` 收起。
 
 旧写法照旧兼容：`XAssistant.exe --fx warn 3 "AI Computer Use"`、`--fx confetti`、`--fx off`。`mcp/xassistant_fx_server.py` 是个纯标准库的 MCP 垫片，把 `xassistant_banner` / `xassistant_confetti` / `xassistant_off` 三个工具翻译成上面的命令；可执行文件位置读环境变量 `XASSISTANT_EXE`。
 
