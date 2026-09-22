@@ -102,11 +102,16 @@
 
 ```
 xa -s <色|类型> [持续 [淡入 [淡出]]] [-border on|off [渐宽 [延伸 [周期]]]] [-lable on|off [字号] [文本…]]
+             [-group <词>] [-from <平台>] [-icon <png路径>]
                     [-tag <识别符>] [-replay <间隔秒> [次数]] [-emergency] [-from <平台>]
 xa -k [-emergency] [-tag <识别符>] [-any <正文片段>]          # 杀除；三种选择条件都可省，全不写就是全停
 ```
 
-例：`xa -s info 5 1 1 -border on 50 30 1 -lable on 24 "AI 接管中"`。`-s` 段给颜色——颜色名（`green`、`amber`、`#3B82F6` 等）或类型色（`info` / `warn` / `error` 及其缩写）——与三段节奏（默认 5 / 1 / 1 秒）；`-border` 是四边的淡化渐变带：两个数字分别是主带与淡出延伸带的宽度（px），第三个是亮度呼吸的循环周期（秒），总持续时间内自动在明暗之间循环，写 0 就静态亮着；`-lable` 段第一个数字永远是字号，剩下的是条带文案，写 `off` 或不给文案就只剩边框。`xa confetti` 撒花、`xa off` 收起。
+例：`xa -s info 5 1 1 -border on 50 30 1 -lable on 24 "AI 接管中"`。`-s` 段给颜色——颜色名（`green`、`amber`、`#3B82F6` 等）或类型色（`info` / `warn` / `error` 及其缩写）——与三段节奏（默认 8 / 0.5 / 0.5 秒；淡入那一段同时是扫描头擦边的时长）；`-border` 是四边的淡化渐变带：两个数字分别是主带与淡出延伸带的宽度（px），第三个是亮度呼吸的循环周期（秒），总持续时间内自动在明暗之间循环，写 0 就静态亮着；`-lable` 段第一个数字永远是字号，剩下的是条带文案，写 `off` 或不给文案就只剩边框。`-group` 是组合键：同键的多条告警在屏幕上**竖着排成一叠**（最多 4 行），
+全屏边框按组里最高那一档亮，新的同类消息进来时整组从那一刻重新计时，整组到最迟那一行的点一起退；
+不写 `-group`/`-tag`/`-from` 就不成组，照旧一条播完才播下一条。`-icon` 指定这一条垫在背后的 IDE 立绘
+（不写按 `-from` 取 `Assets/IdeIcons/<平台>.png`；图标自己的 alpha 当遮罩、颜色跟着档位走，不需要白色图，
+尺寸位置与不透明度在「警告背景立绘」卡片里调）。`xa confetti` 撒花、`xa off` 收起。
 
 旧写法照旧兼容：`XAssistant.exe --fx warn 3 "AI Computer Use"`、`--fx confetti`、`--fx off`。`mcp/xassistant_fx_server.py` 是个纯标准库的 MCP 垫片，把 `xassistant_banner` / `xassistant_confetti` / `xassistant_off` 三个工具翻译成上面的命令；可执行文件位置读环境变量 `XASSISTANT_EXE`。
 

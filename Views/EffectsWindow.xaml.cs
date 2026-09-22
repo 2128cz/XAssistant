@@ -42,13 +42,13 @@ public sealed partial class EffectsWindow : Window
     private const int MaxParticles = 12;
 
     /// <summary>默认淡入秒数（用户定的节奏：淡入 1 s → 持续 5 s → 淡出 1 s）。</summary>
-    public const double BannerFadeInSeconds = 1.0;
+    public const double BannerFadeInSeconds = 0.5;
 
     /// <summary>默认持续秒数：闪烁铺在这一段里，不写时长时就是这一段撑住可读。</summary>
-    public const double BannerHoldSeconds = 5.0;
+    public const double BannerHoldSeconds = 8.0;
 
     /// <summary>默认淡出秒数。</summary>
-    public const double BannerFadeOutSeconds = 1.0;
+    public const double BannerFadeOutSeconds = 0.5;
 
     /// <summary>
     /// 扫描头单趟的时长（用户定的节奏：一条动画 0.5 s）。淡入比它短时以淡入为准，
@@ -185,10 +185,10 @@ public sealed partial class EffectsWindow : Window
                 FadeOut: fadeOut,
                 Blinks: blinks,
                 BorderOn: true,
-                BorderWidth: 50,
-                BorderFade: 30,
+                BorderWidth: 60,
+                BorderFade: 36,
                 BorderCycle: 0,
-                FontSize: 46,
+                FontSize: EffectCommand.DefaultFontSize,
                 Urgent: false,
                 Icon: null,
                 // 彩蛋按「这句词」成组：同一个词连敲是重新计时，不同词各开一叠，不互相叠成两行
@@ -590,8 +590,9 @@ public sealed partial class EffectsWindow : Window
     /// </summary>
     private void EnterRow(BannerRow row, TimeSpan now)
     {
+        double sweep = Math.Clamp(row.Spec.FadeIn <= 0 ? SweepSeconds : row.Spec.FadeIn, 0.15, 1.5);
         var at = _nextEntryAt is { } pending && pending > now ? pending : now;
-        _nextEntryAt = at + TimeSpan.FromSeconds(SweepSeconds);
+        _nextEntryAt = at + TimeSpan.FromSeconds(sweep);
         var delay = at - now;
 
         StopRow(row);                                   // 重扫同一行：先把上一次挂在它身上的动画摘干净
@@ -599,10 +600,11 @@ public sealed partial class EffectsWindow : Window
         var shown = new Rect(0, 0, Width, Height);
         var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
         var story = new Storyboard { BeginTime = delay };
+        var wipe = TimeSpan.FromSeconds(sweep);
 
         var reveal = new RectAnimationUsingKeyFrames
         {
-            Duration = TimeSpan.FromSeconds(SweepSeconds),
+            Duration = wipe,
             FillBehavior = FillBehavior.HoldEnd,
         };
         reveal.KeyFrames.Add(new EasingRectKeyFrame(hidden, KeyTime.FromPercent(0)));
@@ -611,7 +613,7 @@ public sealed partial class EffectsWindow : Window
         Storyboard.SetTargetProperty(reveal, new PropertyPath("Clip.Rect"));
         story.Children.Add(reveal);
 
-        var run = new DoubleAnimation(Width, -SweepWidth, new Duration(TimeSpan.FromSeconds(SweepSeconds)))
+        var run = new DoubleAnimation(Width, -SweepWidth, new Duration(wipe))
         {
             EasingFunction = ease,
             FillBehavior = FillBehavior.Stop,
@@ -620,7 +622,7 @@ public sealed partial class EffectsWindow : Window
         Storyboard.SetTargetProperty(run, new PropertyPath("RenderTransform.X"));
         story.Children.Add(run);
 
-        var glow = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(SweepSeconds) };
+        var glow = new DoubleAnimationUsingKeyFrames { Duration = wipe };
         glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(0)));
         glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0.15)));
         glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0.85)));

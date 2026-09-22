@@ -14,7 +14,7 @@ namespace XAssistant.Services;
 /// 纯数据 + 纯解析：整个类不碰窗口、不碰 Application 资源，夹具可以直接断言解析结果。
 ///
 /// 语法（新）：
-///   <c>-s &lt;色|类型&gt; [持续 [淡入 [淡出]]]</c>            默认 info / 5 / 1 / 1
+///   <c>-s &lt;色|类型&gt; [持续 [淡入 [淡出]]]</c>            默认 info / 8 / 0.5 / 0.5
 ///   <c>-border on|off [渐宽 [延伸 [周期]]]</c>               默认 on / 50 / 30 / 1（周期 0 = 不循环）
 ///   <c>-lable on|off [字号] [文本…]</c>                      文本写在段内；不给文本就不显示文字条带
 ///   <c>-from &lt;词&gt;</c>                                  来源平台标记（hook 传 -Platform 名），消息栈卡片拿它配 IDE 图标徽章
@@ -40,13 +40,13 @@ public sealed record EffectCommand
     public string Color { get; set; } = "info";
 
     /// <summary>持续秒数（闪烁铺在这一段里）。与 <see cref="Services.EffectCli"/>、EffectsWindow 的默认节奏互指。</summary>
-    public double Hold { get; set; } = 5;
+    public double Hold { get; set; } = 8;
 
     /// <summary>淡入秒数。</summary>
-    public double FadeIn { get; set; } = 1;
+    public double FadeIn { get; set; } = 0.5;
 
     /// <summary>淡出秒数。</summary>
-    public double FadeOut { get; set; } = 1;
+    public double FadeOut { get; set; } = 0.5;
 
     /// <summary>闪烁次数（只有旧语法会配；新语法固定 1）。</summary>
     public int Blinks { get; set; } = 1;
@@ -55,7 +55,7 @@ public sealed record EffectCommand
     public bool BorderOn { get; set; } = true;
 
     /// <summary>边缘渐变的淡化带宽度（DIP）：从屏幕边缘向内由亮渐隐的主带。</summary>
-    public double BorderWidth { get; set; } = 50;
+    public double BorderWidth { get; set; } = 60;
 
     /// <summary>主带之后的淡出延伸带宽度（DIP）：亮度继续收到 0 的收尾段。</summary>
     public double BorderFade { get; set; } = 30;
@@ -64,7 +64,11 @@ public sealed record EffectCommand
     public double BorderCycle { get; set; } = 1;
 
     /// <summary>条带文字字号（DIP）；斜线高度按字号推，二者始终等高。</summary>
-    public double FontSize { get; set; } = 46;
+    /// <summary>条带文字字号（DIP）；斜线高度按字号推，二者始终等高。默认值与彩蛋共用一份。</summary>
+    public double FontSize { get; set; } = DefaultFontSize;
+
+    /// <summary>日常警告与关键词彩蛋同一个字号：彩蛋那边「字更大」不该是它独占的待遇。</summary>
+    public const double DefaultFontSize = 58;
 
     /// <summary>来源平台标记（<c>-from qoder</c>）：消息栈的小圆牌用它配 IDE 图标；自由词不校验，没写就不贴牌。</summary>
     public string? Source { get; set; }
@@ -120,8 +124,8 @@ public sealed record EffectCommand
     public double ScreenSeconds => FadeIn + Hold + FadeOut;
 
     /// <summary>数字参数缺省值（与上面的属性默认值一一对应，改一处要同步另一处）。</summary>
-    private static readonly double[] ShowDefaults = [5, 1, 1];
-    private static readonly double[] BorderDefaults = [50, 30, 1];
+    private static readonly double[] ShowDefaults = [8, 0.5, 0.5];
+    private static readonly double[] BorderDefaults = [60, 30, 1];
 
     /// <summary>颜色名表：常见色各给一支现代色板色。十六进制直接写 <c>#RRGGBB</c> 也可以。</summary>
     private static readonly IReadOnlyDictionary<string, string> NamedPalette =
