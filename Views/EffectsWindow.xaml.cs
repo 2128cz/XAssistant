@@ -19,6 +19,7 @@ using Pen = System.Windows.Media.Pen;
 using Point = System.Windows.Point;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using FontFamily = System.Windows.Media.FontFamily;
+using Rectangle = System.Windows.Shapes.Rectangle;
 
 namespace XAssistant.Views;
 
@@ -49,6 +50,21 @@ public sealed partial class EffectsWindow : Window
     /// <summary>默认淡出秒数。</summary>
     public const double BannerFadeOutSeconds = 1.0;
 
+    /// <summary>
+    /// 扫描头单趟的时长（用户定的节奏：一条动画 0.5 s）。淡入比它短时以淡入为准，
+    /// 免得「扫入」跑到淡入前面去——那时条带还没亮完，扫的东西看不见。
+    /// </summary>
+    public const double SweepSeconds = 0.5;
+
+    /// <summary>警戒线慢移一格（一个瓦片）要几秒：驻留段里循环，文本不动，所以只有线在走。</summary>
+    private const double DriftSecondsPerTile = 2.4;
+
+    /// <summary>退场时整条带子往左带的距离（DIP）：给「平移出去」一点位移感，又不至于把字推走。</summary>
+    private const double ExitDrift = 80;
+
+    /// <summary>扫描头的宽度（与 XAML 里那个 Border 一致）：平移量的两端都按它算。</summary>
+    private const double SweepWidth = 150;
+
     /// <summary>粒子的布局盒边长与字形大小的比例：留够余量，转起来不会被盒子裁掉。</summary>
     private const double BoxRatio = 1.8;
 
@@ -59,6 +75,7 @@ public sealed partial class EffectsWindow : Window
     private bool _bannerOn;
     private Storyboard? _bannerStory;
     private Storyboard? _breathStory;
+    private Storyboard? _driftStory;
 
     /// <summary>
     /// 一条条带的完整规格：<see cref="ShowBanner"/>（旧调用）与 <see cref="ShowCommand"/>（xa 命令行）
@@ -328,7 +345,9 @@ public sealed partial class EffectsWindow : Window
             // 斜线跟文字等高：行高由字号推，画刷的瓦片尺寸就按这个高算
             double height = spec.FontSize * 1.25;
             SlashLeft.Height = SlashRight.Height = height;
-            SlashLeft.Background = SlashRight.Background = Hatch(accent, height);
+            // 两侧各一支画刷：慢移是挂在画刷的 Viewport 上的，两侧共用一支的话两条动画会互相踩
+            SlashLeft.Background = Hatch(accent, height);
+            SlashRight.Background = Hatch(accent, height);
             // 紧急档不在文字两边夹小三角，而是上下四颗巨型的（见 BuildCorners）：
             // 警告程度要从余光里就能看见，藏在正文旁边等于没提醒
             SlashLeft.Child = SlashRight.Child = null;
@@ -346,17 +365,45 @@ public sealed partial class EffectsWindow : Window
         AttachLoop();
 
         double total = Math.Max(0.1, spec.FadeIn + spec.Hold + spec.FadeOut);
+        // 扫描头单趟取 0.5 s，但不许越过淡入：淡入只有 0.2 s 时扫入也得在那半秒内收住
+        double sweep = Math.Clamp(Math.Min(SweepSeconds, Math.Max(0.15, spec.FadeIn)), 0.15, total);
+        double revealAt = Math.Clamp(sweep / total, 0.01, 1);              // 扫完那一刻（开始有字的位置）
+        double holdEndAt = Math.Clamp((spec.FadeIn + spec.Hold) / total, revealAt, 1);   // 退场起点
+        // 全遮起步：Clip 是个零宽矩形，此刻一个字都不露——入场动画的起点必须是"什么都没有"，
+        // 否则扫描头撞开的是已经亮着的线，看着就是原地淡入
+        Tape.Clip = new RectangleGeometry(new Rect(Width, 0, 0, Height));
+
         // 中间这句、屏幕四边、四颗警告三角一起淡入淡出：三个目标各一份动画实例
         // （SetTarget 存在动画对象上，共用会互相踩）
         var story = new Storyboard();
-        foreach (var target in new FrameworkElement[] { Tape, Edge, Corners })
+        foreach (var target in new FrameworkElement[] { Edge, Corners })
         {
             var pulse = Pulse(spec, total);
             Storyboard.SetTarget(pulse, target);
             Storyboard.SetTargetProperty(pulse, new PropertyPath(OpacityProperty));
             story.Children.Add(pulse);
         }
+        // 正文那条另算一份：淡入段压到扫描头跑完的那一刻（扫到哪亮到哪，不是先蒙亮再扫），
+        // 省下的那截补进持续段——holdEndAt 不变，闪烁位置与退场起点都不跟着抖
+        if (hasText)
+        {
+            var tapePulse = Pulse(spec with { FadeIn = sweep, Hold = spec.Hold + (spec.FadeIn - sweep) }, total);
+            Storyboard.SetTarget(tapePulse, Tape);
+            Storyboard.SetTargetProperty(tapePulse, new PropertyPath(OpacityProperty));
+            story.Children.Add(tapePulse);
+            Sweep.Child = BuildSweepBody(accent);
+            story.Children.Add(Reveal(total, revealAt, holdEndAt));
+            story.Children.Add(SweepGlow(total, revealAt, holdEndAt));
+            story.Children.Add(SweepRun(total, revealAt, holdEndAt));
+            story.Children.Add(ExitShift(total, holdEndAt));
+        }
+        else
+        {
+            Sweep.Child = null;
+            Tape.Opacity = 0;
+        }
         AddBreath(spec);
+        if (hasText) AddDrift(sweep, spec.Hold);
         story.Completed += (_, _) =>
         {
             // 被新一条或 HideNow 接过的不重复收尾
@@ -386,8 +433,10 @@ public sealed partial class EffectsWindow : Window
     }
 
     /// <summary>
-    /// 停掉主戏与边框呼吸两条动画，把被它们在合成树上按住的 Opacity 交还本地并复位。
+    /// 停掉主戏、边框呼吸、斜线慢移三套动画，把被它们在合成树上按住的属性交还本地并复位。
     /// 先置空引用再 Stop：Stop 会触发 Completed，旧引用留着会让收尾流程（关窗、清动画）重跑一遍。
+    /// 新加的四步动画每一个都占一个属性（Clip.Rect / 扫描头 X / 扫描头 Opacity / 退场位移 / 画刷 Viewport），
+    /// 少归还一个，下一次本地赋值就会被上一次残留的动画按住。
     /// </summary>
     private void StopAnimation()
     {
@@ -397,12 +446,23 @@ public sealed partial class EffectsWindow : Window
         var breath = _breathStory;
         _breathStory = null;
         breath?.Stop();
+        var drift = _driftStory;
+        _driftStory = null;
+        drift?.Stop();
         Tape.BeginAnimation(OpacityProperty, null);
         Edge.BeginAnimation(OpacityProperty, null);
         Corners.BeginAnimation(OpacityProperty, null);
         EdgePulse.BeginAnimation(OpacityProperty, null);
+        Sweep.BeginAnimation(OpacityProperty, null);
+        SweepShift.BeginAnimation(TranslateTransform.XProperty, null);
+        TapeShift.BeginAnimation(TranslateTransform.XProperty, null);
+        if (Tape.Clip is RectangleGeometry mask) mask.BeginAnimation(RectangleGeometry.RectProperty, null);
+        // 斜线那两支画刷不用归还：每次上屏都换新的一支，被动画按住的旧支已经不在树上
         Tape.Opacity = Edge.Opacity = Corners.Opacity = 0;
         EdgePulse.Opacity = 1;   // 内层回到全亮：呼吸跑到暗端时被收起，下一轮开头不带旧值
+        Sweep.Opacity = 0;
+        SweepShift.X = -SweepWidth;   // 扫描头停在屏左外：收起时不留一块透明带子在画面里
+        TapeShift.X = 0;
     }
 
     /// <summary>
@@ -484,6 +544,169 @@ public sealed partial class EffectsWindow : Window
         // 淡出为 0 时持续段直接顶到总长：末尾再放一帧 0 会和上一帧同时间点，跳过（释放动画时自然回 0）
         if (holdEndAt < 1) pulse.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(1)));
         return pulse;
+    }
+
+    /// <summary>
+    /// 揭示遮罩：<see cref="Tape"/> 整层的 Clip 从「屏右一个零宽矩形」长成整个屏幕。左边界就是那道
+    /// 往左跑的警戒线起点，所以线与字是被扫描头一路撞开出来的；退场反向收回（左边界回到屏右），
+    /// 看着像被抽走。入场用 EaseOut（撞开时快、收住时缓），退场匀速。
+    /// 关键帧按总长的百分比铺，和 <see cref="Pulse"/> 共用同一把尺子。
+    /// </summary>
+    private RectAnimationUsingKeyFrames Reveal(double total, double revealAt, double holdEndAt)
+    {
+        var hidden = new Rect(Width, 0, 0, Height);
+        var shown = new Rect(0, 0, Width, Height);
+        var reveal = new RectAnimationUsingKeyFrames
+        {
+            Duration = TimeSpan.FromSeconds(total),
+            FillBehavior = FillBehavior.Stop,
+        };
+        reveal.KeyFrames.Add(new EasingRectKeyFrame(hidden, KeyTime.FromPercent(0)));
+        reveal.KeyFrames.Add(new EasingRectKeyFrame(shown, KeyTime.FromPercent(revealAt),
+            new QuadraticEase { EasingMode = EasingMode.EaseOut }));
+        if (holdEndAt < 1)
+        {
+            reveal.KeyFrames.Add(new LinearRectKeyFrame(shown, KeyTime.FromPercent(holdEndAt)));
+            reveal.KeyFrames.Add(new LinearRectKeyFrame(hidden, KeyTime.FromPercent(1)));
+        }
+        Storyboard.SetTarget(reveal, Tape);
+        Storyboard.SetTargetProperty(reveal, new PropertyPath("Clip.Rect"));
+        return reveal;
+    }
+
+    /// <summary>
+    /// 扫描头的位置：入场从屏右外冲到屏左外，跑在揭示边界前面（所以它是 Tape 的兄弟而不是孩子，
+    /// 孩子的话会被自己拉开的那片 Clip 一起裁掉）；退场反向再跑一趟当擦除器。两趟之间停在屏左外。
+    /// </summary>
+    private DoubleAnimationUsingKeyFrames SweepRun(double total, double revealAt, double holdEndAt)
+    {
+        var run = new DoubleAnimationUsingKeyFrames
+        {
+            Duration = TimeSpan.FromSeconds(total),
+            FillBehavior = FillBehavior.Stop,
+        };
+        run.KeyFrames.Add(new EasingDoubleKeyFrame(Width, KeyTime.FromPercent(0)));
+        run.KeyFrames.Add(new EasingDoubleKeyFrame(-SweepWidth, KeyTime.FromPercent(revealAt),
+            new QuadraticEase { EasingMode = EasingMode.EaseOut }));
+        if (holdEndAt < 1)
+        {
+            run.KeyFrames.Add(new LinearDoubleKeyFrame(-SweepWidth, KeyTime.FromPercent(holdEndAt)));
+            run.KeyFrames.Add(new LinearDoubleKeyFrame(Width, KeyTime.FromPercent(1)));
+        }
+        Storyboard.SetTarget(run, SweepShift);
+        Storyboard.SetTargetProperty(run, new PropertyPath(TranslateTransform.XProperty));
+        return run;
+    }
+
+    /// <summary>扫描头只在两趟路上亮，跑完即灭：留一块半透明带子压在屏上不算效果，算脏。</summary>
+    private DoubleAnimationUsingKeyFrames SweepGlow(double total, double revealAt, double holdEndAt)
+    {
+        var glow = new DoubleAnimationUsingKeyFrames
+        {
+            Duration = TimeSpan.FromSeconds(total),
+            FillBehavior = FillBehavior.Stop,
+        };
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(revealAt * 0.15)));
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(revealAt * 0.85)));
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(revealAt)));
+        if (holdEndAt < 1)
+        {
+            glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(holdEndAt)));
+            glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent((holdEndAt + 1) / 2)));
+            glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(1)));
+        }
+        Storyboard.SetTarget(glow, Sweep);
+        Storyboard.SetTargetProperty(glow, new PropertyPath(OpacityProperty));
+        return glow;
+    }
+
+    /// <summary>
+    /// 退场位移：整条带子在淡出段往左带一小段（<see cref="ExitDrift"/>），配合 Clip 收回读成「平移出去」。
+    /// 只给位移不给缩放——缩放会连正文一起变形，而正文这一路都不该动。
+    /// </summary>
+    private DoubleAnimationUsingKeyFrames ExitShift(double total, double holdEndAt)
+    {
+        var shift = new DoubleAnimationUsingKeyFrames
+        {
+            Duration = TimeSpan.FromSeconds(total),
+            FillBehavior = FillBehavior.Stop,
+        };
+        shift.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+        if (holdEndAt < 1)
+        {
+            shift.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(holdEndAt)));
+            shift.KeyFrames.Add(new EasingDoubleKeyFrame(-ExitDrift, KeyTime.FromPercent(1),
+                new QuadraticEase { EasingMode = EasingMode.EaseIn }));
+        }
+        else shift.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(1)));
+        Storyboard.SetTarget(shift, TapeShift);
+        Storyboard.SetTargetProperty(shift, new PropertyPath(TranslateTransform.XProperty));
+        return shift;
+    }
+
+    /// <summary>
+    /// 警戒线的持续慢移：驻留段里每 <see cref="DriftSecondsPerTile"/> 秒挪走一个瓦片。
+    /// 动的是画刷的 Viewport（采样窗往左挪一格），线框与正文各自不动，所以是「条纹在背景里流」，
+    /// 不是「整条带子在飘」。位移取整整一个瓦片，循环接缝看不出来。
+    /// 挂在单独一条 story 上：主戏那条随时会被下一条接管，慢移的节拍不该跟着一起被掐断。
+    /// </summary>
+    private void AddDrift(double sweep, double hold)
+    {
+        if (hold <= 0) return;
+        double rounds = Math.Max(1, Math.Floor(hold / DriftSecondsPerTile));
+        var drift = new Storyboard();
+        foreach (var slash in new Border[] { SlashLeft, SlashRight })
+        {
+            if (slash.Background is not DrawingBrush hatch) continue;
+            var tile = hatch.Viewport;
+            var slide = new RectAnimation
+            {
+                From = tile,
+                To = new Rect(tile.X + tile.Width, tile.Y, tile.Width, tile.Height),
+                BeginTime = TimeSpan.FromSeconds(sweep),   // 等扫完再开始流，别跟入场抢方向感
+                Duration = TimeSpan.FromSeconds(DriftSecondsPerTile),
+                RepeatBehavior = new RepeatBehavior(rounds),
+            };
+            Storyboard.SetTarget(slide, slash);
+            Storyboard.SetTargetProperty(slide, new PropertyPath("Background.Viewport"));
+            drift.Children.Add(slide);
+        }
+        if (drift.Children.Count == 0) return;
+        _driftStory = drift;
+        drift.Begin();
+    }
+
+    /// <summary>
+    /// 扫描头：一层渐隐底 + 一格密斜纹 + 左缘一道亮线（行进方向的那一头）。斜纹直接复用
+    /// <see cref="Hatch"/>、只把瓦片缩小，所以它撞开的东西跟它本身同源，看着才像「同一套警戒带被拉了出来」。
+    /// </summary>
+    private static FrameworkElement BuildSweepBody(Brush accent) => new Grid
+    {
+        Children =
+        {
+            new Rectangle { Fill = Trail(accent) },
+            new Rectangle { Fill = Hatch(accent, 22), Opacity = 0.9 },
+            new Rectangle { Width = 3, HorizontalAlignment = HorizontalAlignment.Left, Fill = Solid(accent, 0.95) },
+        },
+    };
+
+    /// <summary>扫描头的底：左缘亮、往右散到全透明——它在往左跑，拖在后面的那截才该淡。</summary>
+    private static LinearGradientBrush Trail(Brush accent)
+    {
+        var trail = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
+        trail.GradientStops.Add(new GradientStop(WithAlpha(accent, 0.55), 0));
+        trail.GradientStops.Add(new GradientStop(WithAlpha(accent, 0.12), 0.6));
+        trail.GradientStops.Add(new GradientStop(WithAlpha(accent, 0), 1));
+        trail.Freeze();
+        return trail;
+    }
+
+    private static SolidColorBrush Solid(Brush accent, double alpha)
+    {
+        var solid = new SolidColorBrush(WithAlpha(accent, alpha));
+        solid.Freeze();
+        return solid;
     }
 
     /// <summary>
