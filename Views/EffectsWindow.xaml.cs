@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Data;
 using XAssistant.Services;
 using XAssistant.Services.Keywords;
 using WinForms = System.Windows.Forms;
@@ -20,6 +21,7 @@ using Point = System.Windows.Point;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using FontFamily = System.Windows.Media.FontFamily;
 using Rectangle = System.Windows.Shapes.Rectangle;
+using Binding = System.Windows.Data.Binding;
 
 namespace XAssistant.Views;
 
@@ -70,6 +72,9 @@ public sealed partial class EffectsWindow : Window
 
     /// <summary>行间距（DIP）：斜线有高度，挤在一起会看成一片糊的。</summary>
     private const double RowGap = 12;
+
+    /// <summary>正文限宽：屏宽的 80%。剩下的两成留给左右两道斜线，读起来也才知道字到哪里为止。</summary>
+    private const double TextWidthRatio = 0.8;
 
     /// <summary>
     /// 组层点亮的时长：必须明显短于扫描的 0.5 s。整层跟着淡入的话，扫到左半边时那里还半明半暗，
@@ -387,6 +392,7 @@ public sealed partial class EffectsWindow : Window
         public required Border Head { get; init; }
         public required TranslateTransform HeadShift { get; init; }
         public required TranslateTransform Shift { get; init; }
+        public required TextBlock Body { get; init; }
         public required string Text { get; init; }
         public required BannerSpec Spec { get; set; }
         public TimeSpan Until { get; set; }
@@ -522,7 +528,12 @@ public sealed partial class EffectsWindow : Window
             MorphBands(top, fresh ? GroupOnSeconds : BorderMorphSeconds);
             AddBreath(top);
         }
-        BuildCorners(top, top.Color, top.FontSize * 1.25);
+        // 四角三角要让开整叠的高度：多行正文比一行高，量出来的实际高度才算数
+        double band = _rows.Where(row => !row.Exiting)
+            .Select(row => row.Body.ActualHeight)
+            .DefaultIfEmpty(top.FontSize * 1.25)
+            .Max();
+        BuildCorners(top, top.Color, Math.Max(band, top.FontSize * 1.25));
         Corners.Visibility = top.Urgent ? Visibility.Visible : Visibility.Collapsed;
         if (LayOutBackdrop(top)) BackdropLayer.Visibility = Visibility.Visible;
         else BackdropLayer.Visibility = Visibility.Collapsed;
@@ -592,7 +603,9 @@ public sealed partial class EffectsWindow : Window
     /// <summary>建一行：三列（斜线 | 正文 | 斜线）装进被 Clip 揭示的内容层，外面套一个不被裁的扫描头。</summary>
     private BannerRow BuildRow(BannerSpec spec, string text)
     {
-        double height = spec.FontSize * 1.25;
+        // 一行的高度由**排版量出来**，不由字号猜：正文限宽 80% 屏宽，超了就自己换行，
+        // 换出几行来这条消息就占多高。斜线带绑在正文的实际高度上，所以线跟着字一起长。
+        double tile = spec.FontSize * 1.25;
         var body = new TextBlock
         {
             Text = text,
@@ -600,6 +613,7 @@ public sealed partial class EffectsWindow : Window
             FontWeight = FontWeights.Bold,
             FontFamily = new FontFamily("Consolas, Microsoft YaHei UI"),
             Foreground = spec.Color,
+            MaxWidth = Math.Max(240, Width * TextWidthRatio),
             TextAlignment = TextAlignment.Center,
             TextWrapping = TextWrapping.Wrap,
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -607,18 +621,23 @@ public sealed partial class EffectsWindow : Window
         };
         var left = new Border
         {
-            Height = height,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 22, 0),
-            Background = Hatch(spec.Color, height),
+            Background = Hatch(spec.Color, tile),
         };
         var right = new Border
         {
-            Height = height,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(22, 0, 0, 0),
-            Background = Hatch(spec.Color, height),
+            Background = Hatch(spec.Color, tile),
         };
+        // 斜线的瓦片始终是「一行高」，带子变高时靠 TileMode 往下**重复**（延展），
+        // 不拉伸、也不换字号——拉一下斜笔就糊了，加字号又变成另一种东西
+        foreach (var slash in new Border[] { left, right })
+            slash.SetBinding(Border.HeightProperty, new Binding(nameof(FrameworkElement.ActualHeight))
+            {
+                Source = body, Mode = BindingMode.OneWay,
+            });
         var content = new Grid { Clip = new RectangleGeometry(HiddenRect(Width, Height)) };
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -660,6 +679,7 @@ public sealed partial class EffectsWindow : Window
             Head = head,
             HeadShift = headShift,
             Shift = shift,
+            Body = body,
             Text = text,
             Spec = spec,
         };

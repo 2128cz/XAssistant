@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows;
 
 namespace XAssistant.Services;
 
@@ -56,6 +57,48 @@ public static class IconBackdrop
         return from.Length == 0 ? null : Load(Path.Combine(IconDir, from.ToLowerInvariant() + ".png"));
     }
 
+    /// <summary>
+    /// 剪影可用的透明度区间。两头都得拦：
+    /// 全透明的图（本机 `dsh.png` 实测平均 alpha = 0）当遮罩等于什么都不画；
+    /// 几乎全不透明的图（`xassistant.png` 覆盖 1.00、`trae.png` 0.95）当遮罩就是一块实心方砖——
+    /// 用户原话「显示一个纯色块没搞懂要干啥」。只有中间那段真的带着形状。
+    /// </summary>
+    public const double MinOpaqueRatio = 0.05;
+    public const double MaxOpaqueRatio = 0.90;
+
+    /// <summary>这张图能不能当剪影用（取不到、或透明度落在形状区间外都算不能用）。</summary>
+    public static bool Usable(ImageSource? image) =>
+        image is BitmapSource source && OpaqueRatio(source) is { } ratio
+        && ratio >= MinOpaqueRatio && ratio <= MaxOpaqueRatio;
+
+    /// <summary>不透明像素占比：按 alpha 通道抽样，每四个像素取一个（512² 也就 6.5 万次比较）。</summary>
+    private static double? OpaqueRatio(BitmapSource image)
+    {
+        try
+        {
+            var pixels = new FormatConvertedBitmap(image, PixelFormats.Bgra32, null, 0);
+            int width = pixels.PixelWidth;
+            int height = pixels.PixelHeight;
+            if (width == 0 || height == 0) return null;
+            int stride = width * 4;
+            var buffer = new byte[stride * height];
+            pixels.CopyPixels(buffer, stride, 0);
+            int total = 0;
+            int solid = 0;
+            for (int y = 0; y < height; y += 2)
+                for (int x = 0; x < width; x += 2)
+                {
+                    total++;
+                    if (buffer[y * stride + x * 4 + 3] > 128) solid++;
+                }
+            return total == 0 ? null : (double)solid / total;
+        }
+        catch (Exception error) when (error is InvalidOperationException or System.IO.IOException)
+        {
+            return null;   // 读不出 alpha 就当不能用：宁可少一张立绘，不在屏上摆一块方砖
+        }
+    }
+
     /// <summary>读图。OnLoad 是为了不把文件锁住——用户随时可以换掉那张图。</summary>
     private static ImageSource? Load(string path)
     {
@@ -72,7 +115,7 @@ public static class IconBackdrop
                 bmp.UriSource = new Uri(full, UriKind.Absolute);
                 bmp.EndInit();
                 bmp.Freeze();
-                loaded = bmp;
+                if (Usable(bmp)) loaded = bmp;
             }
             Cache[full] = loaded;
             return loaded;
