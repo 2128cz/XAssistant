@@ -77,6 +77,12 @@ public sealed partial class EffectsWindow : Window
     /// </summary>
     private const double GroupOnSeconds = 0.12;
 
+    /// <summary>
+    /// 边框改级的过渡时长：与一条消息的擦边同量级（0.5 s）。屏上多出一条紧急的、或最后一条紧急的
+    /// 下屏了，全屏那圈带子就在这半秒里自己挪到新颜色，而不是硬盖一层。
+    /// </summary>
+    private const double BorderMorphSeconds = 0.5;
+
     /// <summary>粒子的布局盒边长与字形大小的比例：留够余量，转起来不会被盒子裁掉。</summary>
     private const double BoxRatio = 1.8;
 
@@ -86,6 +92,7 @@ public sealed partial class EffectsWindow : Window
     private bool _loopAttached;
     private bool _bannerOn;
     private Storyboard? _breathStory;
+    private readonly List<LinearGradientBrush> _bands = new();
 
     /// <summary>
     /// 一条条带的完整规格：<see cref="ShowBanner"/>（旧调用）与 <see cref="ShowCommand"/>（xa 命令行）
@@ -330,7 +337,15 @@ public sealed partial class EffectsWindow : Window
         _lastFrame = time;
         // 整组到点由渲染帧来触发退场（不另开一个定时器）：这一帧一帧地走，本来就是判到点的地方，
         // 多一个 DispatcherTimer 就多一条「谁先清状态」的竞路线
-        if (!_exiting && _groupUntil is { } until && Mono() >= until) ExitGroup();
+        var clock = Mono();
+        // 逐行判到点：谁的时间到了谁自己擦出去，剩下的继续摆着；边框在每行真正摘掉后重新定级
+        foreach (var row in _rows.Where(item => !item.Exiting && clock >= item.Until).ToArray()) ExitRow(row);
+        if (_borderOnly && _borderUntil <= clock)
+        {
+            _borderOnly = false;
+            _bannerOn = _rows.Count > 0;
+            RefreshBorder(clock, fresh: false);
+        }
         if (dt <= 0) return;
 
         for (int i = _live.Count - 1; i >= 0; i--)
@@ -374,15 +389,20 @@ public sealed partial class EffectsWindow : Window
         public required TranslateTransform Shift { get; init; }
         public required string Text { get; init; }
         public required BannerSpec Spec { get; set; }
+        public TimeSpan Until { get; set; }
+        public bool Exiting { get; set; }
         public Storyboard? Entry { get; set; }
+        public Storyboard? Exit { get; set; }
         public Storyboard? Drift { get; set; }
     }
 
     private readonly List<BannerRow> _rows = new();
     private string? _groupKey;
     private TimeSpan? _nextEntryAt;      // 下一行的入场起点：连击时按 0.5 s 一档往后排
-    private TimeSpan? _groupUntil;       // 整组什么时候退场（= 组里最迟那一行）
-    private bool _exiting;
+    private bool _borderOnly;            // 只亮边框、不要正文（-lable off）
+    private BannerSpec _borderSpec;
+    private TimeSpan _borderUntil;
+    private bool _borderUp;              // 边框此刻是亮着的吗（降级只做一次，不逐帧重放）
     private Storyboard? _groupStory;
     private Storyboard? _blinkStory;
     private static readonly System.Diagnostics.Stopwatch Clock = System.Diagnostics.Stopwatch.StartNew();
@@ -395,36 +415,33 @@ public sealed partial class EffectsWindow : Window
 
     /// <summary>单调时钟：退场与入场错峰都按它算，不用墙上时间（用户改系统时钟不该把警告带卡住）。</summary>
     private static TimeSpan Mono() => Clock.Elapsed;
-
     /// <summary>
     /// 一条命令进来，三种去向：
-    /// ① 组键不同 → 旧的一叠让位，开新的一叠；
-    /// ② 同键同正文 → 不新增行，把那一行顶到最前重新扫一遍（同一句又喊一遍不该排成两行）；
-    /// ③ 同键新正文 → 排成下面的一行，入场排在已经排上的那几行之后（每条 0.5 s，不是一起炸开）。
-    /// 三种情况都把整组的到点时刻推到「此刻 + 组里最长那一条」——这就是「新的进来，时间从它进来那刻重算」。
+    /// ① 组键不同 → 旧的一叠整体让位，开新的一叠；
+    /// ② 同键同正文 → 不新增行，把那一行顶到最前、只给它自己重新上表并重扫（同一句又喊一遍）；
+    /// ③ 同键新正文 → 排成下面的一行，入场排在已经排上的那几行之后（每条各扫各的 0.5 s）。
+    ///
+    /// 每条消息都是分立的一条：自己上屏、等满自己那一段、自己下屏。这里只给**这一行**上时间表，
+    /// 既不给同叠的别人续命，也不把别人提前掐掉；边框则跟着「此刻屏上还有什么」实时改级。
     /// </summary>
     private void Banner(BannerSpec spec)
     {
         var now = Mono();
-        // 只要边框不要正文：清空这一叠，边框单独亮一会儿（-lable off 就落在这条路上）
+        // 只要边框不要正文：清空这一叠，边框单独亮一会儿（-lable off 落在这条路上）
         if (spec.Text is not { Length: > 0 } text)
         {
             StopGroup();
             ClearRows();
             _groupKey = spec.Key;
-            Edge.Visibility = spec.BorderOn ? Visibility.Visible : Visibility.Collapsed;
-            Rows.Visibility = Visibility.Collapsed;
-            if (!spec.BorderOn) { if (_live.Count == 0) Close(); return; }
-            BuildBands(spec.Color, spec.BorderWidth, spec.BorderFade);
-            Corners.Children.Clear();
-            _groupUntil = now + TimeSpan.FromSeconds(Math.Max(0.2, spec.Hold + spec.FadeOut));
+            _borderOnly = true;
+            _borderSpec = spec;
+            _borderUntil = now + Span(spec);
             _bannerOn = true;
             AttachLoop();
-            FadeIn(Rows, 0);
-            FadeIn(Edge, GroupOnSeconds);
-            AddBreath(spec);
+            RefreshBorder(now, fresh: true);
             return;
         }
+        _borderOnly = false;
 
         bool fresh = _groupKey != spec.Key;
         if (fresh)
@@ -437,62 +454,130 @@ public sealed partial class EffectsWindow : Window
         }
         Rows.Visibility = Visibility.Visible;
 
-        var twin = _rows.FirstOrDefault(row => row.Text == text);
+        var twin = _rows.FirstOrDefault(row => !row.Exiting && row.Text == text);
         if (twin is not null)
         {
             _rows.Remove(twin);
             _rows.Insert(0, twin);
             twin.Spec = spec;
+            twin.Until = now + Span(spec);
             RowStack.Children.Remove(twin.Root);
             RowStack.Children.Insert(0, twin.Root);
-            EnterRow(twin, now);                       // 顶到最前并重扫：让「还在响」看得见
+            EnterRow(twin, now);
         }
         else
         {
-            if (_rows.Count >= MaxRows) EvictOldestRow();
+            if (LiveRows >= MaxRows) EvictOldestRow();
             var row = BuildRow(spec, text);
             _rows.Add(row);
+            row.Until = now + Span(spec);
             EnterRow(row, now);
         }
 
-        ReTimeGroup(now, spec);
-        ShowGroupBorder(spec);
+        if (Rows.Opacity < 0.99) FadeIn(Rows, GroupOnSeconds);
         if (fresh) AddBlink(spec);
         _bannerOn = true;
+        RefreshBorder(now, fresh);
         AttachLoop();
     }
 
-    /// <summary>整组到点时刻：此刻 + 组里最长那一条的占屏时长。</summary>
-    private void ReTimeGroup(TimeSpan now, BannerSpec spec)
-    {
-        double longest = _rows.Count == 0 ? spec.ScreenSeconds : _rows.Max(row => row.Spec.ScreenSeconds);
-        _groupUntil = now + TimeSpan.FromSeconds(Math.Max(0.2, longest));
-        if (Rows.Opacity < 0.99 && !_exiting) FadeIn(Rows, GroupOnSeconds);   // 第一行进来时把组层点亮
-    }
+    /// <summary>一条消息在屏上停多久：淡入（= 擦边）+ 持续 + 淡出（= 擦出）。</summary>
+    private static TimeSpan Span(BannerSpec spec) => TimeSpan.FromSeconds(Math.Max(0.1, spec.ScreenSeconds));
+
+    /// <summary>还没开始退场的行数——边框按这些行的最高档定级，正在擦出去的几条不算数。</summary>
+    private int LiveRows => _rows.Count(row => !row.Exiting);
 
     /// <summary>
-    /// 边框与四角三角按**组里最高那一档**亮：一叠里混进一条紧急的，整屏的边框就该是红的、
-    /// 该有四颗巨型三角——等级差的消息挤在一起时，说服力取上限而不是平均。
+    /// 边框与四角按**此刻屏上还有什么**实时定级：只剩普通消息就用普通的颜色，混进一条紧急的就升到
+    /// 紧急档，最后一条紧急的下屏之后它自己得降回去。升降级走同一种过渡（渐变色标自己动 0.5 s），
+    /// 不许直接盖一层新颜色——那看着就是「红的是另贴上去的一张」。
     /// </summary>
-    private void ShowGroupBorder(BannerSpec newest)
+    private void RefreshBorder(TimeSpan now, bool fresh)
     {
-        var top = _rows.Select(row => row.Spec)
-            .Concat(new[] { newest })
-            .OrderByDescending(spec => spec.Urgent)
+        var live = _rows.Where(row => !row.Exiting).Select(row => row.Spec).ToList();
+        if (_borderOnly && _borderUntil > now && _borderSpec is { } only) live.Add(only);
+        if (live.Count == 0)
+        {
+            if (!_borderUp) return;
+            _borderUp = false;
+            double outSeconds = Math.Clamp(live.Count == 0 ? BannerFadeOutSeconds : 0.5, 0.2, 3);
+            FadeOut(Edge, outSeconds);
+            FadeOut(Corners, outSeconds);
+            FadeOut(BackdropLayer, outSeconds);
+            var breath = _breathStory;
+            _breathStory = null;
+            breath?.Stop();
+            EdgePulse.BeginAnimation(OpacityProperty, null);
+            EdgePulse.Opacity = 1;
+            return;
+        }
+
+        var top = live.OrderByDescending(spec => spec.Urgent)
             .ThenByDescending(spec => spec.BorderWidth)
+            .ThenByDescending(spec => spec.FontSize)
             .First();
         Edge.Visibility = top.BorderOn ? Visibility.Visible : Visibility.Collapsed;
         if (top.BorderOn)
         {
-            BuildBands(top.Color, top.BorderWidth, top.BorderFade);
-            FadeIn(Edge, GroupOnSeconds);
+            MorphBands(top, fresh ? GroupOnSeconds : BorderMorphSeconds);
             AddBreath(top);
         }
-        double height = top.FontSize * 1.25;
-        BuildCorners(top, top.Color, height);
-        if (LayOutBackdrop(top)) FadeIn(BackdropLayer, GroupOnSeconds);
-        if (top.Urgent) FadeIn(Corners, GroupOnSeconds);
-        else { Corners.Opacity = 0; Corners.Children.Clear(); }
+        BuildCorners(top, top.Color, top.FontSize * 1.25);
+        Corners.Visibility = top.Urgent ? Visibility.Visible : Visibility.Collapsed;
+        if (LayOutBackdrop(top)) BackdropLayer.Visibility = Visibility.Visible;
+        else BackdropLayer.Visibility = Visibility.Collapsed;
+
+        // 第一次点亮用短淡入，之后的升降级用过渡时长：同一套语言，只是没有「从无到有」那一段
+        double seconds = fresh ? GroupOnSeconds : BorderMorphSeconds;
+        _borderUp = true;
+        if (Edge.Visibility == Visibility.Visible) FadeIn(Edge, seconds);
+        if (Corners.Visibility == Visibility.Visible) FadeIn(Corners, seconds);
+        if (BackdropLayer.Visibility == Visibility.Visible) FadeIn(BackdropLayer, seconds);
+    }
+
+    /// <summary>
+    /// 渐变带改色改宽：四支画刷的色标与四条边的长度各挂一条动画，0.5 s 内自己挪过去。
+    /// 画刷与色标都不能 Freeze——冻住的 Freezable 挂不上动画，改色就会变成硬切。
+    /// </summary>
+    private void MorphBands(BannerSpec top, double seconds)
+    {
+        double span = top.BorderWidth + top.BorderFade;
+        double mid = span <= 0 ? 1 : top.BorderWidth / span;
+        if (_bands.Count == 0)
+        {
+            BuildBands(top.Color, top.BorderWidth, top.BorderFade);   // 头一次没有「上一个颜色」可过渡
+            return;
+        }
+        var rects = new[] { EdgeTop, EdgeBottom, EdgeLeft, EdgeRight };
+        for (int i = 0; i < rects.Length; i++)
+        {
+            var brush = _bands[i];
+            Animate(brush.GradientStops[0], GradientStop.ColorProperty, WithAlpha(top.Color, 0.85), seconds);
+            Animate(brush.GradientStops[1], GradientStop.ColorProperty, WithAlpha(top.Color, 0.30), seconds);
+            Animate(brush.GradientStops[2], GradientStop.ColorProperty, WithAlpha(top.Color, 0), seconds);
+            Animate(brush.GradientStops[1], GradientStop.OffsetProperty, mid, seconds);
+            var size = i < 2 ? HeightProperty : WidthProperty;
+            Animate(rects[i], size, span, seconds);
+        }
+        // 立绘跟着档位换色：形状不动，只把填充色挪过去
+        if (Backdrop.Background is SolidColorBrush tint)
+            Animate(tint, SolidColorBrush.ColorProperty, WithAlpha(top.Color, 1), seconds);
+    }
+
+    /// <summary>
+    /// 给一个 Freezable / 图元挂一条到值动画。走 <c>BeginAnimation</c> 而不是 Storyboard：
+    /// 色标与代码建出来的图元都不在名字作用域里，SetTarget 那条路要靠名字解析，解析不上就是静默不生效。
+    /// </summary>
+    private static void Animate(DependencyObject target, DependencyProperty property, object to, double seconds)
+    {
+        var duration = TimeSpan.FromSeconds(Math.Max(0.05, seconds));
+        AnimationTimeline anim = property == GradientStop.OffsetProperty
+            ? new DoubleAnimation((double)to, duration) { FillBehavior = FillBehavior.HoldEnd }
+            : property == GradientStop.ColorProperty
+                ? new ColorAnimation((Color)to, duration) { FillBehavior = FillBehavior.HoldEnd }
+                : new DoubleAnimation((double)to, duration) { FillBehavior = FillBehavior.HoldEnd };
+        if (target is UIElement element) element.BeginAnimation(property, anim);
+        else ((Animatable)target).BeginAnimation(property, anim);
     }
 
     /// <summary>行数到顶：挤掉最老那一行（打头那条不动，它代表这一叠的开头）。</summary>
@@ -671,74 +756,74 @@ public sealed partial class EffectsWindow : Window
         row.Drift = null;
         drift?.Stop();
     }
-
     /// <summary>
-    /// 整组退场：每行的 Clip 反向收回（左边界回到屏右，线像被抽走），扫描头反向再跑一趟当擦除器，
-    /// 正文同时往左带一小段——读成「平移出去」。边框与四角三角跟着一起淡掉，全屏效果就此结束。
+    /// 一行到自己的点：Clip 反向收回（左边界回到屏右，线像被抽走）、扫描头反向再跑一趟当擦除器、
+    /// 正文往左带一小段——读成「平移出去」。只走它自己这一行，同叠里别的消息照自己的表继续摆着。
+    /// 摘掉之后必须让边框重新定级：最后一条紧急的下屏，全屏边框就该自己降回普通的颜色。
     /// </summary>
-    private void ExitGroup()
+    private void ExitRow(BannerRow row)
     {
-        if (_exiting) return;
-        _exiting = true;
-        double fadeOut = _rows.Count == 0
-            ? BannerFadeOutSeconds
-            : Math.Clamp(_rows.Max(row => row.Spec.FadeOut), 0.2, 3);
+        if (row.Exiting) return;
+        row.Exiting = true;
+        double fadeOut = Math.Clamp(row.Spec.FadeOut <= 0 ? SweepSeconds : row.Spec.FadeOut, 0.2, 3);
         var shown = new Rect(0, 0, Width, Height);
         var hidden = HiddenRect(Width, Height);
+
+        row.Mask.Rect = shown;      // 先把本地值对齐到全开：Stop 会撤掉 HoldEnd，不对齐就闪一下
+        StopRow(row);
         var story = new Storyboard();
-        foreach (var row in _rows)
+
+        var retract = new RectAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(fadeOut) };
+        retract.KeyFrames.Add(new EasingRectKeyFrame(shown, KeyTime.FromPercent(0)));
+        retract.KeyFrames.Add(new EasingRectKeyFrame(hidden, KeyTime.FromPercent(1)));
+        Storyboard.SetTarget(retract, row.Content);
+        Storyboard.SetTargetProperty(retract, new PropertyPath("Clip.Rect"));
+        story.Children.Add(retract);
+
+        var wipe = new DoubleAnimation(-SweepWidth, Width, new Duration(TimeSpan.FromSeconds(fadeOut)));
+        Storyboard.SetTarget(wipe, row.Head);
+        Storyboard.SetTargetProperty(wipe, new PropertyPath("RenderTransform.X"));
+        story.Children.Add(wipe);
+
+        var glow = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(fadeOut) };
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0.2)));
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0.8)));
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(1)));
+        Storyboard.SetTarget(glow, row.Head);
+        Storyboard.SetTargetProperty(glow, new PropertyPath(OpacityProperty));
+        story.Children.Add(glow);
+
+        var leave = new DoubleAnimation(0, -ExitDrift, new Duration(TimeSpan.FromSeconds(fadeOut)))
         {
-            // 先把本地值对齐到「全开」，再停旧动画：Stop 会把 HoldEnd 的值撤掉，本地值不对齐就闪一下
-            row.Mask.Rect = shown;
-            StopRow(row);
-            var retract = new RectAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(fadeOut) };
-            retract.KeyFrames.Add(new EasingRectKeyFrame(shown, KeyTime.FromPercent(0)));
-            retract.KeyFrames.Add(new EasingRectKeyFrame(hidden, KeyTime.FromPercent(1)));
-            Storyboard.SetTarget(retract, row.Content);
-            Storyboard.SetTargetProperty(retract, new PropertyPath("Clip.Rect"));
-            story.Children.Add(retract);
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn },
+        };
+        Storyboard.SetTarget(leave, row.Root);
+        Storyboard.SetTargetProperty(leave, new PropertyPath("RenderTransform.X"));
+        story.Children.Add(leave);
 
-            var wipe = new DoubleAnimation(-SweepWidth, Width, new Duration(TimeSpan.FromSeconds(fadeOut)));
-            Storyboard.SetTarget(wipe, row.Head);
-            Storyboard.SetTargetProperty(wipe, new PropertyPath("RenderTransform.X"));
-            story.Children.Add(wipe);
-
-            var glow = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(fadeOut) };
-            glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(0)));
-            glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0.2)));
-            glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0.8)));
-            glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(1)));
-            Storyboard.SetTarget(glow, row.Head);
-            Storyboard.SetTargetProperty(glow, new PropertyPath(OpacityProperty));
-            story.Children.Add(glow);
-
-            var leave = new DoubleAnimation(0, -ExitDrift, new Duration(TimeSpan.FromSeconds(fadeOut)))
-            {
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn },
-            };
-            Storyboard.SetTarget(leave, row.Root);
-            Storyboard.SetTargetProperty(leave, new PropertyPath("RenderTransform.X"));
-            story.Children.Add(leave);
-        }
-        foreach (var layer in new FrameworkElement[] { Rows, Edge, Corners, BackdropLayer })
-        {
-            var fade = new DoubleAnimation(layer.Opacity, 0, new Duration(TimeSpan.FromSeconds(fadeOut)));
-            Storyboard.SetTarget(fade, layer);
-            Storyboard.SetTargetProperty(fade, new PropertyPath(OpacityProperty));
-            story.Children.Add(fade);
-        }
         story.Completed += (_, _) =>
         {
-            // 被新一条或 HideNow 接过的不重复收尾
-            if (!ReferenceEquals(_groupStory, story)) return;
-            _groupStory = null;
-            _exiting = false;
-            _bannerOn = false;
-            StopAnimation();
-            if (_live.Count == 0) Close();
+            if (!ReferenceEquals(row.Exit, story)) return;
+            row.Exit = null;
+            if (!_rows.Remove(row)) return;
+            RowStack.Children.Remove(row.Root);
+            _bannerOn = _rows.Count > 0 || _borderOnly;
+            RefreshBorder(Mono(), fresh: false);
+            if (_rows.Count == 0 && !_borderOnly && _live.Count == 0) Close();
         };
-        _groupStory = story;
+        row.Exit = story;
         story.Begin();
+    }
+
+    /// <summary>把某层的 Opacity 在若干秒内带到 0（边框与四角降级时用；正文那条自己会擦出去）。</summary>
+    private static void FadeOut(FrameworkElement layer, double seconds)
+    {
+        var fade = new DoubleAnimation(0, new Duration(TimeSpan.FromSeconds(Math.Max(0.05, seconds))))
+        {
+            FillBehavior = FillBehavior.HoldEnd,
+        };
+        layer.BeginAnimation(OpacityProperty, fade);
     }
 
     /// <summary>把某层的 Opacity 在若干秒内抬到 1（组层、边框、四角都用它，FillBehavior 停在末值）。</summary>
@@ -796,8 +881,6 @@ public sealed partial class EffectsWindow : Window
         ClearRows();
         _groupKey = null;
         _nextEntryAt = null;
-        _groupUntil = null;
-        _exiting = false;
         foreach (var layer in new FrameworkElement[] { Rows, RowsPulse, Edge, EdgePulse, Corners, BackdropLayer })
             layer.BeginAnimation(OpacityProperty, null);
         Rows.Opacity = Edge.Opacity = Corners.Opacity = BackdropLayer.Opacity = 0;
@@ -812,9 +895,15 @@ public sealed partial class EffectsWindow : Window
         foreach (var row in _rows)
         {
             StopRow(row);
+            var exit = row.Exit;
+            row.Exit = null;
+            exit?.Stop();
             RowStack.Children.Remove(row.Root);
         }
         _rows.Clear();
+        _borderOnly = false;
+        _borderUp = false;
+        _borderUntil = default;
     }
 
     /// <summary>
@@ -982,10 +1071,20 @@ public sealed partial class EffectsWindow : Window
     {
         double span = width + fade;
         EdgeTop.Height = EdgeBottom.Height = EdgeLeft.Width = EdgeRight.Width = span;
-        EdgeTop.Fill = Band(accent, width, fade, new Point(0, 0), new Point(0, 1));      // 上边：向下渐隐
-        EdgeBottom.Fill = Band(accent, width, fade, new Point(0, 1), new Point(0, 0));   // 下边：向上渐隐
-        EdgeLeft.Fill = Band(accent, width, fade, new Point(0, 0), new Point(1, 0));     // 左边：向右渐隐
-        EdgeRight.Fill = Band(accent, width, fade, new Point(1, 0), new Point(0, 0));    // 右边：向左渐隐
+        _bands.Clear();
+        // 上边向下渐隐、下边向上、左边向右、右边向左：四条各一支画刷，换级时四支一起动
+        foreach (var pair in new (FrameworkElement, Point, Point)[]
+                 {
+                     (EdgeTop, new Point(0, 0), new Point(0, 1)),
+                     (EdgeBottom, new Point(0, 1), new Point(0, 0)),
+                     (EdgeLeft, new Point(0, 0), new Point(1, 0)),
+                     (EdgeRight, new Point(1, 0), new Point(0, 0)),
+                 })
+        {
+            var brush = Band(accent, width, fade, pair.Item2, pair.Item3);
+            _bands.Add(brush);
+            ((System.Windows.Shapes.Shape)pair.Item1).Fill = brush;
+        }
     }
 
     /// <summary>
@@ -999,7 +1098,7 @@ public sealed partial class EffectsWindow : Window
         band.GradientStops.Add(new GradientStop(WithAlpha(accent, 0.85), 0));
         band.GradientStops.Add(new GradientStop(WithAlpha(accent, 0.30), mid));
         band.GradientStops.Add(new GradientStop(WithAlpha(accent, 0), 1));
-        band.Freeze();   // 只读化：四条带是一次性铺的，冻结后渲染线程直接复用
+        // 刻意不 Freeze：档位升降时这四支画刷的色标要自己动 0.5 s，冻住的 Freezable 挂不上动画
         return band;
     }
 

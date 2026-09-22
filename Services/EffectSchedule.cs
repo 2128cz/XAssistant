@@ -60,8 +60,9 @@ public sealed class EffectJob
 ///    队列溢出淘汰时先丢最旧的一次性项，一条都不剩才动重播项里到期最远的那条——
 ///    否则「丢旧的」会连着把重播的到期节奏一起丢掉。
 /// 5. <b>同组合并不排队</b>：屏上正播着某组（<c>-group</c> &gt; <c>-tag</c> &gt; <c>-from</c>，三者都没写就不成组）时，
-///    同组的新消息立刻排成它下面的一行（最多 <see cref="MaxRows"/> 行），并把整组的到点时刻从此刻重算；
-///    组里最迟那一行走完才一起退场。不同组照旧排队，紧急项照旧抢屏（抢的是整组）。
+///    同组的新消息立刻排成它下面的一行（最多 <see cref="MaxRows"/> 行）。**每行各有一条自己的时间表**：
+///    自己上屏、等满自己那一段、自己下屏；新来的一条只给自己上表，不给别人续命也不把别人提前掐掉。
+///    不同组照旧排队，紧急项照旧抢屏（抢的是整叠）。
 /// </summary>
 public sealed class EffectSchedule
 {
@@ -144,8 +145,9 @@ public sealed class EffectSchedule
             same.Remaining = job.Remaining;
             if (_onScreen.Contains(same))
             {
-                // 屏上那一行又喊了一遍：整组从此刻重新计时，这一行重扫一次（"还在响"要看得见）
-                TimeGroup(now);
+                // 屏上那一行又喊了一遍：只给它自己重新上表并重扫一次（"还在响"要看得见），
+                // 同叠里别的消息不该被这一嗓子续命
+                ArmRow(same, now);
                 _start(same);
             }
             else
@@ -186,14 +188,13 @@ public sealed class EffectSchedule
     public void Tick()
     {
         var now = _clock();
-        if (_onScreen.Count > 0 && now >= _busyUntil)
+        // 逐行判到点：谁的时间到了谁自己下屏，剩下那几条继续摆着（边框随后按留下的最高档改色）
+        foreach (var row in _onScreen.Where(job => job.RowUntil <= now).ToArray())
         {
-            // 组里最迟那一行到点才算整组结束：其余行多留一会儿，正是「以最后一条消失的时间为准」
-            var rows = _onScreen.ToArray();
-            _onScreen.Clear();
-            _busyUntil = default;
-            foreach (var row in rows) FinishRound(row, now);
+            _onScreen.Remove(row);
+            FinishRound(row, now);
         }
+        Reclock();
         foreach (var due in _rearming.Where(job => job.Due <= now).OrderBy(job => job.Due).ToArray())
         {
             _rearming.Remove(due);
@@ -281,20 +282,23 @@ public sealed class EffectSchedule
     private void StartPlaying(EffectJob job)
     {
         _onScreen.Add(job);
-        TimeGroup(_clock());
+        ArmRow(job, _clock());
         _start(job);
     }
 
     /// <summary>
-    /// 整组重新计时：每行从此刻起再播自己那一段，组的到点时刻取最迟那一行。
-    /// 这就是「新的同类消息进来之后，时间从它进来那一刻重算」——老行不会被半路掐掉，
-    /// 但也不会停在「再播 0.4 秒就走」这种被新来者挤剩的零头上。
+    /// 给一行上自己的表：从此刻起播它自己那一段。别的行**不受影响**——
+    /// 屏上这一叠里每条消息都是分立的一条，自己上屏、等满自己那一段、自己下屏。
     /// </summary>
-    private void TimeGroup(DateTime now)
+    private void ArmRow(EffectJob job, DateTime now)
     {
-        foreach (var row in _onScreen) row.RowUntil = now.AddSeconds(Math.Max(0.1, row.ScreenSeconds));
-        _busyUntil = _onScreen.Count == 0 ? now : _onScreen.Max(row => row.RowUntil);
+        job.RowUntil = now.AddSeconds(Math.Max(0.1, job.ScreenSeconds));
+        Reclock();
     }
+
+    /// <summary>屏幕什么时候彻底空出来 = 还在屏上的那些行里最迟到点的那一条。</summary>
+    private void Reclock() =>
+        _busyUntil = _onScreen.Count == 0 ? default : _onScreen.Max(row => row.RowUntil);
 
     /// <summary>
     /// 同组入屏：屏上正播着同键的一组，这条就排成它下面的一行，不排队等屏幕空。
@@ -312,7 +316,7 @@ public sealed class EffectSchedule
             _onScreen.Remove(twin);
             _onScreen.Insert(0, twin);
             twin.Remaining = job.Remaining;
-            TimeGroup(now);
+            ArmRow(twin, now);
             _start(twin);
             return true;
         }
@@ -337,11 +341,11 @@ public sealed class EffectSchedule
         return true;
     }
 
-    /// <summary>把一行并到屏上那一叠里，并按「此刻 + 它自己的时长」重算整组的到点时刻。</summary>
+    /// <summary>把一行并到屏上那一叠里：只给它自己上表，别的行照自己的表走。</summary>
     private void JoinRow(EffectJob job, DateTime now)
     {
         _onScreen.Add(job);
-        TimeGroup(now);
+        ArmRow(job, now);
         _start(job);
     }
 
@@ -407,9 +411,8 @@ public sealed class EffectSchedule
     {
         _waiting.Remove(job);
         _rearming.Remove(job);
-        if (_onScreen.Remove(job) && _onScreen.Count > 0)
-            _busyUntil = _onScreen.Max(row => row.RowUntil);   // 少一行不改别人的到点时刻，只重算最迟那条
-        else if (_onScreen.Count == 0) _busyUntil = default;
+        _onScreen.Remove(job);
+        Reclock();   // 少一行不改别人的到点时刻，只重算「屏幕什么时候彻底空出来」
         _report?.Invoke(job, outcome);
         Pump();
     }
