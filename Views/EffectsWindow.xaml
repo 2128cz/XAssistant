@@ -28,6 +28,12 @@
         <Rectangle x:Name="EdgeRight" HorizontalAlignment="Right"/>
       </Grid>
     </Grid>
+    <!--  背景立绘：谁在说话，就把它那台 IDE 的图标当剪影垫在警告背后。外层 BackdropLayer 只管随整组
+          淡入淡出，内层 Border 的 OpacityMask 用图标自身的 alpha、底色用这一组的档位色——
+          所以任何一张带透明的 png 都能直接用，不需要另外准备白色图。  -->
+    <Grid x:Name="BackdropLayer" Opacity="0" IsHitTestVisible="False">
+      <Border x:Name="Backdrop" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+    </Grid>
     <!--  警告语：同组的多条竖着排成一叠，整叠在屏幕中间。分三层是为了三条动画不抢同一个属性：
           外层 Rows 走整组的淡入淡出，内层 RowsPulse 走持续段里的闪烁，StackPanel 只管排版。
           每一行自己再套一层：内容层挂揭示用的 Clip（扫到哪亮到哪），扫描头是不被裁的兄弟节点。

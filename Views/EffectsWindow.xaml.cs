@@ -95,7 +95,7 @@ public sealed partial class EffectsWindow : Window
     private readonly record struct BannerSpec(
         string? Text, Brush Color, double Hold, double FadeIn, double FadeOut, int Blinks,
         bool BorderOn, double BorderWidth, double BorderFade, double BorderCycle, double FontSize,
-        bool Urgent, string Key)
+        bool Urgent, string Key, ImageSource? Icon)
     {
         /// <summary>这一行占屏多久：与 <see cref="EffectCommand.ScreenSeconds"/> 同一口径。</summary>
         public double ScreenSeconds => FadeIn + Hold + FadeOut;
@@ -190,6 +190,7 @@ public sealed partial class EffectsWindow : Window
                 BorderCycle: 0,
                 FontSize: 46,
                 Urgent: false,
+                Icon: null,
                 // 彩蛋按「这句词」成组：同一个词连敲是重新计时，不同词各开一叠，不互相叠成两行
                 Key: "keyword:" + text));
         });
@@ -224,7 +225,9 @@ public sealed partial class EffectsWindow : Window
                 Urgent: command.Urgent,
                 // 没有归组键的裸消息各成一组（= 后来的把前一叠换掉），与调度器「不成组就排队」同一口径；
                 // 同一句裸话重发仍然并到同一行，不会在屏上叠出两行一模一样的
-                Key: command.GroupKey ?? "solo:" + command.Text));
+                Key: command.GroupKey ?? "solo:" + command.Text,
+                // 立绘只在开关打开时取图：关掉就别留一张剪影在屏上
+                Icon: IconBackdrop.Current.On ? IconBackdrop.ImageFor(command) : null));
         });
     }
     
@@ -487,6 +490,7 @@ public sealed partial class EffectsWindow : Window
         }
         double height = top.FontSize * 1.25;
         BuildCorners(top, top.Color, height);
+        if (LayOutBackdrop(top)) FadeIn(BackdropLayer, GroupOnSeconds);
         if (top.Urgent) FadeIn(Corners, GroupOnSeconds);
         else { Corners.Opacity = 0; Corners.Children.Clear(); }
     }
@@ -714,9 +718,9 @@ public sealed partial class EffectsWindow : Window
             Storyboard.SetTargetProperty(leave, new PropertyPath("RenderTransform.X"));
             story.Children.Add(leave);
         }
-        foreach (var layer in new FrameworkElement[] { Rows, Edge, Corners })
+        foreach (var layer in new FrameworkElement[] { Rows, Edge, Corners, BackdropLayer })
         {
-            var fade = new DoubleAnimation(Rows.Opacity, 0, new Duration(TimeSpan.FromSeconds(fadeOut)));
+            var fade = new DoubleAnimation(layer.Opacity, 0, new Duration(TimeSpan.FromSeconds(fadeOut)));
             Storyboard.SetTarget(fade, layer);
             Storyboard.SetTargetProperty(fade, new PropertyPath(OpacityProperty));
             story.Children.Add(fade);
@@ -792,9 +796,10 @@ public sealed partial class EffectsWindow : Window
         _nextEntryAt = null;
         _groupUntil = null;
         _exiting = false;
-        foreach (var layer in new FrameworkElement[] { Rows, RowsPulse, Edge, EdgePulse, Corners })
+        foreach (var layer in new FrameworkElement[] { Rows, RowsPulse, Edge, EdgePulse, Corners, BackdropLayer })
             layer.BeginAnimation(OpacityProperty, null);
-        Rows.Opacity = Edge.Opacity = Corners.Opacity = 0;
+        Rows.Opacity = Edge.Opacity = Corners.Opacity = BackdropLayer.Opacity = 0;
+        Backdrop.Child = null;
         RowsPulse.Opacity = EdgePulse.Opacity = 1;   // 内层回到全亮：闪到暗端时被收起，下一轮开头不带旧值
         Rows.Visibility = Visibility.Visible;
     }
@@ -835,6 +840,31 @@ public sealed partial class EffectsWindow : Window
         var story = new Storyboard { Children = { blink } };
         _blinkStory = story;
         story.Begin();
+    }
+
+    /// <summary>
+    /// 立绘铺一次：边长按屏高百分比算，中心对到 (x%, y%)，颜色用这一组的档位色、形状用图标自己的
+    /// alpha。返回 false = 这一组不该有立绘（开关关了、或那张图取不到），调用方就别点亮这一层。
+    /// </summary>
+    private bool LayOutBackdrop(BannerSpec spec)
+    {
+        var settings = IconBackdrop.Current;
+        if (!settings.On || spec.Icon is null)
+        {
+            Backdrop.OpacityMask = null;
+            Backdrop.Background = null;
+            return false;
+        }
+        double side = Math.Clamp(Height * settings.SizePercent / 100, 40, Math.Max(40, Height));
+        Backdrop.Width = side;
+        Backdrop.Height = side;
+        Backdrop.Margin = new Thickness(
+            Math.Clamp(Width * settings.XPercent / 100 - side / 2, -side, Width),
+            Math.Clamp(Height * settings.YPercent / 100 - side / 2, -side, Height), 0, 0);
+        Backdrop.Background = spec.Color;
+        Backdrop.OpacityMask = new ImageBrush(spec.Icon) { Stretch = Stretch.Uniform };
+        Backdrop.Opacity = Math.Clamp(settings.OpacityPercent / 100, 0.02, 1);
+        return true;
     }
 
     /// <summary>
