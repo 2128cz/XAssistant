@@ -18,6 +18,7 @@ namespace XAssistant.Services;
 ///   <c>-border on|off [渐宽 [延伸 [周期]]]</c>               默认 on / 50 / 30 / 1（周期 0 = 不循环）
 ///   <c>-lable on|off [字号] [文本…]</c>                      文本写在段内；不给文本就不显示文字条带
 ///   <c>-from &lt;词&gt;</c>                                  来源平台标记（hook 传 -Platform 名），消息栈卡片拿它配 IDE 图标徽章
+///   <c>-group &lt;词&gt;</c>                                 组合键：同键的多条在屏上排成一叠，边框取组内最高档
 ///   <c>confetti</c> / <c>off</c>                            撒花 / 收起
 ///
 /// 语法（旧，保留兼容 <c>--fx</c> 与 MCP 垫片）：<c>warn 3 "AI Computer Use"</c>，走 <see cref="SlashParser"/>，
@@ -72,6 +73,20 @@ public sealed record EffectCommand
     /// 没写 tag 时退到用 <c>-any</c> 在正文里做子串匹配。
     /// </summary>
     public string? Tag { get; set; }
+
+    /// <summary>
+    /// 组合键（<c>-group ai-hooks</c>）：同键的消息不算「排队等别人播完」，而是**在同一屏上竖着排成一叠**，
+    /// 边框按组里最高那一档亮，整组到点一起退。不写就退到 tag → from（见 <see cref="GroupKey"/>），三者都没有就不成组、照旧排队。
+    /// </summary>
+    public string? Group { get; set; }
+
+    /// <summary>
+    /// 归组：显式 <c>-group</c> 最大，其次 <c>-tag</c>（同一个告警的多次播报当然是一组），
+    /// 再次 <c>-from</c>（同一个 IDE 一路对话的多条提醒）。三者都没写就是 <b>null = 不成组</b>——
+    /// 裸消息照旧一条播完才播下一条，这是当初「告警一密集就互相挤掉」那起事故换来的规矩，不能因为
+    /// 有了分组就把它丢掉。
+    /// </summary>
+    public string? GroupKey => Group ?? Tag ?? Source;
     
     /// <summary>紧急档（<c>-s emergency</c> 或单独的 <c>-emergency</c>）：走紧急通道、画自绘三角感叹号。</summary>
     public bool Urgent { get; set; }
@@ -126,7 +141,7 @@ public sealed record EffectCommand
 
     /// <summary>新语法的段开关。任一个出现就走新解析，否则整条按旧语法读。</summary>
     private static readonly string[] SectionSwitches =
-        ["-s", "-border", "-lable", "-label", "-from", "-tag", "-replay", "-any", "-emergency", "-urgent", "-k", "-kill"];
+        ["-s", "-border", "-lable", "-label", "-from", "-tag", "-group", "-replay", "-any", "-emergency", "-urgent", "-k", "-kill"];
 
     /// <summary>
     /// 解析一整行命令。返回 false = 不是已知指令（整条跳过，不猜、不弹、不报错），
@@ -182,6 +197,7 @@ public sealed record EffectCommand
         var label = new List<string>();
         var from = new List<string>();
         var tag = new List<string>();
+        var group = new List<string>();
         var replay = new List<string>();
         var any = new List<string>();
         List<string>? current = null;
@@ -194,6 +210,7 @@ public sealed record EffectCommand
                 case "-lable" or "-label": current = label; break;
                 case "-from": current = from; break;
                 case "-tag": current = tag; break;
+                case "-group": current = group; break;
                 case "-replay": current = replay; break;
                 case "-any": current = any; break;
                 // 无参开关：紧急档既能在 -s 里用颜色词表达，也能这样单独挂上（kill 的选择器靠它限定通道）
@@ -207,6 +224,7 @@ public sealed record EffectCommand
         }
         if (from.Count > 0) command.Source = from[0].ToLowerInvariant();   // 多写只认第一个：平台名就一个词
         if (tag.Count > 0) command.Tag = tag[0];                           // tag 是个词，多写也只认第一个
+        if (group.Count > 0) command.Group = group[0];                     // 同上：组合键就是一个词
         if (any.Count > 0) command.MatchAny = string.Join(" ", any);
         // -k 一条不需要节奏/带宽：给不出正文也不当错（“全停”就是合法命令）
         if (command.Kill) { command.Text = any.Count > 0 ? string.Join(" ", any) : null; return true; }

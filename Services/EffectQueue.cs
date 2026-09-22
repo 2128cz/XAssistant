@@ -128,9 +128,10 @@ public sealed class EffectQueue
     {
         EffectCommand command = job.Command;
         EffectsWindow.ShowCommand(command);
-        // 重播不重复钉卡：一条无限重播每轮都往顶上叠一张一模一样的话，十张上限转眼就被它刷满，
+        // 重播与「同组又喊一遍」都不重复钉卡：一条无限重播每轮都往顶上叠一张一模一样的话，十张上限转眼就被它刷满，
         // 反而把别的提醒挤下去。第一张卡已经代表“这件事需要人来看”。
-        if (job.Plays > 0 || command.Text is not { Length: > 0 } text) return;
+        if (job.Carded || command.Text is not { Length: > 0 } text) return;
+        job.Carded = true;
         // 紧急档不往文案里贴 ⚠ 字形：卡片自己画一颗警告三角（urgent 参数），尺寸与颜色才能控制
         MessageStackWindow.Push(text, EffectCommand.BrushOf(command.Color) ?? Accent(), command.Source, command.Urgent);
     }

@@ -28,26 +28,15 @@
         <Rectangle x:Name="EdgeRight" HorizontalAlignment="Right"/>
       </Grid>
     </Grid>
-    <!--  警告语：中间一句大字，左右两道斜线夹着，铺满屏宽。整层挂一个 RectangleGeometry 当 Clip，
-          入场时它从屏右往左展开（扫描头扫到哪，线与字才亮到哪），退场时反向收回——文字与斜线
-          都留在原位不动，只有遮罩在走，所以不会出现「原地淡入淡出」那种没有指向感的动画。
-          斜线本身的持续慢移走画刷 Viewport（代码里 AddDrift），因此文本不参与平移，始终居中。  -->
-    <Grid x:Name="Tape" Opacity="0" IsHitTestVisible="False" Margin="0">
-      <Grid.RenderTransform><TranslateTransform x:Name="TapeShift"/></Grid.RenderTransform>
-      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-      <Border x:Name="SlashLeft" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,22,0"/>
-      <TextBlock x:Name="TapeText" Grid.Column="1" Text="" VerticalAlignment="Center"
-                 FontFamily="Consolas, Microsoft YaHei UI" FontSize="46" FontWeight="Bold"
-                 Foreground="{DynamicResource AccentBrush}"/>
-      <Border x:Name="SlashRight" Grid.Column="2" VerticalAlignment="Center" Margin="22,0,0,0"/>
+    <!--  警告语：同组的多条竖着排成一叠，整叠在屏幕中间。分三层是为了三条动画不抢同一个属性：
+          外层 Rows 走整组的淡入淡出，内层 RowsPulse 走持续段里的闪烁，StackPanel 只管排版。
+          每一行自己再套一层：内容层挂揭示用的 Clip（扫到哪亮到哪），扫描头是不被裁的兄弟节点。
+          文字背后不垫背景框：垫了就像贴了块便利贴，跟这套 1 px 发丝线的界面不合。  -->
+    <Grid x:Name="Rows" Opacity="0" IsHitTestVisible="False">
+      <Grid x:Name="RowsPulse">
+        <StackPanel x:Name="RowStack" VerticalAlignment="Center"/>
+      </Grid>
     </Grid>
-    <!--  扫描头：一道加密斜带 + 左缘亮线，从屏右快速冲到屏左。它是 Tape 的**兄弟**而不是孩子——
-          Tape 整层挂着揭示用的 Clip，孩子会被一起裁掉；只有放在外面它才能跑在自己拉开的那片警戒线前头。
-          竖向铺满，横向宽 150，平移量在代码里给。  -->
-    <Border x:Name="Sweep" Width="150" HorizontalAlignment="Left" VerticalAlignment="Stretch"
-            Opacity="0" IsHitTestVisible="False">
-      <Border.RenderTransform><TranslateTransform x:Name="SweepShift"/></Border.RenderTransform>
-    </Border>
     <Canvas x:Name="Stage" IsHitTestVisible="False" ClipToBounds="True"/>
     <!--  紧急档的四颗巨大警告三角：上下各两颗，分列屏宽 1/4 与 3/4 处（用户给的那张示意图就是这个布局）。
           放在 Tape 之外、窗口根上，才能拿到整屏尺寸；淡入淡出与 Tape 共用同一段动画。  -->

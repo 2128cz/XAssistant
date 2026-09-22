@@ -65,6 +65,18 @@ public sealed partial class EffectsWindow : Window
     /// <summary>扫描头的宽度（与 XAML 里那个 Border 一致）：平移量的两端都按它算。</summary>
     private const double SweepWidth = 150;
 
+    /// <summary>一屏最多叠几行：与调度器同一个数，两边不许各说各话。</summary>
+    private const int MaxRows = EffectSchedule.MaxRows;
+
+    /// <summary>行间距（DIP）：斜线有高度，挤在一起会看成一片糊的。</summary>
+    private const double RowGap = 12;
+
+    /// <summary>
+    /// 组层点亮的时长：必须明显短于扫描的 0.5 s。整层跟着淡入的话，扫到左半边时那里还半明半暗，
+    /// 「扫到哪亮到哪」就被这层淡入糊成「整条一起慢慢亮起来」——观感与门禁都读不到那道擦边。
+    /// </summary>
+    private const double GroupOnSeconds = 0.12;
+
     /// <summary>粒子的布局盒边长与字形大小的比例：留够余量，转起来不会被盒子裁掉。</summary>
     private const double BoxRatio = 1.8;
 
@@ -73,9 +85,7 @@ public sealed partial class EffectsWindow : Window
     private TimeSpan? _lastFrame;
     private bool _loopAttached;
     private bool _bannerOn;
-    private Storyboard? _bannerStory;
     private Storyboard? _breathStory;
-    private Storyboard? _driftStory;
 
     /// <summary>
     /// 一条条带的完整规格：<see cref="ShowBanner"/>（旧调用）与 <see cref="ShowCommand"/>（xa 命令行）
@@ -85,7 +95,11 @@ public sealed partial class EffectsWindow : Window
     private readonly record struct BannerSpec(
         string? Text, Brush Color, double Hold, double FadeIn, double FadeOut, int Blinks,
         bool BorderOn, double BorderWidth, double BorderFade, double BorderCycle, double FontSize,
-        bool Urgent);
+        bool Urgent, string Key)
+    {
+        /// <summary>这一行占屏多久：与 <see cref="EffectCommand.ScreenSeconds"/> 同一口径。</summary>
+        public double ScreenSeconds => FadeIn + Hold + FadeOut;
+    }
 
     /// <summary>边框呼吸的暗端（亮端是 1）：只收 45%，看着是「亮暗之间循环」，不是「闪灭」。</summary>
     private const double BreathLow = 0.55;
@@ -175,7 +189,9 @@ public sealed partial class EffectsWindow : Window
                 BorderFade: 30,
                 BorderCycle: 0,
                 FontSize: 46,
-                Urgent: false));
+                Urgent: false,
+                // 彩蛋按「这句词」成组：同一个词连敲是重新计时，不同词各开一叠，不互相叠成两行
+                Key: "keyword:" + text));
         });
     }
 
@@ -205,7 +221,10 @@ public sealed partial class EffectsWindow : Window
                 BorderFade: command.BorderFade,
                 BorderCycle: command.BorderCycle,
                 FontSize: command.FontSize,
-                Urgent: command.Urgent));
+                Urgent: command.Urgent,
+                // 没有归组键的裸消息各成一组（= 后来的把前一叠换掉），与调度器「不成组就排队」同一口径；
+                // 同一句裸话重发仍然并到同一行，不会在屏上叠出两行一模一样的
+                Key: command.GroupKey ?? "solo:" + command.Text));
         });
     }
     
@@ -306,6 +325,9 @@ public sealed partial class EffectsWindow : Window
         // 掉帧、切窗口、断点回来时空档可能几百毫秒，按 50 ms 封顶：衰减走闭式解，跨步也不会算飞
         double dt = _lastFrame is { } last ? Math.Clamp((time - last).TotalSeconds, 0, 0.05) : 0;
         _lastFrame = time;
+        // 整组到点由渲染帧来触发退场（不另开一个定时器）：这一帧一帧地走，本来就是判到点的地方，
+        // 多一个 DispatcherTimer 就多一条「谁先清状态」的竞路线
+        if (!_exiting && _groupUntil is { } until && Mono() >= until) ExitGroup();
         if (dt <= 0) return;
 
         for (int i = _live.Count - 1; i >= 0; i--)
@@ -328,95 +350,416 @@ public sealed partial class EffectsWindow : Window
         }
         if (_live.Count == 0 && !_bannerOn) Close();
     }
+    // ===== 一叠警告：同组竖排、逐条扫入、整组一起退 =====
 
-    // ===== 警告语 + 边缘高亮：一个动作，一起淡入淡出 =====
+    /// <summary>
+    /// 屏上的一行：斜线 + 正文 + 斜线挂在被揭示的 Clip 里，扫描头是不被裁的兄弟节点。
+    /// 每行一份遮罩、一份入场动画，所以「逐条 0.5 s 入场」就是各行的入场故事按到达顺序错开挂上。
+    ///
+    /// 平移走 RenderTransform、揭示走 Clip，两者不叠进同一个矩阵：布局给的是盒子左上角，
+    /// 遮罩要的是「整屏宽的一块」，混在一个变换里做收尾缩放就会把整行拽回原点（上一版踩过）。
+    /// </summary>
+    private sealed class BannerRow
+    {
+        public required Grid Root { get; init; }
+        public required Grid Content { get; init; }
+        public required RectangleGeometry Mask { get; init; }
+        public required Border SlashLeft { get; init; }
+        public required Border SlashRight { get; init; }
+        public required Border Head { get; init; }
+        public required TranslateTransform HeadShift { get; init; }
+        public required TranslateTransform Shift { get; init; }
+        public required string Text { get; init; }
+        public required BannerSpec Spec { get; set; }
+        public Storyboard? Entry { get; set; }
+        public Storyboard? Drift { get; set; }
+    }
 
+    private readonly List<BannerRow> _rows = new();
+    private string? _groupKey;
+    private TimeSpan? _nextEntryAt;      // 下一行的入场起点：连击时按 0.5 s 一档往后排
+    private TimeSpan? _groupUntil;       // 整组什么时候退场（= 组里最迟那一行）
+    private bool _exiting;
+    private Storyboard? _groupStory;
+    private Storyboard? _blinkStory;
+    private static readonly System.Diagnostics.Stopwatch Clock = System.Diagnostics.Stopwatch.StartNew();
+
+    /// <summary>
+    /// 「全遮」的那个矩形：宽度给 1 DIP 而不是 0——零宽矩形在 WPF 里是退化值，拿它当动画端点会被
+    /// 折叠成 (0,0,0,0)，于是揭示从「左边界 0」开始长成从左往右推开，方向整个反掉。
+    /// </summary>
+    private static Rect HiddenRect(double width, double height) => new Rect(width, 0, 1, height);
+
+    /// <summary>单调时钟：退场与入场错峰都按它算，不用墙上时间（用户改系统时钟不该把警告带卡住）。</summary>
+    private static TimeSpan Mono() => Clock.Elapsed;
+
+    /// <summary>
+    /// 一条命令进来，三种去向：
+    /// ① 组键不同 → 旧的一叠让位，开新的一叠；
+    /// ② 同键同正文 → 不新增行，把那一行顶到最前重新扫一遍（同一句又喊一遍不该排成两行）；
+    /// ③ 同键新正文 → 排成下面的一行，入场排在已经排上的那几行之后（每条 0.5 s，不是一起炸开）。
+    /// 三种情况都把整组的到点时刻推到「此刻 + 组里最长那一条」——这就是「新的进来，时间从它进来那刻重算」。
+    /// </summary>
     private void Banner(BannerSpec spec)
     {
-        var accent = spec.Color;
-        // 文字条带：不给正文就整段收起，只剩边框那圈渐变带在工作
-        bool hasText = spec.Text is { Length: > 0 };
-        Tape.Visibility = hasText ? Visibility.Visible : Visibility.Collapsed;
-        if (hasText)
+        var now = Mono();
+        // 只要边框不要正文：清空这一叠，边框单独亮一会儿（-lable off 就落在这条路上）
+        if (spec.Text is not { Length: > 0 } text)
         {
-            TapeText.Text = spec.Text;
-            TapeText.Foreground = accent;
-            TapeText.FontSize = spec.FontSize;
-            // 斜线跟文字等高：行高由字号推，画刷的瓦片尺寸就按这个高算
-            double height = spec.FontSize * 1.25;
-            SlashLeft.Height = SlashRight.Height = height;
-            // 两侧各一支画刷：慢移是挂在画刷的 Viewport 上的，两侧共用一支的话两条动画会互相踩
-            SlashLeft.Background = Hatch(accent, height);
-            SlashRight.Background = Hatch(accent, height);
-            // 紧急档不在文字两边夹小三角，而是上下四颗巨型的（见 BuildCorners）：
-            // 警告程度要从余光里就能看见，藏在正文旁边等于没提醒
-            SlashLeft.Child = SlashRight.Child = null;
-            BuildCorners(spec, accent, height);
+            StopGroup();
+            ClearRows();
+            _groupKey = spec.Key;
+            Edge.Visibility = spec.BorderOn ? Visibility.Visible : Visibility.Collapsed;
+            Rows.Visibility = Visibility.Collapsed;
+            if (!spec.BorderOn) { if (_live.Count == 0) Close(); return; }
+            BuildBands(spec.Color, spec.BorderWidth, spec.BorderFade);
+            Corners.Children.Clear();
+            _groupUntil = now + TimeSpan.FromSeconds(Math.Max(0.2, spec.Hold + spec.FadeOut));
+            _bannerOn = true;
+            AttachLoop();
+            FadeIn(Rows, 0);
+            FadeIn(Edge, GroupOnSeconds);
+            AddBreath(spec);
+            return;
         }
 
-        // 四边渐变带：关了边框就整层收起，不再铺画刷
-        Edge.Visibility = spec.BorderOn ? Visibility.Visible : Visibility.Collapsed;
-        if (spec.BorderOn) BuildBands(accent, spec.BorderWidth, spec.BorderFade);
-
-        // 同时只挂一条：上一句还在飞就先停下。两条动画同时抢 Tape.Opacity 的话，
-        // 结果就是 HideBanner 归零后又被旧动画抬回去，且计数器只减不增、窗口永远关不掉
-        StopAnimation();
-        _bannerOn = true;
-        AttachLoop();
-
-        double total = Math.Max(0.1, spec.FadeIn + spec.Hold + spec.FadeOut);
-        // 扫描头单趟取 0.5 s，但不许越过淡入：淡入只有 0.2 s 时扫入也得在那半秒内收住
-        double sweep = Math.Clamp(Math.Min(SweepSeconds, Math.Max(0.15, spec.FadeIn)), 0.15, total);
-        double revealAt = Math.Clamp(sweep / total, 0.01, 1);              // 扫完那一刻（开始有字的位置）
-        double holdEndAt = Math.Clamp((spec.FadeIn + spec.Hold) / total, revealAt, 1);   // 退场起点
-        // 全遮起步：Clip 是个零宽矩形，此刻一个字都不露——入场动画的起点必须是"什么都没有"，
-        // 否则扫描头撞开的是已经亮着的线，看着就是原地淡入
-        Tape.Clip = new RectangleGeometry(new Rect(Width, 0, 0, Height));
-
-        // 中间这句、屏幕四边、四颗警告三角一起淡入淡出：三个目标各一份动画实例
-        // （SetTarget 存在动画对象上，共用会互相踩）
-        var story = new Storyboard();
-        foreach (var target in new FrameworkElement[] { Edge, Corners })
+        bool fresh = _groupKey != spec.Key;
+        if (fresh)
         {
-            var pulse = Pulse(spec, total);
-            Storyboard.SetTarget(pulse, target);
-            Storyboard.SetTargetProperty(pulse, new PropertyPath(OpacityProperty));
-            story.Children.Add(pulse);
+            StopGroup();
+            ClearRows();
+            _groupKey = spec.Key;
+            _nextEntryAt = null;
+            Rows.Opacity = 0;
         }
-        // 正文那条另算一份：淡入段压到扫描头跑完的那一刻（扫到哪亮到哪，不是先蒙亮再扫），
-        // 省下的那截补进持续段——holdEndAt 不变，闪烁位置与退场起点都不跟着抖
-        if (hasText)
+        Rows.Visibility = Visibility.Visible;
+
+        var twin = _rows.FirstOrDefault(row => row.Text == text);
+        if (twin is not null)
         {
-            var tapePulse = Pulse(spec with { FadeIn = sweep, Hold = spec.Hold + (spec.FadeIn - sweep) }, total);
-            Storyboard.SetTarget(tapePulse, Tape);
-            Storyboard.SetTargetProperty(tapePulse, new PropertyPath(OpacityProperty));
-            story.Children.Add(tapePulse);
-            Sweep.Child = BuildSweepBody(accent);
-            story.Children.Add(Reveal(total, revealAt, holdEndAt));
-            story.Children.Add(SweepGlow(total, revealAt, holdEndAt));
-            story.Children.Add(SweepRun(total, revealAt, holdEndAt));
-            story.Children.Add(ExitShift(total, holdEndAt));
+            _rows.Remove(twin);
+            _rows.Insert(0, twin);
+            twin.Spec = spec;
+            RowStack.Children.Remove(twin.Root);
+            RowStack.Children.Insert(0, twin.Root);
+            EnterRow(twin, now);                       // 顶到最前并重扫：让「还在响」看得见
         }
         else
         {
-            Sweep.Child = null;
-            Tape.Opacity = 0;
+            if (_rows.Count >= MaxRows) EvictOldestRow();
+            var row = BuildRow(spec, text);
+            _rows.Add(row);
+            EnterRow(row, now);
         }
-        AddBreath(spec);
-        if (hasText) AddDrift(sweep, spec.Hold);
+
+        ReTimeGroup(now, spec);
+        ShowGroupBorder(spec);
+        if (fresh) AddBlink(spec);
+        _bannerOn = true;
+        AttachLoop();
+    }
+
+    /// <summary>整组到点时刻：此刻 + 组里最长那一条的占屏时长。</summary>
+    private void ReTimeGroup(TimeSpan now, BannerSpec spec)
+    {
+        double longest = _rows.Count == 0 ? spec.ScreenSeconds : _rows.Max(row => row.Spec.ScreenSeconds);
+        _groupUntil = now + TimeSpan.FromSeconds(Math.Max(0.2, longest));
+        if (Rows.Opacity < 0.99 && !_exiting) FadeIn(Rows, GroupOnSeconds);   // 第一行进来时把组层点亮
+    }
+
+    /// <summary>
+    /// 边框与四角三角按**组里最高那一档**亮：一叠里混进一条紧急的，整屏的边框就该是红的、
+    /// 该有四颗巨型三角——等级差的消息挤在一起时，说服力取上限而不是平均。
+    /// </summary>
+    private void ShowGroupBorder(BannerSpec newest)
+    {
+        var top = _rows.Select(row => row.Spec)
+            .Concat(new[] { newest })
+            .OrderByDescending(spec => spec.Urgent)
+            .ThenByDescending(spec => spec.BorderWidth)
+            .First();
+        Edge.Visibility = top.BorderOn ? Visibility.Visible : Visibility.Collapsed;
+        if (top.BorderOn)
+        {
+            BuildBands(top.Color, top.BorderWidth, top.BorderFade);
+            FadeIn(Edge, GroupOnSeconds);
+            AddBreath(top);
+        }
+        double height = top.FontSize * 1.25;
+        BuildCorners(top, top.Color, height);
+        if (top.Urgent) FadeIn(Corners, GroupOnSeconds);
+        else { Corners.Opacity = 0; Corners.Children.Clear(); }
+    }
+
+    /// <summary>行数到顶：挤掉最老那一行（打头那条不动，它代表这一叠的开头）。</summary>
+    private void EvictOldestRow()
+    {
+        var oldest = _rows.Count > 1 ? _rows[1] : _rows[0];
+        _rows.Remove(oldest);
+        StopRow(oldest);
+        RowStack.Children.Remove(oldest.Root);
+    }
+
+    /// <summary>建一行：三列（斜线 | 正文 | 斜线）装进被 Clip 揭示的内容层，外面套一个不被裁的扫描头。</summary>
+    private BannerRow BuildRow(BannerSpec spec, string text)
+    {
+        double height = spec.FontSize * 1.25;
+        var body = new TextBlock
+        {
+            Text = text,
+            FontSize = spec.FontSize,
+            FontWeight = FontWeights.Bold,
+            FontFamily = new FontFamily("Consolas, Microsoft YaHei UI"),
+            Foreground = spec.Color,
+            TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var left = new Border
+        {
+            Height = height,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 22, 0),
+            Background = Hatch(spec.Color, height),
+        };
+        var right = new Border
+        {
+            Height = height,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(22, 0, 0, 0),
+            Background = Hatch(spec.Color, height),
+        };
+        var content = new Grid { Clip = new RectangleGeometry(HiddenRect(Width, Height)) };
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(left, 0);
+        Grid.SetColumn(body, 1);
+        Grid.SetColumn(right, 2);
+        content.Children.Add(left);
+        content.Children.Add(body);
+        content.Children.Add(right);
+
+        var headShift = new TranslateTransform(Width, 0);
+        var head = new Border
+        {
+            Width = SweepWidth,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            Opacity = 0,
+            Child = BuildSweepBody(spec.Color),
+            RenderTransform = headShift,
+        };
+        var shift = new TranslateTransform();
+        var root = new Grid
+        {
+            Margin = new Thickness(0, RowGap, 0, RowGap),
+            RenderTransform = shift,
+            IsHitTestVisible = false,
+        };
+        root.Children.Add(content);
+        root.Children.Add(head);
+        RowStack.Children.Add(root);
+        return new BannerRow
+        {
+            Root = root,
+            Content = content,
+            Mask = (RectangleGeometry)content.Clip,
+            SlashLeft = left,
+            SlashRight = right,
+            Head = head,
+            HeadShift = headShift,
+            Shift = shift,
+            Text = text,
+            Spec = spec,
+        };
+    }
+
+    /// <summary>
+    /// 一行的入场：扫描头从屏右冲到屏左（0.5 s），Clip 跟着把这一行从右往左揭示出来，
+    /// 斜纹从这一刻起开始慢移。FillBehavior.HoldEnd：扫完就停在全开，等整组到点再一起退。
+    /// 连击时按 <see cref="_nextEntryAt"/> 往后错开，所以是「一条播完才播下一条」而不是三条一起炸。
+    ///
+    /// BeginTime 是**相对这条 story 开跑那一刻的延时**，不是绝对时刻：把时钟读数直接塞进去，
+    /// 第二行就会「延后三十秒才揭示」——屏上看着就是它根本没来（第一行没事，因为那时读数还接近零）。
+    /// </summary>
+    private void EnterRow(BannerRow row, TimeSpan now)
+    {
+        var at = _nextEntryAt is { } pending && pending > now ? pending : now;
+        _nextEntryAt = at + TimeSpan.FromSeconds(SweepSeconds);
+        var delay = at - now;
+
+        StopRow(row);                                   // 重扫同一行：先把上一次挂在它身上的动画摘干净
+        var hidden = HiddenRect(Width, Height);
+        var shown = new Rect(0, 0, Width, Height);
+        var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+        var story = new Storyboard { BeginTime = delay };
+
+        var reveal = new RectAnimationUsingKeyFrames
+        {
+            Duration = TimeSpan.FromSeconds(SweepSeconds),
+            FillBehavior = FillBehavior.HoldEnd,
+        };
+        reveal.KeyFrames.Add(new EasingRectKeyFrame(hidden, KeyTime.FromPercent(0)));
+        reveal.KeyFrames.Add(new EasingRectKeyFrame(shown, KeyTime.FromPercent(1), ease));
+        Storyboard.SetTarget(reveal, row.Content);
+        Storyboard.SetTargetProperty(reveal, new PropertyPath("Clip.Rect"));
+        story.Children.Add(reveal);
+
+        var run = new DoubleAnimation(Width, -SweepWidth, new Duration(TimeSpan.FromSeconds(SweepSeconds)))
+        {
+            EasingFunction = ease,
+            FillBehavior = FillBehavior.Stop,
+        };
+        Storyboard.SetTarget(run, row.Head);
+        Storyboard.SetTargetProperty(run, new PropertyPath("RenderTransform.X"));
+        story.Children.Add(run);
+
+        var glow = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(SweepSeconds) };
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0.15)));
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0.85)));
+        glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(1)));
+        Storyboard.SetTarget(glow, row.Head);
+        Storyboard.SetTargetProperty(glow, new PropertyPath(OpacityProperty));
+        story.Children.Add(glow);
+
+        row.Entry = story;
+        story.Begin();
+        DriftRow(row, delay);
+    }
+
+    /// <summary>
+    /// 这一行的斜纹慢移：每 <see cref="DriftSecondsPerTile"/> 秒挪走一个瓦片，无限循环到整组退场。
+    /// 动的是画刷的 Viewport（采样窗往左挪一格），线框与正文各自不动，所以是「条纹在背景里流」，
+    /// 不是「整条带子在飘」。位移取整整一个瓦片，循环接缝看不出来。
+    /// </summary>
+    private void DriftRow(BannerRow row, TimeSpan delay)
+    {
+        var drift = new Storyboard { BeginTime = delay };
+        foreach (var slash in new Border[] { row.SlashLeft, row.SlashRight })
+        {
+            if (slash.Background is not DrawingBrush hatch) continue;
+            var tile = hatch.Viewport;
+            var slide = new RectAnimation(tile, new Rect(tile.X + tile.Width, tile.Y, tile.Width, tile.Height),
+                new Duration(TimeSpan.FromSeconds(DriftSecondsPerTile)))
+            {
+                RepeatBehavior = RepeatBehavior.Forever,
+            };
+            Storyboard.SetTarget(slide, slash);
+            Storyboard.SetTargetProperty(slide, new PropertyPath("Background.Viewport"));
+            drift.Children.Add(slide);
+        }
+        row.Drift = drift;
+        drift.Begin();
+    }
+
+    /// <summary>摘掉一行身上挂着的入场与慢移动画（重扫与退场前都要先做这一步，否则旧动画按住新赋值）。</summary>
+    private static void StopRow(BannerRow row)
+    {
+        var entry = row.Entry;
+        row.Entry = null;
+        entry?.Stop();
+        var drift = row.Drift;
+        row.Drift = null;
+        drift?.Stop();
+    }
+
+    /// <summary>
+    /// 整组退场：每行的 Clip 反向收回（左边界回到屏右，线像被抽走），扫描头反向再跑一趟当擦除器，
+    /// 正文同时往左带一小段——读成「平移出去」。边框与四角三角跟着一起淡掉，全屏效果就此结束。
+    /// </summary>
+    private void ExitGroup()
+    {
+        if (_exiting) return;
+        _exiting = true;
+        double fadeOut = _rows.Count == 0
+            ? BannerFadeOutSeconds
+            : Math.Clamp(_rows.Max(row => row.Spec.FadeOut), 0.2, 3);
+        var shown = new Rect(0, 0, Width, Height);
+        var hidden = HiddenRect(Width, Height);
+        var story = new Storyboard();
+        foreach (var row in _rows)
+        {
+            // 先把本地值对齐到「全开」，再停旧动画：Stop 会把 HoldEnd 的值撤掉，本地值不对齐就闪一下
+            row.Mask.Rect = shown;
+            StopRow(row);
+            var retract = new RectAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(fadeOut) };
+            retract.KeyFrames.Add(new EasingRectKeyFrame(shown, KeyTime.FromPercent(0)));
+            retract.KeyFrames.Add(new EasingRectKeyFrame(hidden, KeyTime.FromPercent(1)));
+            Storyboard.SetTarget(retract, row.Content);
+            Storyboard.SetTargetProperty(retract, new PropertyPath("Clip.Rect"));
+            story.Children.Add(retract);
+
+            var wipe = new DoubleAnimation(-SweepWidth, Width, new Duration(TimeSpan.FromSeconds(fadeOut)));
+            Storyboard.SetTarget(wipe, row.Head);
+            Storyboard.SetTargetProperty(wipe, new PropertyPath("RenderTransform.X"));
+            story.Children.Add(wipe);
+
+            var glow = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(fadeOut) };
+            glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+            glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0.2)));
+            glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0.8)));
+            glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(1)));
+            Storyboard.SetTarget(glow, row.Head);
+            Storyboard.SetTargetProperty(glow, new PropertyPath(OpacityProperty));
+            story.Children.Add(glow);
+
+            var leave = new DoubleAnimation(0, -ExitDrift, new Duration(TimeSpan.FromSeconds(fadeOut)))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn },
+            };
+            Storyboard.SetTarget(leave, row.Root);
+            Storyboard.SetTargetProperty(leave, new PropertyPath("RenderTransform.X"));
+            story.Children.Add(leave);
+        }
+        foreach (var layer in new FrameworkElement[] { Rows, Edge, Corners })
+        {
+            var fade = new DoubleAnimation(Rows.Opacity, 0, new Duration(TimeSpan.FromSeconds(fadeOut)));
+            Storyboard.SetTarget(fade, layer);
+            Storyboard.SetTargetProperty(fade, new PropertyPath(OpacityProperty));
+            story.Children.Add(fade);
+        }
         story.Completed += (_, _) =>
         {
             // 被新一条或 HideNow 接过的不重复收尾
-            if (!ReferenceEquals(_bannerStory, story)) return;
-            _bannerStory = null;
+            if (!ReferenceEquals(_groupStory, story)) return;
+            _groupStory = null;
+            _exiting = false;
             _bannerOn = false;
-            // 动画自然走完时也要把属性交回去，否则下一次本地赋值会被已结束的动画按住
             StopAnimation();
             if (_live.Count == 0) Close();
         };
-        _bannerStory = story;
+        _groupStory = story;
         story.Begin();
     }
+
+    /// <summary>把某层的 Opacity 在若干秒内抬到 1（组层、边框、四角都用它，FillBehavior 停在末值）。</summary>
+    private static void FadeIn(FrameworkElement layer, double seconds)
+    {
+        var fade = new DoubleAnimation(1, new Duration(TimeSpan.FromSeconds(Math.Max(0.05, seconds))))
+        {
+            FillBehavior = FillBehavior.HoldEnd,
+        };
+        Storyboard.SetTarget(fade, layer);
+        Storyboard.SetTargetProperty(fade, new PropertyPath(OpacityProperty));
+        var story = new Storyboard { Children = { fade } };
+        story.Begin();
+    }
+
+    /// <summary>停掉整组那条退场/闪烁动画（不退场也要停：留着会把下一次赋的 Opacity 按住）。</summary>
+    private void StopGroup()
+    {
+        var story = _groupStory;
+        _groupStory = null;
+        story?.Stop();
+        var blink = _blinkStory;
+        _blinkStory = null;
+        blink?.Stop();
+    }
+
+
 
     /// <summary>
     /// 收起。两个坑都踩到过：
@@ -433,36 +776,65 @@ public sealed partial class EffectsWindow : Window
     }
 
     /// <summary>
-    /// 停掉主戏、边框呼吸、斜线慢移三套动画，把被它们在合成树上按住的属性交还本地并复位。
+    /// 停掉整组退场、闪烁、边框呼吸与每行的入场/慢移动画，把被它们按住的属性交还本地并复位。
     /// 先置空引用再 Stop：Stop 会触发 Completed，旧引用留着会让收尾流程（关窗、清动画）重跑一遍。
-    /// 新加的四步动画每一个都占一个属性（Clip.Rect / 扫描头 X / 扫描头 Opacity / 退场位移 / 画刷 Viewport），
-    /// 少归还一个，下一次本地赋值就会被上一次残留的动画按住。
+    /// 光 story.Stop() 不够：动画还在合成树上抢着 Opacity，本地赋的 0 会被盖回去，
+    /// 所以每一层都要 BeginAnimation(prop, null) 把属性交还给本地值——这套动作全在这里。
     /// </summary>
     private void StopAnimation()
     {
-        var story = _bannerStory;
-        _bannerStory = null;
-        story?.Stop();
+        StopGroup();
         var breath = _breathStory;
         _breathStory = null;
         breath?.Stop();
-        var drift = _driftStory;
-        _driftStory = null;
-        drift?.Stop();
-        Tape.BeginAnimation(OpacityProperty, null);
-        Edge.BeginAnimation(OpacityProperty, null);
-        Corners.BeginAnimation(OpacityProperty, null);
-        EdgePulse.BeginAnimation(OpacityProperty, null);
-        Sweep.BeginAnimation(OpacityProperty, null);
-        SweepShift.BeginAnimation(TranslateTransform.XProperty, null);
-        TapeShift.BeginAnimation(TranslateTransform.XProperty, null);
-        if (Tape.Clip is RectangleGeometry mask) mask.BeginAnimation(RectangleGeometry.RectProperty, null);
-        // 斜线那两支画刷不用归还：每次上屏都换新的一支，被动画按住的旧支已经不在树上
-        Tape.Opacity = Edge.Opacity = Corners.Opacity = 0;
-        EdgePulse.Opacity = 1;   // 内层回到全亮：呼吸跑到暗端时被收起，下一轮开头不带旧值
-        Sweep.Opacity = 0;
-        SweepShift.X = -SweepWidth;   // 扫描头停在屏左外：收起时不留一块透明带子在画面里
-        TapeShift.X = 0;
+        ClearRows();
+        _groupKey = null;
+        _nextEntryAt = null;
+        _groupUntil = null;
+        _exiting = false;
+        foreach (var layer in new FrameworkElement[] { Rows, RowsPulse, Edge, EdgePulse, Corners })
+            layer.BeginAnimation(OpacityProperty, null);
+        Rows.Opacity = Edge.Opacity = Corners.Opacity = 0;
+        RowsPulse.Opacity = EdgePulse.Opacity = 1;   // 内层回到全亮：闪到暗端时被收起，下一轮开头不带旧值
+        Rows.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>把这一叠行全摘掉：停掉挂在行上的两套动画，再从排版里移走。</summary>
+    private void ClearRows()
+    {
+        foreach (var row in _rows)
+        {
+            StopRow(row);
+            RowStack.Children.Remove(row.Root);
+        }
+        _rows.Clear();
+    }
+
+    /// <summary>
+    /// 整叠一起闪：持续段里按 <c>Blinks</c> 下几次暗坑（掉到 0.2 不熄全）。
+    /// 闪在组层的内层 RowsPulse 上，外层 Rows 归淡入淡出——两条动画不能抢同一个 Opacity。
+    /// 新语法固定 1 下（= 不闪），只有旧语法会配多下。
+    /// </summary>
+    private void AddBlink(BannerSpec spec)
+    {
+        int blinks = Math.Clamp(spec.Blinks, 0, 5);
+        if (blinks < 2 || spec.Hold <= 0) return;
+        var blink = new DoubleAnimationUsingKeyFrames
+        {
+            BeginTime = TimeSpan.FromSeconds(SweepSeconds),
+            Duration = TimeSpan.FromSeconds(spec.Hold),
+        };
+        blink.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0)));
+        for (int i = 0; i < blinks; i++)
+        {
+            blink.KeyFrames.Add(new EasingDoubleKeyFrame(0.2, KeyTime.FromPercent((i + 0.5) / blinks * 0.9)));
+            blink.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent((i + 1) / (double)blinks * 0.9)));
+        }
+        Storyboard.SetTarget(blink, RowsPulse);
+        Storyboard.SetTargetProperty(blink, new PropertyPath(OpacityProperty));
+        var story = new Storyboard { Children = { blink } };
+        _blinkStory = story;
+        story.Begin();
     }
 
     /// <summary>
@@ -511,170 +883,6 @@ public sealed partial class EffectsWindow : Window
             ViewportUnits = BrushMappingMode.Absolute,
             Stretch = Stretch.None,
         };
-    }
-
-    /// <summary>
-    /// 三段时序：淡入 spec.FadeIn → 持续 spec.Hold（闪烁铺在这一段里）→ 淡出 spec.FadeOut，
-    /// 段长由指令各自给，关键帧百分比按总长换算。
-    /// FillBehavior.Stop：动画结束后 Opacity 回到 XAML 里那个 0。
-    /// </summary>
-    private static DoubleAnimationUsingKeyFrames Pulse(BannerSpec spec, double total)
-    {
-        var pulse = new DoubleAnimationUsingKeyFrames
-        {
-            Duration = TimeSpan.FromSeconds(total),
-            FillBehavior = FillBehavior.Stop,
-        };
-        double fadeInAt = Math.Clamp(spec.FadeIn / total, 0, 1);                         // 淡入结束 = 持续段的起点
-        double holdEndAt = Math.Clamp((spec.FadeIn + spec.Hold) / total, fadeInAt, 1);   // 持续段终点 = 淡出的起点
-        int blinks = Math.Clamp(spec.Blinks, 1, 5);
-        if (fadeInAt > 0) pulse.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(0)));
-        pulse.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(fadeInAt)));
-        if (holdEndAt > fadeInAt)
-        {
-            for (int i = 0; i < blinks; i++)
-            {
-                // 闪烁只占持续段，两端不碰：最后一闪也不中途掉下去（否则只闪一下的场景先黑半屏再亮，看着像闪崩）
-                double dimAt = fadeInAt + (holdEndAt - fadeInAt) * (i + 0.5) / blinks;
-                double backAt = fadeInAt + (holdEndAt - fadeInAt) * (i + 1) / blinks;
-                if (i < blinks - 1) pulse.KeyFrames.Add(new EasingDoubleKeyFrame(0.15, KeyTime.FromPercent(dimAt)));
-                pulse.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(backAt)));
-            }
-        }
-        // 淡出为 0 时持续段直接顶到总长：末尾再放一帧 0 会和上一帧同时间点，跳过（释放动画时自然回 0）
-        if (holdEndAt < 1) pulse.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(1)));
-        return pulse;
-    }
-
-    /// <summary>
-    /// 揭示遮罩：<see cref="Tape"/> 整层的 Clip 从「屏右一个零宽矩形」长成整个屏幕。左边界就是那道
-    /// 往左跑的警戒线起点，所以线与字是被扫描头一路撞开出来的；退场反向收回（左边界回到屏右），
-    /// 看着像被抽走。入场用 EaseOut（撞开时快、收住时缓），退场匀速。
-    /// 关键帧按总长的百分比铺，和 <see cref="Pulse"/> 共用同一把尺子。
-    /// </summary>
-    private RectAnimationUsingKeyFrames Reveal(double total, double revealAt, double holdEndAt)
-    {
-        var hidden = new Rect(Width, 0, 0, Height);
-        var shown = new Rect(0, 0, Width, Height);
-        var reveal = new RectAnimationUsingKeyFrames
-        {
-            Duration = TimeSpan.FromSeconds(total),
-            FillBehavior = FillBehavior.Stop,
-        };
-        reveal.KeyFrames.Add(new EasingRectKeyFrame(hidden, KeyTime.FromPercent(0)));
-        reveal.KeyFrames.Add(new EasingRectKeyFrame(shown, KeyTime.FromPercent(revealAt),
-            new QuadraticEase { EasingMode = EasingMode.EaseOut }));
-        if (holdEndAt < 1)
-        {
-            reveal.KeyFrames.Add(new LinearRectKeyFrame(shown, KeyTime.FromPercent(holdEndAt)));
-            reveal.KeyFrames.Add(new LinearRectKeyFrame(hidden, KeyTime.FromPercent(1)));
-        }
-        Storyboard.SetTarget(reveal, Tape);
-        Storyboard.SetTargetProperty(reveal, new PropertyPath("Clip.Rect"));
-        return reveal;
-    }
-
-    /// <summary>
-    /// 扫描头的位置：入场从屏右外冲到屏左外，跑在揭示边界前面（所以它是 Tape 的兄弟而不是孩子，
-    /// 孩子的话会被自己拉开的那片 Clip 一起裁掉）；退场反向再跑一趟当擦除器。两趟之间停在屏左外。
-    /// </summary>
-    private DoubleAnimationUsingKeyFrames SweepRun(double total, double revealAt, double holdEndAt)
-    {
-        var run = new DoubleAnimationUsingKeyFrames
-        {
-            Duration = TimeSpan.FromSeconds(total),
-            FillBehavior = FillBehavior.Stop,
-        };
-        run.KeyFrames.Add(new EasingDoubleKeyFrame(Width, KeyTime.FromPercent(0)));
-        run.KeyFrames.Add(new EasingDoubleKeyFrame(-SweepWidth, KeyTime.FromPercent(revealAt),
-            new QuadraticEase { EasingMode = EasingMode.EaseOut }));
-        if (holdEndAt < 1)
-        {
-            run.KeyFrames.Add(new LinearDoubleKeyFrame(-SweepWidth, KeyTime.FromPercent(holdEndAt)));
-            run.KeyFrames.Add(new LinearDoubleKeyFrame(Width, KeyTime.FromPercent(1)));
-        }
-        Storyboard.SetTarget(run, SweepShift);
-        Storyboard.SetTargetProperty(run, new PropertyPath(TranslateTransform.XProperty));
-        return run;
-    }
-
-    /// <summary>扫描头只在两趟路上亮，跑完即灭：留一块半透明带子压在屏上不算效果，算脏。</summary>
-    private DoubleAnimationUsingKeyFrames SweepGlow(double total, double revealAt, double holdEndAt)
-    {
-        var glow = new DoubleAnimationUsingKeyFrames
-        {
-            Duration = TimeSpan.FromSeconds(total),
-            FillBehavior = FillBehavior.Stop,
-        };
-        glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(0)));
-        glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(revealAt * 0.15)));
-        glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(revealAt * 0.85)));
-        glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(revealAt)));
-        if (holdEndAt < 1)
-        {
-            glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(holdEndAt)));
-            glow.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent((holdEndAt + 1) / 2)));
-            glow.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(1)));
-        }
-        Storyboard.SetTarget(glow, Sweep);
-        Storyboard.SetTargetProperty(glow, new PropertyPath(OpacityProperty));
-        return glow;
-    }
-
-    /// <summary>
-    /// 退场位移：整条带子在淡出段往左带一小段（<see cref="ExitDrift"/>），配合 Clip 收回读成「平移出去」。
-    /// 只给位移不给缩放——缩放会连正文一起变形，而正文这一路都不该动。
-    /// </summary>
-    private DoubleAnimationUsingKeyFrames ExitShift(double total, double holdEndAt)
-    {
-        var shift = new DoubleAnimationUsingKeyFrames
-        {
-            Duration = TimeSpan.FromSeconds(total),
-            FillBehavior = FillBehavior.Stop,
-        };
-        shift.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(0)));
-        if (holdEndAt < 1)
-        {
-            shift.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(holdEndAt)));
-            shift.KeyFrames.Add(new EasingDoubleKeyFrame(-ExitDrift, KeyTime.FromPercent(1),
-                new QuadraticEase { EasingMode = EasingMode.EaseIn }));
-        }
-        else shift.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(1)));
-        Storyboard.SetTarget(shift, TapeShift);
-        Storyboard.SetTargetProperty(shift, new PropertyPath(TranslateTransform.XProperty));
-        return shift;
-    }
-
-    /// <summary>
-    /// 警戒线的持续慢移：驻留段里每 <see cref="DriftSecondsPerTile"/> 秒挪走一个瓦片。
-    /// 动的是画刷的 Viewport（采样窗往左挪一格），线框与正文各自不动，所以是「条纹在背景里流」，
-    /// 不是「整条带子在飘」。位移取整整一个瓦片，循环接缝看不出来。
-    /// 挂在单独一条 story 上：主戏那条随时会被下一条接管，慢移的节拍不该跟着一起被掐断。
-    /// </summary>
-    private void AddDrift(double sweep, double hold)
-    {
-        if (hold <= 0) return;
-        double rounds = Math.Max(1, Math.Floor(hold / DriftSecondsPerTile));
-        var drift = new Storyboard();
-        foreach (var slash in new Border[] { SlashLeft, SlashRight })
-        {
-            if (slash.Background is not DrawingBrush hatch) continue;
-            var tile = hatch.Viewport;
-            var slide = new RectAnimation
-            {
-                From = tile,
-                To = new Rect(tile.X + tile.Width, tile.Y, tile.Width, tile.Height),
-                BeginTime = TimeSpan.FromSeconds(sweep),   // 等扫完再开始流，别跟入场抢方向感
-                Duration = TimeSpan.FromSeconds(DriftSecondsPerTile),
-                RepeatBehavior = new RepeatBehavior(rounds),
-            };
-            Storyboard.SetTarget(slide, slash);
-            Storyboard.SetTargetProperty(slide, new PropertyPath("Background.Viewport"));
-            drift.Children.Add(slide);
-        }
-        if (drift.Children.Count == 0) return;
-        _driftStory = drift;
-        drift.Begin();
     }
 
     /// <summary>
