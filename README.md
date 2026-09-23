@@ -102,7 +102,7 @@
 
 ```
 xa -s <色|类型> [持续 [淡入 [淡出]]] [-border on|off [渐宽 [延伸 [周期]]]] [-lable on|off [字号] [文本…]]
-             [-group <词>] [-from <平台>] [-icon <png路径>]
+             [-group <词>] [-from <平台>] [-icon <png路径>] [-aurora on|off [球数]]
                     [-tag <识别符>] [-replay <间隔秒> [次数]] [-emergency] [-from <平台>]
 xa -k [-emergency] [-tag <识别符>] [-any <正文片段>]          # 杀除；三种选择条件都可省，全不写就是全停
 ```
@@ -121,6 +121,8 @@ Qoder / Trae / DSH / ZCode / Codex / VS Code 每张卡都带「背景立绘」�
 **太干净或太满的图一律不垫**——全透明的图当遮罩等于什么都不画，几乎不透明的当遮罩就是一块实心方砖，
 只有真带形状的剪影才上屏。
 正文限宽屏宽八成，超了自己换行，左右两道斜线带跟着正文的实际高度往下**重复**（不拉伸、不改字号）。
+`-aurora on` 打开**流光溢彩**：屏幕四周排一整圈彩色渐变球（青→蓝→紫→洋红，相邻两球只差 20°，一整圈连成一条），
+中间靠一层径向遮罩保持全透 —— 只有屏幕边缘变成彩色，正文那一片是干净的；默认关，`-aurora on 20` 可调球数。
 `xa confetti` 撒花、`xa off` 收起。
 
 旧写法照旧兼容：`XAssistant.exe --fx warn 3 "AI Computer Use"`、`--fx confetti`、`--fx off`。`mcp/xassistant_fx_server.py` 是个纯标准库的 MCP 垫片，把 `xassistant_banner` / `xassistant_confetti` / `xassistant_off` 三个工具翻译成上面的命令；可执行文件位置读环境变量 `XASSISTANT_EXE`。

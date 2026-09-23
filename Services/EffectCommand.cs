@@ -92,6 +92,15 @@ public sealed record EffectCommand
     public string? Icon { get; set; }
 
     /// <summary>
+    /// 屏幕四周那圈「流光溢彩」（<c>-aurora on|off [球数]</c>）：彩色渐变球沿边缘排一整圈，
+    /// 中间靠径向遮罩保持全透 —— 正文那一片不能有颜色。默认关，这是可选模式不是常态。
+    /// </summary>
+    public bool Aurora { get; set; }
+
+    /// <summary>流光球数（<c>-aurora on 16</c>）：太少环上会漏缝（离屏量过：11 颗时第 10 百分位只有 37），太多白烧渲染。</summary>
+    public int AuroraBlobs { get; set; } = AuroraField.DefaultBlobCount;
+
+    /// <summary>
     /// 归组：显式 <c>-group</c> 最大，其次 <c>-tag</c>（同一个告警的多次播报当然是一组），
     /// 再次 <c>-from</c>（同一个 IDE 一路对话的多条提醒）。三者都没写就是 <b>null = 不成组</b>——
     /// 裸消息照旧一条播完才播下一条，这是当初「告警一密集就互相挤掉」那起事故换来的规矩，不能因为
@@ -152,7 +161,7 @@ public sealed record EffectCommand
 
     /// <summary>新语法的段开关。任一个出现就走新解析，否则整条按旧语法读。</summary>
     private static readonly string[] SectionSwitches =
-        ["-s", "-border", "-lable", "-label", "-from", "-tag", "-group", "-icon", "-replay", "-any", "-emergency", "-urgent", "-k", "-kill"];
+        ["-s", "-border", "-lable", "-label", "-from", "-tag", "-group", "-icon", "-aurora", "-replay", "-any", "-emergency", "-urgent", "-k", "-kill"];
 
     /// <summary>
     /// 解析一整行命令。返回 false = 不是已知指令（整条跳过，不猜、不弹、不报错），
@@ -210,6 +219,9 @@ public sealed record EffectCommand
         var tag = new List<string>();
         var group = new List<string>();
         var icon = new List<string>();
+        // 流光段用可空表：空表分不出「写了 -aurora 没带参数」与「根本没写 -aurora」，
+        // 而这两件事的意思正相反（前者=开，后者=关）
+        List<string>? aurora = null;
         var replay = new List<string>();
         var any = new List<string>();
         List<string>? current = null;
@@ -224,6 +236,7 @@ public sealed record EffectCommand
                 case "-tag": current = tag; break;
                 case "-group": current = group; break;
                 case "-icon": current = icon; break;
+                case "-aurora": current = aurora = new List<string>(); break;
                 case "-replay": current = replay; break;
                 case "-any": current = any; break;
                 // 无参开关：紧急档既能在 -s 里用颜色词表达，也能这样单独挂上（kill 的选择器靠它限定通道）
@@ -243,7 +256,25 @@ public sealed record EffectCommand
         // -k 一条不需要节奏/带宽：给不出正文也不当错（“全停”就是合法命令）
         if (command.Kill) { command.Text = any.Count > 0 ? string.Join(" ", any) : null; return true; }
         return ParseReplay(replay, command)
-            && ParseShow(show, command) && ParseBorder(border, command) && ParseLabel(label, command);
+            && ParseShow(show, command) && ParseBorder(border, command) && ParseLabel(label, command)
+            && (aurora is null || ParseAurora(aurora, command));
+    }
+
+    /// <summary>
+    /// <c>-aurora on|off [球数]</c>：屏幕四周那一圈流光溢彩。首个词是开关，只写段名就算开。
+    /// 球数夹在 6-24：环的周长约 6000 px，太少会漏缝（离屏量过：11 颗时环上第 10 百分位只有 37）。
+    /// </summary>
+    private static bool ParseAurora(List<string> args, EffectCommand command)
+    {
+        if (args.Count == 0) { command.Aurora = true; return true; }   // 只写段名也算要这一段（与 -border 的"否则默认开"同规矩）
+        int at = 0;
+        if (TrySwitch(args[at], out bool on)) { command.Aurora = on; at++; }
+        else command.Aurora = true;
+        if (at >= args.Count) return true;
+        if (at != args.Count - 1) return false;
+        if (!int.TryParse(args[at], NumberStyles.Integer, CultureInfo.InvariantCulture, out int count)) return false;
+        command.AuroraBlobs = Math.Clamp(count, 6, 24);
+        return true;
     }
 
     /// <summary>

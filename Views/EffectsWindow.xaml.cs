@@ -107,7 +107,8 @@ public sealed partial class EffectsWindow : Window
     private readonly record struct BannerSpec(
         string? Text, Brush Color, double Hold, double FadeIn, double FadeOut, int Blinks,
         bool BorderOn, double BorderWidth, double BorderFade, double BorderCycle, double FontSize,
-        bool Urgent, string Key, IconBackdropStyle? Backdrop, string? Glyph, string? IconPath)
+        bool Urgent, string Key, IconBackdropStyle? Backdrop, string? Glyph, string? IconPath,
+        bool Aurora, int AuroraCount)
     {
         /// <summary>这一行占屏多久：与 <see cref="EffectCommand.ScreenSeconds"/> 同一口径。</summary>
         public double ScreenSeconds => FadeIn + Hold + FadeOut;
@@ -205,6 +206,7 @@ public sealed partial class EffectsWindow : Window
                 Backdrop: null,
                 // 彩蛋自己会甩粒子（KeywordWatcher 直接调 Emit），这条路上不再来一颗
                 Glyph: null, IconPath: null,
+                Aurora: false, AuroraCount: AuroraField.DefaultBlobCount,
                 // 彩蛋按「这句词」成组：同一个词连敲是重新计时，不同词各开一叠，不互相叠成两行
                 Key: "keyword:" + text));
         });
@@ -243,7 +245,8 @@ public sealed partial class EffectsWindow : Window
                 // 立绘按来源查发布表：没有模块认领这个来源、又没写 -icon，就是 null = 这一层什么都不画
                 Backdrop: IconBackdrop.Resolve(command),
                 // 上屏同时甩一颗粒子：图是这台 IDE 的图标，角标是这条消息的类型（询问 ❓ / 完成 ✔ / 错误 ❌）
-                Glyph: Notice.GlyphOf(command), IconPath: IconBackdrop.BadgePathFor(command)));
+                Glyph: Notice.GlyphOf(command), IconPath: IconBackdrop.BadgePathFor(command),
+                Aurora: command.Aurora, AuroraCount: command.AuroraBlobs));
         });
     }
     
@@ -349,6 +352,86 @@ public sealed partial class EffectsWindow : Window
         return chip;
     }
 
+    // ===== 流光溢彩（-aurora on）：边缘一圈彩色球 + 中心淡出遮罩 =====
+
+    /// <summary>一颗流光球：几何定义 + 挂在画布上的图元 + 那份刻意不 Freeze 的画刷（每帧改色）。</summary>
+    private sealed class AuroraBall
+    {
+        public required AuroraBlob Blob { get; init; }
+        public required System.Windows.Shapes.Ellipse Body { get; init; }
+        public required RadialGradientBrush Brush { get; init; }
+        public required double Radius { get; init; }
+    }
+
+    /// <summary>
+    /// 按这一组重新铺一圈球（换组时才重建：球数与屏幕比例变了才需要重来）。
+    /// 画刷不能 Freeze —— 每帧要改色标颜色，冻住就写不进去。
+    /// </summary>
+    private void BuildAurora(BannerSpec spec)
+    {
+        AuroraBlobs.Children.Clear();
+        _aurora.Clear();
+        if (!spec.Aurora || Width <= 0 || Height <= 0) return;
+        double shortSide = Math.Min(Width, Height);
+        foreach (AuroraBlob blob in AuroraField.Blobs(spec.AuroraCount,
+                     AuroraField.DefaultBaseHue, AuroraField.DefaultSpanDegrees, Width / Height))
+        {
+            var brush = new RadialGradientBrush
+            {
+                GradientOrigin = new Point(0.5, 0.5),
+                Center = new Point(0.5, 0.5),
+                RadiusX = 0.5,
+                RadiusY = 0.5,
+            };
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(165, 255, 255, 255), 0));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(90, 255, 255, 255), 0.55));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 255, 255, 255), 1));
+            double side = blob.Radius * shortSide * 2;
+            var body = new System.Windows.Shapes.Ellipse { Width = side, Height = side, Fill = brush };
+            AuroraBlobs.Children.Add(body);
+            _aurora.Add(new AuroraBall { Blob = blob, Body = body, Brush = brush, Radius = blob.Radius * shortSide });
+        }
+        Aurora.OpacityMask = AuroraMask();
+    }
+
+    /// <summary>每帧推进：整圈色相慢慢转，球沿自己那根半径呼吸。位置走布局（Canvas.Left/Top）。</summary>
+    private void StepAurora(double seconds)
+    {
+        if (_aurora.Count == 0) return;
+        _auroraClock = seconds;
+        foreach (AuroraBall ball in _aurora)
+        {
+            var (r, g, b) = AuroraField.ToRgb(AuroraField.HueAt(ball.Blob, seconds), 0.85, 0.58);
+            byte R = (byte)Math.Round(r * 255), G = (byte)Math.Round(g * 255), B = (byte)Math.Round(b * 255);
+            ball.Brush.GradientStops[0].Color = Color.FromArgb(165, R, G, B);
+            ball.Brush.GradientStops[1].Color = Color.FromArgb(90, R, G, B);
+            ball.Brush.GradientStops[2].Color = Color.FromArgb(0, R, G, B);
+            var (cx, cy) = AuroraField.CenterAt(ball.Blob, seconds);
+            Canvas.SetLeft(ball.Body, cx * Width - ball.Radius);
+            Canvas.SetTop(ball.Body, cy * Height - ball.Radius);
+        }
+    }
+
+    /// <summary>
+    /// 中心淡出遮罩：径向按 <see cref="AuroraField.MaskStops"/> 从全透爬到全实。
+    /// 用 RelativeToBoundingBox（半径 0.5 = 各自半轴），于是椭圆天然按屏幕比例拉伸，
+    /// 换显示器、插副屏都不用重算 —— 绝对模式下那套圆心/半径得跟着 Width/Height 走，多一份出错的机会。
+    /// </summary>
+    private static Brush AuroraMask()
+    {
+        var brush = new RadialGradientBrush
+        {
+            MappingMode = BrushMappingMode.RelativeToBoundingBox,
+            Center = new Point(0.5, 0.5),
+            GradientOrigin = new Point(0.5, 0.5),
+            RadiusX = 0.5,
+            RadiusY = 0.5,
+        };
+        foreach ((double offset, double alpha) in AuroraField.MaskStops())
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)Math.Round(alpha * 255), 255, 255, 255), offset));
+        return brush;
+    }
+
     /// <summary>撒花用的主题色盘：取当前生效的几支画刷，所以换肤后撒出来的颜色也跟着变。</summary>
     private Brush[] ThemePalette()
         => new[] { "AccentBrush", "DangerBrush", "SuccessBrush", "LinkBrush", "HighlightNumber" }
@@ -372,6 +455,8 @@ public sealed partial class EffectsWindow : Window
         // 擦出**住在这一行的预算里**（Until 就是它彻底消失的时刻），所以调度器交出屏幕的这一刻
         // 正好是最后一条擦完的一刻——下一条不会把正在擦的上一行抹掉，边框也不会抢在正文走完前先收。
         foreach (var row in _rows.Where(item => !item.Exiting && clock >= ExitAt(item)).ToArray()) ExitRow(row);
+        // 流光自己也要在这一帧上走一步：它的时钟就是渲染时钟，不开第二个计时器（多一条计时器就多一条竞路线）
+        if (_aurora.Count > 0 && Aurora.Visibility == Visibility.Visible) StepAurora(clock.TotalSeconds);
         if (_borderOnly && _borderUntil <= clock)
         {
             _borderOnly = false;
@@ -432,6 +517,9 @@ public sealed partial class EffectsWindow : Window
     }
 
     private readonly List<BannerRow> _rows = new();
+    /// <summary>流光层的球：一份状态（球定义 + 图元 + 那份没冻住的画刷），每帧改色改位。</summary>
+    private readonly List<AuroraBall> _aurora = new();
+    private double _auroraClock;
     private string? _groupKey;
     private TimeSpan? _nextEntryAt;      // 下一行的入场起点：连击时按 0.5 s 一档往后排
     private bool _borderOnly;            // 只亮边框、不要正文（-lable off）
@@ -472,6 +560,7 @@ public sealed partial class EffectsWindow : Window
             _borderSpec = spec;
             _borderUntil = now + Span(spec);
             _bannerOn = true;
+            BuildAurora(spec);
             AttachLoop();
             RefreshBorder(now, fresh: true);
             return;
@@ -486,6 +575,7 @@ public sealed partial class EffectsWindow : Window
             _groupKey = spec.Key;
             _nextEntryAt = null;
             Rows.Opacity = 0;
+            BuildAurora(spec);      // 换组才重铺一圈球（球数或开关跟着这一组的第一条命令）
         }
         Rows.Visibility = Visibility.Visible;
 
@@ -554,6 +644,7 @@ public sealed partial class EffectsWindow : Window
             FadeOut(Edge, outSeconds);
             FadeOut(Corners, outSeconds);
             FadeOut(BackdropLayer, outSeconds);
+            FadeOut(Aurora, outSeconds);   // 流光跟边框同一时刻收：整屏的边缘色不能留在桌面上
             var breath = _breathStory;
             _breathStory = null;
             breath?.Stop();
@@ -588,6 +679,11 @@ public sealed partial class EffectsWindow : Window
         if (Edge.Visibility == Visibility.Visible) FadeIn(Edge, seconds);
         if (Corners.Visibility == Visibility.Visible) FadeIn(Corners, seconds);
         if (BackdropLayer.Visibility == Visibility.Visible) FadeIn(BackdropLayer, seconds);
+        if (_aurora.Count > 0)
+        {
+            Aurora.Visibility = Visibility.Visible;
+            FadeIn(Aurora, seconds);
+        }
     }
 
     /// <summary>
@@ -946,9 +1042,11 @@ public sealed partial class EffectsWindow : Window
         ClearRows();
         _groupKey = null;
         _nextEntryAt = null;
-        foreach (var layer in new FrameworkElement[] { Rows, RowsPulse, Edge, EdgePulse, Corners, BackdropLayer })
+        foreach (var layer in new FrameworkElement[] { Rows, RowsPulse, Edge, EdgePulse, Corners, BackdropLayer, Aurora })
             layer.BeginAnimation(OpacityProperty, null);
-        Rows.Opacity = Edge.Opacity = Corners.Opacity = BackdropLayer.Opacity = 0;
+        Rows.Opacity = Edge.Opacity = Corners.Opacity = BackdropLayer.Opacity = Aurora.Opacity = 0;
+        AuroraBlobs.Children.Clear();
+        _aurora.Clear();
         Backdrop.Child = null;
         RowsPulse.Opacity = EdgePulse.Opacity = 1;   // 内层回到全亮：闪到暗端时被收起，下一轮开头不带旧值
         Rows.Visibility = Visibility.Visible;

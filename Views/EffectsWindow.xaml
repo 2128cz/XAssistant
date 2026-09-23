@@ -34,6 +34,11 @@
     <Grid x:Name="BackdropLayer" Opacity="0" IsHitTestVisible="False">
       <Border x:Name="Backdrop" HorizontalAlignment="Left" VerticalAlignment="Top"/>
     </Grid>
+    <!--  流光溢彩（-aurora on）：彩色渐变球沿屏幕边缘排一整圈，中间靠一层径向遮罩保持全透，
+          所以只有屏幕边缘变成彩色、正文那一片是干净的。球的位置与色相每帧按 AuroraField 算。  -->
+    <Grid x:Name="Aurora" Opacity="0" IsHitTestVisible="False">
+      <Canvas x:Name="AuroraBlobs" ClipToBounds="True"/>
+    </Grid>
     <!--  警告语：同组的多条竖着排成一叠，整叠在屏幕中间。分三层是为了三条动画不抢同一个属性：
           外层 Rows 走整组的淡入淡出，内层 RowsPulse 走持续段里的闪烁，StackPanel 只管排版。
           每一行自己再套一层：内容层挂揭示用的 Clip（扫到哪亮到哪），扫描头是不被裁的兄弟节点。
