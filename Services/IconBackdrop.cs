@@ -99,12 +99,39 @@ public static class IconBackdrop
         if (raw.Length > 0)
         {
             // 只写了个名字（不带目录）就当 IdeIcons 里的图名看；写了路径就照路径读
-            var first = raw.Contains('/') || raw.Contains('\\') ? raw : InIconDir(raw);
-            var found = Load(first);
+            var first = Pathed(raw) ? raw : InIconDir(raw);
+            var found = Load(first, silhouette: true);
             if (found is not null) return found;
         }
-        return source.Length > 0 ? Load(InIconDir(source)) : null;
+        return source.Length > 0 ? Load(InIconDir(source), silhouette: true) : null;
     }
+
+    /// <summary>
+    /// 粒子那枚「来料标签」用的小图路径：<b>不做立绘那套形状筛选</b>（小图上实心方块照样是张好图），
+    /// 只要求里头真有可见像素——本机 <c>dsh.png</c> 全透明，摆一颗看不见的粒子等于没摆。
+    /// 也<b>不看立绘开关</b>：这颗粒子是消息自己的一部分（「谁在说话」），跟全屏立绘开不开没关系。
+    /// </summary>
+    public static string? BadgePathFor(EffectCommand command)
+    {
+        string named = command.Icon?.Trim() ?? "";
+        if (named.Length > 0)
+        {
+            string direct = Pathed(named) ? named : InIconDir(named);
+            if (Load(direct, silhouette: false) is not null) return Full(direct);
+        }
+        string source = command.Source?.Trim() ?? "";
+        if (source.Length > 0)
+        {
+            string bySource = InIconDir(source);
+            if (Load(bySource, silhouette: false) is not null) return Full(bySource);
+        }
+        return null;
+    }
+
+    private static bool Pathed(string name) => name.Contains('/') || name.Contains('\\');
+
+    private static string Full(string pathOrName) =>
+        Path.IsPathRooted(pathOrName) ? pathOrName : Path.Combine(AppContext.BaseDirectory, pathOrName);
 
     private static string InIconDir(string name) =>
         Path.Combine(IconDir, (Path.HasExtension(name) ? name : name + ".png").ToLowerInvariant());
@@ -122,6 +149,10 @@ public static class IconBackdrop
     public static bool Usable(ImageSource? image) =>
         image is BitmapSource source && OpaqueRatio(source) is { } ratio
         && ratio >= MinOpaqueRatio && ratio <= MaxOpaqueRatio;
+
+    /// <summary>这张图看不看得见（小图标用：实心方块也算好图，只有全透明/取不到才算没有）。</summary>
+    public static bool Visible(ImageSource? image) =>
+        image is BitmapSource source && OpaqueRatio(source) is { } ratio && ratio >= MinOpaqueRatio;
 
     /// <summary>不透明像素占比：按 alpha 通道抽样，每四个像素取一个（512² 也就 6.5 万次比较）。</summary>
     private static double? OpaqueRatio(BitmapSource image)
@@ -151,15 +182,18 @@ public static class IconBackdrop
         }
     }
 
-    /// <summary>读图。OnLoad 是为了不把文件锁住——用户随时可以换掉那张图。</summary>
-    private static ImageSource? Load(string pathOrName)
+    /// <summary>
+    /// 读图。OnLoad 是为了不把文件锁住——用户随时可以换掉那张图。
+    /// 两条口径分开缓存：当全屏剪影要过形状筛（<see cref="Usable"/>），当小图标只要求看得见
+    /// （<see cref="Visible"/>）——实心方块当立绘是块方砖，当粒子标签却是一张好图。
+    /// </summary>
+    private static ImageSource? Load(string pathOrName, bool silhouette)
     {
         try
         {
-            string full = Path.IsPathRooted(pathOrName)
-                ? pathOrName
-                : Path.Combine(AppContext.BaseDirectory, pathOrName);
-            if (Cache.TryGetValue(full, out ImageSource? known)) return known;
+            string full = Full(pathOrName);
+            string key = silhouette ? full : full + "|badge";
+            if (Cache.TryGetValue(key, out ImageSource? known)) return known;
             ImageSource? loaded = null;
             if (File.Exists(full))
             {
@@ -169,9 +203,9 @@ public static class IconBackdrop
                 bmp.UriSource = new Uri(full, UriKind.Absolute);
                 bmp.EndInit();
                 bmp.Freeze();
-                if (Usable(bmp)) loaded = bmp;
+                if (silhouette ? Usable(bmp) : Visible(bmp)) loaded = bmp;
             }
-            Cache[full] = loaded;
+            Cache[key] = loaded;
             return loaded;
         }
         catch (Exception error) when (error is IOException or UriFormatException or InvalidOperationException)

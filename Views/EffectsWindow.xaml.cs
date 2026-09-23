@@ -107,7 +107,7 @@ public sealed partial class EffectsWindow : Window
     private readonly record struct BannerSpec(
         string? Text, Brush Color, double Hold, double FadeIn, double FadeOut, int Blinks,
         bool BorderOn, double BorderWidth, double BorderFade, double BorderCycle, double FontSize,
-        bool Urgent, string Key, IconBackdropStyle? Backdrop)
+        bool Urgent, string Key, IconBackdropStyle? Backdrop, string? Glyph, string? IconPath)
     {
         /// <summary>这一行占屏多久：与 <see cref="EffectCommand.ScreenSeconds"/> 同一口径。</summary>
         public double ScreenSeconds => FadeIn + Hold + FadeOut;
@@ -203,6 +203,8 @@ public sealed partial class EffectsWindow : Window
                 FontSize: EffectCommand.DefaultFontSize,
                 Urgent: false,
                 Backdrop: null,
+                // 彩蛋自己会甩粒子（KeywordWatcher 直接调 Emit），这条路上不再来一颗
+                Glyph: null, IconPath: null,
                 // 彩蛋按「这句词」成组：同一个词连敲是重新计时，不同词各开一叠，不互相叠成两行
                 Key: "keyword:" + text));
         });
@@ -239,7 +241,9 @@ public sealed partial class EffectsWindow : Window
                 // 同一句裸话重发仍然并到同一行，不会在屏上叠出两行一模一样的
                 Key: command.GroupKey ?? "solo:" + command.Text,
                 // 立绘按来源查发布表：没有模块认领这个来源、又没写 -icon，就是 null = 这一层什么都不画
-                Backdrop: IconBackdrop.Resolve(command)));
+                Backdrop: IconBackdrop.Resolve(command),
+                // 上屏同时甩一颗粒子：图是这台 IDE 的图标，角标是这条消息的类型（询问 ❓ / 完成 ✔ / 错误 ❌）
+                Glyph: Notice.GlyphOf(command), IconPath: IconBackdrop.BadgePathFor(command)));
         });
     }
     
@@ -291,7 +295,7 @@ public sealed partial class EffectsWindow : Window
                 FontSize = size,
                 Foreground = tint ?? TryFindResource("AccentBrush") as Brush ?? Brushes.Gainsboro,
             }
-            : new Image { Source = source, Width = size };
+            : BadgeChip(glyph, source, size, tint);
 
         // 固定尺寸的盒子：缩放只作用在盒子上，盒子本身的位置由布局钉住，缩到 0 也还在原地
         double box = size * BoxRatio;
@@ -322,6 +326,27 @@ public sealed partial class EffectsWindow : Window
                 Life: 3.0 + Random.Shared.NextDouble() * 0.8),
         });
         AttachLoop();
+    }
+
+    /// <summary>
+    /// 一颗粒子的一枚「来料标签」：正脸是发消息那台 IDE 的图标，右下角贴这条消息的类型角标。
+    /// 角标用这条消息自己的颜色染（红档❌、黄档❓、完成✔），所以一眼看得懂又不用另配色板。
+    /// </summary>
+    private FrameworkElement BadgeChip(string glyph, ImageSource source, double size, Brush? tint)
+    {
+        var chip = new Grid();
+        chip.Children.Add(new Image { Source = source, Width = size, Height = size });
+        if (glyph.Length > 0)
+            chip.Children.Add(new TextBlock
+            {
+                Text = glyph,
+                FontFamily = new FontFamily("Segoe UI Emoji, Segoe UI Symbol"),
+                FontSize = size * 0.55,
+                Foreground = tint ?? TryFindResource("AccentBrush") as Brush ?? Brushes.Gainsboro,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+                VerticalAlignment = System.Windows.VerticalAlignment.Bottom,
+            });
+        return chip;
     }
 
     /// <summary>撒花用的主题色盘：取当前生效的几支画刷，所以换肤后撒出来的颜色也跟着变。</summary>
@@ -486,6 +511,9 @@ public sealed partial class EffectsWindow : Window
 
         if (Rows.Opacity < 0.99) FadeIn(Rows, GroupOnSeconds);
         if (fresh) AddBlink(spec);
+        // 每条消息上屏甩一颗粒子：正脸是这台 IDE 的图标，右下角贴这条消息的类型角标（❓/✔/❌）。
+        // 取不到图标就只剩角标——不摆空盒子，也不摆一颗看不见的粒子（全透明那种图直接判没有）。
+        if (spec.Glyph is { Length: > 0 } mark) Spawn(ToastWindow.Anchor, mark, LoadImage(spec.IconPath), spec.Color);
         _bannerOn = true;
         RefreshBorder(now, fresh);
         AttachLoop();
