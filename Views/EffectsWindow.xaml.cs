@@ -107,7 +107,7 @@ public sealed partial class EffectsWindow : Window
     private readonly record struct BannerSpec(
         string? Text, Brush Color, double Hold, double FadeIn, double FadeOut, int Blinks,
         bool BorderOn, double BorderWidth, double BorderFade, double BorderCycle, double FontSize,
-        bool Urgent, string Key, ImageSource? Icon)
+        bool Urgent, string Key, IconBackdropStyle? Backdrop)
     {
         /// <summary>这一行占屏多久：与 <see cref="EffectCommand.ScreenSeconds"/> 同一口径。</summary>
         public double ScreenSeconds => FadeIn + Hold + FadeOut;
@@ -202,7 +202,7 @@ public sealed partial class EffectsWindow : Window
                 BorderCycle: 0,
                 FontSize: EffectCommand.DefaultFontSize,
                 Urgent: false,
-                Icon: null,
+                Backdrop: null,
                 // 彩蛋按「这句词」成组：同一个词连敲是重新计时，不同词各开一叠，不互相叠成两行
                 Key: "keyword:" + text));
         });
@@ -238,8 +238,8 @@ public sealed partial class EffectsWindow : Window
                 // 没有归组键的裸消息各成一组（= 后来的把前一叠换掉），与调度器「不成组就排队」同一口径；
                 // 同一句裸话重发仍然并到同一行，不会在屏上叠出两行一模一样的
                 Key: command.GroupKey ?? "solo:" + command.Text,
-                // 立绘只在开关打开时取图：关掉就别留一张剪影在屏上
-                Icon: IconBackdrop.Current.On ? IconBackdrop.ImageFor(command) : null));
+                // 立绘按来源查发布表：没有模块认领这个来源、又没写 -icon，就是 null = 这一层什么都不画
+                Backdrop: IconBackdrop.Resolve(command)));
         });
     }
     
@@ -955,26 +955,26 @@ public sealed partial class EffectsWindow : Window
 
     /// <summary>
     /// 立绘铺一次：边长按屏高百分比算，中心对到 (x%, y%)，颜色用这一组的档位色、形状用图标自己的
-    /// alpha。返回 false = 这一组不该有立绘（开关关了、或那张图取不到），调用方就别点亮这一层。
+    /// alpha。返回 false = 这一条没有立绘（没人认领这个来源、或那张图取不到），这一层就整个空着——
+    /// 这里不留任何默认形状，画不出来就是什么都不画。
     /// </summary>
     private bool LayOutBackdrop(BannerSpec spec)
     {
-        var settings = IconBackdrop.Current;
-        if (!settings.On || spec.Icon is null)
+        if (spec.Backdrop is not { } style)
         {
             Backdrop.OpacityMask = null;
             Backdrop.Background = null;
             return false;
         }
-        double side = Math.Clamp(Height * settings.SizePercent / 100, 40, Math.Max(40, Height));
+        double side = Math.Clamp(Height * style.SizePercent / 100, 40, Math.Max(40, Height));
         Backdrop.Width = side;
         Backdrop.Height = side;
         Backdrop.Margin = new Thickness(
-            Math.Clamp(Width * settings.XPercent / 100 - side / 2, -side, Width),
-            Math.Clamp(Height * settings.YPercent / 100 - side / 2, -side, Height), 0, 0);
+            Math.Clamp(Width * style.XPercent / 100 - side / 2, -side, Width),
+            Math.Clamp(Height * style.YPercent / 100 - side / 2, -side, Height), 0, 0);
         Backdrop.Background = spec.Color;
-        Backdrop.OpacityMask = new ImageBrush(spec.Icon) { Stretch = Stretch.Uniform };
-        Backdrop.Opacity = Math.Clamp(settings.OpacityPercent / 100, 0.02, 1);
+        Backdrop.OpacityMask = new ImageBrush(style.Image) { Stretch = Stretch.Uniform };
+        Backdrop.Opacity = Math.Clamp(style.OpacityPercent / 100, 0.02, 1);
         return true;
     }
 

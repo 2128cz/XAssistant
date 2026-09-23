@@ -5,7 +5,12 @@ description: 为 XAssistant 编写监视模块（IWatchModule）——UPS 式外
 
 # XAssistant 监视模块写法
 
-工作台「PART 4 / MODULES」的卡片由 `Services/Modules/` 的协议驱动：**实现 `IWatchModule` 即完成注册**——宿主反射扫描本程序集（`WatchModuleRegistry.Start`），要求**无参构造函数**。参考实现：`Services/Modules/UpsModule.cs`。
+工作台「PART 4 / MODULES」的卡片由 `Services/Modules/` 的协议驱动：**实现 `IWatchModule` 即完成注册**——宿主反射扫描本程序集（`WatchModuleRegistry.Start`），要求**无参构造函数**（`abstract` 基类与没有公共无参构造的类型都被跳过，所以基类不会被当成一张建不出实例的卡列进面板）。参考实现：`Services/Modules/UpsModule.cs`。
+
+## 先选基类
+
+- **纯外部状态监视**（设备、接口、串口，像 UPS）：`sealed class FooModule : IWatchModule`。
+- **会替某个 IDE 发消息**（hook 提醒、日志尾随告警，命令行带 `-from <平台>`）：`sealed class FooModule : IconBackdropModule`——多出一段背景立绘参数（`bd-on`/`bd-icon`/`bd-size`/`bd-x`/`bd-y`/`bd-opacity` + `bd-preview`），子类只要再给一个 `IdeSource`（这张卡认领哪个来源）。这时生命周期实现的是 `OnIdeActivate/OnIdeUpdate/OnIdeDeactivate/OnIdeValuesPushed` 四个钩子，参数行给 `OwnFields()`/`OwnMetas()`——`Fields()`、`Metas()` 与四个生命周期入口由基类占住，别去覆盖。默认不画任何东西：卡没激活或没勾「启用」就不发布，关掉立刻撤回。
 
 ## 三条协议约定（先记住这三条）
 
@@ -86,6 +91,7 @@ _sink.Clear(AlertTag);
 ## 落地检查单
 
 - [ ] `Services/Modules/XxxModule.cs`：实现 `IWatchModule`，public 无参构造（真依赖）+ internal 构造（注假，供测试）
+- [ ] 替某个 IDE 发消息的卡：继承 `IconBackdropModule`（别再造一张通用设置卡），给 `IdeSource`＝hook 传的 `-Platform` 词，真告警命令行带 `-from <那个词>`；不引入全局开关、不留默认形状
 - [ ] 外部 IO 抽接口（`IXxxApi`/`IXxxTransport`），异步自己 catch，绝不让异常逃出回调
 - [ ] `OnActivate` 做启动检查；`OnDeactivate` 按自己的 tag `Clear`
 - [ ] 告警命令：真实告警带 `-tag`（+ 紧急档 `-replay`）；演练独立 tag 不带 `-replay`

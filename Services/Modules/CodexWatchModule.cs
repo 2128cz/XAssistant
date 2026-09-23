@@ -24,6 +24,9 @@ public sealed class CodexWatchModule : IdeStatusModule
     public override string Id => "codex-watch";
     public override string Title => "Codex 接入状态（占位）";
 
+    /// <summary>这张卡认领的来源词（hook 的 <c>-from codex</c>）：真实事件过滤与背景立绘共用它。</summary>
+    protected override string IdeSource => "codex";
+
     protected override string Note =>
         "CLI 形态：社区 hooks（~/.codex/hooks）可接入，本机未检测到安装——装好后照 skill 落地";
 
@@ -31,5 +34,5 @@ public sealed class CodexWatchModule : IdeStatusModule
         IdeProbe.Program("codex", Path.Combine(_userProfile, ".codex")),
         IdeProbe.Data(Path.Combine(_userProfile, ".codex"), Path.Combine(_userProfile, ".codex", "sessions")),
         IdeProbe.Hooks(Path.Combine(_userProfile, ".codex", "hooks.json")),
-        IdeProbe.LastRealEvent(Path.Combine(_localAppData, "XAssistant", "agent-hooks", "agent-status.log"), "codex"));
+        IdeProbe.LastRealEvent(Path.Combine(_localAppData, "XAssistant", "agent-hooks", "agent-status.log"), IdeSource));
 }

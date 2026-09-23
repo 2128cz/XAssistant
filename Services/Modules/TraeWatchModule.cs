@@ -26,6 +26,9 @@ public sealed class TraeWatchModule : IdeStatusModule
     public override string Id => "trae-watch";
     public override string Title => "Trae 接入状态";
 
+    /// <summary>这张卡认领的来源词（hook 的 <c>-from trae</c>）：真实事件过滤与背景立绘共用它。</summary>
+    protected override string IdeSource => "trae";
+
     protected override string Note =>
         "hooks 已部署（官方 schema：version:1 + Notification/PostToolUse/Stop）——重启 Trae 后验证首触发；" +
         "对话报错的日志形态未校准，拿到真实样本后照 QoderWatchModule 补尾随告警";
@@ -37,5 +40,5 @@ public sealed class TraeWatchModule : IdeStatusModule
             Path.Combine(_appData, "Trae CN", "logs"),
             Path.Combine(_userProfile, ".trae-cn")),
         IdeProbe.Hooks(Path.Combine(_userProfile, ".trae-cn", "hooks.json")),
-        IdeProbe.LastRealEvent(Path.Combine(_localAppData, "XAssistant", "agent-hooks", "agent-status.log"), "trae"));
+        IdeProbe.LastRealEvent(Path.Combine(_localAppData, "XAssistant", "agent-hooks", "agent-status.log"), IdeSource));
 }

@@ -25,6 +25,9 @@ public sealed class VsCodeWatchModule : IdeStatusModule
     public override string Id => "vscode-watch";
     public override string Title => "VS Code 接入状态（占位）";
 
+    /// <summary>这张卡认领的来源词（<c>-from vscode</c>）：真实事件过滤与背景立绘共用它。</summary>
+    protected override string IdeSource => "vscode";
+
     protected override string Note =>
         "占位：官方无 hooks 协议——可行路径是自写扩展或 UI Automation 观察，目前未实现；" +
         "想接入时先定「观察点」（扩展事件 / 状态栏文本），再照 skill 写模块";
@@ -37,5 +40,5 @@ public sealed class VsCodeWatchModule : IdeStatusModule
             Path.Combine(_appData, "Code", "User", "globalStorage", "state.vscdb"),
             Path.Combine(_appData, "Code", "logs")),
         "未提供（官方无 hooks 协议）",
-        IdeProbe.LastRealEvent(Path.Combine(_localAppData, "XAssistant", "agent-hooks", "agent-status.log"), "vscode"));
+        IdeProbe.LastRealEvent(Path.Combine(_localAppData, "XAssistant", "agent-hooks", "agent-status.log"), IdeSource));
 }

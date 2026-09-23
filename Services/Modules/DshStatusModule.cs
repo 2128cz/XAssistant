@@ -32,6 +32,9 @@ public sealed class DshStatusModule : IdeStatusModule
     public override string Id => "dsh-watch";
     public override string Title => "DSH 接入状态";
 
+    /// <summary>这张卡认领的来源词（插件 spawn 的是 <c>-Platform dsh</c> → <c>-from dsh</c>）。</summary>
+    protected override string IdeSource => "dsh";
+
     protected override string Note =>
         "原生 Cordis 插件单向推事件，XAssistant 侧无需监听或轮询：装好 profile 里的插件与状态脚本、" +
         "cordis.patch.yml 有标记块即可。DSH 的用户 patch 支持热重载（不像 Qoder / Claude 必须重启 IDE），" +
@@ -61,7 +64,7 @@ public sealed class DshStatusModule : IdeStatusModule
                 + $"（profile {profiles.Count} 个）",
             DescribeProfiles(profiles),
             IdeProbe.LastRealEvent(
-                Path.Combine(_localAppData, "XAssistant", "agent-hooks", "agent-status.log"), "dsh"));
+                Path.Combine(_localAppData, "XAssistant", "agent-hooks", "agent-status.log"), IdeSource));
     }
 
     /// <summary>逐 profile 如实报：patch 里有没有我们的标记块、插件文件在不在位。</summary>
