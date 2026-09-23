@@ -107,7 +107,8 @@ public sealed class QoderWatchModule : IconBackdropModule
         // 「试弹」按钮：bool 行按下去就是 true，弹一条演练红档再复位
         if (Flag("testAlert"))
         {
-            _sink.Raise($"-s error 5 1 1 -border on 60 30 1 -lable on 26 中断 · 请求人类介入：演练 · Qoder 报错监视 -tag {DrillTag} -from {IdeSource}");
+            // 文案与 hook 共用同一套四段机械格式：机械回复 · 现况 ·（来源缺）· 信息
+            _sink.Raise($"-s error 5 1 1 -border on 60 30 1 -lable on 26 故障 · 意外中断对话 · 演练 / Qoder 报错监视 -tag {DrillTag} -from {IdeSource}");
             Context?.Submit("testAlert", false);
         }
     }
@@ -135,7 +136,8 @@ public sealed class QoderWatchModule : IconBackdropModule
         string key = platform + "/" + code;
         if (_lastAlert.TryGetValue(key, out DateTime last) && ctx.Now - last < TimeSpan.FromMinutes(Number("cooldownMinutes", 2))) return;
         _lastAlert[key] = ctx.Now;
-        // 与 hook 提醒同一链路：红档全屏带 + 顶部消息卡 + 平台徽章
-        _sink.Raise($"-s error 8 1 1 -border on 60 30 1 -lable on 26 中断 · 请求人类介入：对话被 API 错误打断 · code {code} -from {IdeSource}");
+        // 与 hook 提醒同一链路（四段机械文案 + 红档）与同一条上屏通道；来源段没有会话标题可报就省，
+        // 平台名（CN / 国际版）留在信息段——它才是该去看哪一个 IDE 的线索
+        _sink.Raise($"-s error 8 1 1 -border on 60 30 1 -lable on 26 故障 · 意外中断对话 · code {code} / {platform} -from {IdeSource}");
     }
 }

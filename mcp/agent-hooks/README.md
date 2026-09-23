@@ -16,13 +16,41 @@ mcp/agent-hooks/
 Claude Code 定下的 hooks 协议已被各家照抄成事实标准——**同一套 PascalCase 事件名 + stdin 收 JSON +
 exit code 表达决定**，所以分诊逻辑没有平台分支，平台差异只剩「配置写在哪个文件」：
 
-| 事件 | 分档 | 提醒文案 |
+| 事件 | 分档 | 四段文案：机械回复 · 现况 · 来源 · 信息 |
 |---|---|---|
-| `PostToolUseFailure` | 红 | `故障/中断 · 请求人类介入：项目 · “对话标题” · 错误摘要` |
-| `PermissionRequest` | 黄 | `授权(工具名) · 请求人类介入：…` |
-| `Notification`（确认 / 提问） | 黄 | `接管 · …` / `提问 · …` |
-| `Warning`（DSH token 上限 / 策略阻断） | 黄 | `警告 · 请求人类介入：…` |
-| `Stop` | 普通 | `回复 · 已完成：…`（`stop_hook_active` 时静默，防 Stop→xa→Stop 死循环） |
+| `PostToolUseFailure` / `PostToolUse` 结果异常 | 黄（工具挂了但对话还在跑，不必按红色惊动）；`is_interrupt` 升红 | `警告 · 工具调用失败 · “对话标题” · code 1`；被人为打断写成 `故障 · 意外中断对话 · …` |
+| `StopFailure`（限流 / 配额 / API 错误打断整轮） | 红 | `故障 · 意外中断对话 · “对话标题” · ratelimit` |
+| `PermissionRequest` | 黄 | `询问 · 等待授权 · “对话标题” · Bash` |
+| `Notification`（确认 / 提问） | 黄 | `询问 · 请求人类介入 · “对话标题” · 要人回的那句话` |
+| `Warning`（DSH token 上限 / 策略阻断） | 黄 | `警告 · 运行告警 · “对话标题” · 输出达到 token 上限` |
+| `Stop` | 普通 | `回复 · 对话回合结束 · “对话标题”`（`stop_hook_active` 时静默，防 Stop→xa→Stop 死循环） |
+
+四段的规矩（`selftest.ps1` 是按段拆开来断言的，不是匹配关键字）：
+
+- **机械回复**是固定领词 `提醒 / 警告 / 故障 / 询问 / 回复`——颜色与分流按它走，别的系统也在认它，不许现场造词
+  （旧写法把工具名塞进领词变成「授权(Bash)」，现在工具名归到信息段）。
+- **现况**说清是哪一环：主对话用 `工具调用失败 / 意外中断对话 / 对话回合结束 / 等待授权 / 请求人类介入 / 运行告警 / 事件数据不完整`；
+  事件带 `agent_id`/`agent_type` 的就是子实例，换成 `子代理失败 / 子代理成功`——两类消息一眼分得清该回哪一路。
+- **来源**只有这场对话的名字（事件自带 `session_title` → IDE 的 vscdb 任务名 → 退回项目目录名，都没有就省这一段）。
+  **对话内容一律不上屏**：`last_assistant_message` 那种原文既读不到重点又泄上下文。
+- **信息**是定位用的额外内容（错误码 / 工具名 / 退出码 / 子代理在干什么 / 要人回的那个问题），段内部用 ` / ` 分隔，
+  ` · ` 只留给四段之间，正文按它才拆得出恰好四段。缺哪段省哪段。
+
+真机事件喂进脚本后跑出来的样子：
+
+```
+警告 · 工具调用失败 · “修复构建脚本的编码问题” · code 1
+故障 · 意外中断对话 · “修复构建脚本的编码问题” · ratelimit
+询问 · 等待授权 · “修复构建脚本的编码问题” · Bash
+询问 · 请求人类介入 · “修复构建脚本的编码问题” · 这个问题我们需要怎么做——先合 dev 还是先出补丁？
+回复 · 对话回合结束 · “修复构建脚本的编码问题”
+回复 · 子代理成功 · XericCICD · 子代理 Explore
+警告 · 子代理失败 · XericCICD · 子代理 Explore / boom
+警告 · 工具调用失败 · XericCICD · 退出码 2
+```
+
+最后四条分别说明：完成卡不带回复原文；子实例换成 `子代理成功 / 子代理失败`，名字与「派下去干什么」进信息段；
+拿不到会话标题时来源退回项目目录名（`XericCICD`）。
 
 ## 平台对照
 
@@ -92,15 +120,15 @@ Qoder 的事件里带 `agent_id` + `agent_type` 的就是**子代理**，主对�
 布局注意：`<会话>.jsonl` 与同名**目录**平级，档案在目录里的 `subagents/` 下，所以脚本按
 `dirname(transcript)/basename(去扩展)/subagents/` 找，再退回 `dirname/subagents/`（兼容 transcript 指到会话目录本身）。
 
-文案因此多一段来源，效果是「项目 · “任务名” · 来源 · 细节」：
+子实例的名字与「派下去干什么」进**信息段**（不占来源段，来源仍是那场对话的标题），效果是：
 
 ```
-故障 · 请求人类介入：AI · 子代理 general-purpose：Probe NAS-adjacent hosts · Exit code 1 Traceback…
-回复 · 已完成：HotRollingDigitalTwin · “1. 现在后端dev” · 主对话
+警告 · 子代理失败 · AI · 子代理 general-purpose：Probe NAS-adjacent hosts / Exit code 1
+回复 · 子代理成功 · HotRollingDigitalTwin · 子代理 Explore：盘点前端数据需求
 ```
 
 `color` 只有内置类型带（本机 59 份档案里 16 份有，全是 `Explore`；`general-purpose` 一律没有），
-所以**没拿它参与配色**——屏幕颜色由档位表达（红=要人看、黄=等人回、info=完成）。
+所以**没拿它参与配色**——屏幕颜色由档位表达（红=对话断了要人回来、黄=要你回一句或先看一眼、info=这一轮完了）。
 项目级的小图标 / 颜色本机拿不到：global state 里 `"color":"…"` 零命中，`questWorkspaceHistory` 只有
 `uri/label/normalizedPath/lastOpenedAt/workspaceKind`，8 个 `workspaceStorage` 也没有——真在项目上打了标记后
 再扫一次才能定位。
@@ -122,7 +150,7 @@ $fake = "$env:TEMP\fake-xa.cmd"
 $env:XASSISTANT_XA = $fake
 '{"hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"D:\\repo"}' |
   powershell -NoProfile -File .\agent-status.ps1 -Platform trae
-Get-Content "$env:TEMP\fake-xa.log"     # 应看到 -s warn 8 1 1 -border on 60 30 1 -lable on 26 "授权(Bash) · 请求人类介入：repo"
+Get-Content "$env:TEMP\fake-xa.log"     # 应看到 -s warn 8 1 1 -border on 60 30 1 -lable on 26 "询问 · 等待授权 · repo · Bash"
 ```
 
 ## 自测

@@ -66,10 +66,16 @@ public sealed class FooModule : IWatchModule
 
 ```csharp
 // 紧急档：无限重播直到恢复（-replay 间隔 [次数]，不写次数=无限；宿主不在时会被记成「被挤掉」）
-_sink.Raise($"-s emergency 9 1 1 -border on 60 30 1 -lable on 30 故障 · 请求人类介入：{细节} -tag {AlertTag} -replay 20");
+_sink.Raise($"-s emergency 9 1 1 -border on 60 30 1 -lable on 30 故障 · {现况} · {细节} -tag {AlertTag} -replay 20");
 // 恢复/关闭：按 tag 精确收掉，不误杀别的紧急档
 _sink.Clear(AlertTag);
 ```
+
+**IDE 消息模块这一族（`agent-status.ps1` 与 `QoderWatchModule` 那类）正文统一四段**：机械回复 · 现况 · 来源 · 信息，
+缺哪段省哪段；` · ` 只作段间分隔，信息段内部用 ` / `（按 ` · ` 拆才恰好四段，两边自测都是拆段逐段断言的）。
+**机械回复只能用固定领词**（`提醒 / 警告 / 故障 / 询问 / 回复`）：颜色与分流按它走，别的系统也在认它，别把参数现场拼进领词
+（「授权(Bash)」那种就不是领词了——工具名归信息段）。**来源**只放这场对话的名字（标题 → 项目目录名），对话内容一律不上屏。
+设备类告警（UPS 的「紧急 · 供电中断 …」）保持自己已有的文案，别顺手改它——它的分档词与节奏是另一套口径。
 
 语法段速查（解析在 `Services/EffectCommand.cs`）：`-s <色|emergency/urgent> 持续 淡入 淡出`、`-border on 渐宽 延伸 呼吸周期`、`-lable on 字号 文本`、`-from <平台>`（消息卡徽章）、`-tag <名>`、`-replay <秒> [次]`、`-k [-tag X | -any 子串]`（杀除，不给条件=全停）。
 

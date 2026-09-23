@@ -160,86 +160,159 @@ function Fire([string]$json, [int]$expect = 1, [string]$plat = 'trae') {
     return $code
 }
 
+# ---- 四段机械文案的结构性判据：机械回复 · 现况 · 来源 · 信息 -------------------------------
+# 只匹配关键字在是假门：正文里出现「故障」两个字不代表领词就是它。这里直接按 ' · ' 拆段，
+# 逐段问「第 N 段是不是它」，并钉住领词只能来自固定词表（别的系统按领词分流，现场造词就断了）。
+$Leads = '提醒', '警告', '故障', '询问', '回复'
+$States = '工具调用失败', '意外中断对话', '对话回合结束', '请求人类介入', '等待授权',
+         '子代理失败', '子代理成功', '事件数据不完整', '运行告警'
+
+function BodyText([string]$line) {
+    $m = [regex]::Match($line, '-lable on \d+ "([^"]*)"')
+    return $m.Groups[1].Value
+}
+function BodyParts([string]$line) { @((BodyText $line) -split ' · ') }
+
+# 断言第 i 段（从 0 数）正好等于给定值；缺段/错段都把整行吐出来好定位
+function CheckPart([string]$label, [string]$line, [int]$at, [string]$want) {
+    $parts = BodyParts $line
+    $got = if ($at -lt $parts.Count) { $parts[$at] } else { '<缺段>' }
+    Check ("$label 第 $($at + 1) 段＝$want") ($got -eq $want) "实得「$got」  整行：$line"
+}
+function CheckShape([string]$label, [string]$line, [string]$lead, [string]$state, [int]$count) {
+    $parts = BodyParts $line
+    Check ("$label 四段结构齐（实得 $($parts.Count) 段）") ($parts.Count -eq $count) "整行：$line"
+    Check ("$label 领词在固定词表里") ($Leads -contains $parts[0]) "实得「$($parts[0])」  整行：$line"
+    Check ("$label 现况在固定词表里") ($States -contains $parts[1]) "实得「$($parts[1])」  整行：$line"
+    CheckPart $label $line 0 $lead
+    CheckPart $label $line 1 $state
+}
+
 Check 'PermissionRequest 正常退出' ((Fire '{"hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"D:\\repo"}') -eq 0)
 $e = LastEffect
-Check 'PermissionRequest → 黄档 + 授权(工具) + 项目名' (($e -match '-s warn') -and ($e -match '授权\(Bash\)') -and ($e -match 'repo')) $e
+# 四段：领词固定是「询问」，工具名不再挤进领词（旧写法「授权(Bash)」），来源段这里退回项目目录名
+CheckShape 'PermissionRequest' $e '询问' '等待授权' 4
+CheckPart 'PermissionRequest' $e 2 'repo'
+CheckPart 'PermissionRequest' $e 3 'Bash'
+Check 'PermissionRequest → 黄档' ($e -match '-s warn') $e
 Check '命令行带 -from 来源标记（消息栈徽章靠它）' ($e -match '-from trae') $e
 
 Fire '{"hook_event_name":"Warning","warning_type":"token-limit","message":"输出达到 token 上限","cwd":"D:\\repo","session_title":"检查 DSH 通知"}' 1 'dsh' | Out-Null
 $e = LastEffect
-Check 'DSH Warning → 黄档 + 警告 + 会话标题' (($e -match '-s warn') -and ($e -match '警告') -and ($e -match '检查 DSH 通知')) $e
+CheckShape 'DSH Warning' $e '警告' '运行告警' 4
+CheckPart 'DSH Warning 来源段用会话标题而不是项目名' $e 2 '“检查 DSH 通知”'
+CheckPart 'DSH Warning' $e 3 '输出达到 token 上限'
+Check 'DSH Warning → 黄档' ($e -match '-s warn') $e
 Check 'DSH 命令带 -from dsh（图标徽章）' ($e -match '-from dsh') $e
 
 Fire '{"hook_event_name":"StopFailure","error_type":"ratelimit","cwd":"D:\\repo"}' | Out-Null
-Check 'StopFailure（限流/配额打断）→ 红档 + 中断 + 错误型' (((LastEffect) -match '-s error') -and ((LastEffect) -match '中断') -and ((LastEffect) -match 'ratelimit')) (LastEffect)
+$e = LastEffect
+Check 'StopFailure（限流/配额打断）→ 红档' ($e -match '-s error') $e
+CheckShape 'StopFailure' $e '故障' '意外中断对话' 4
+CheckPart 'StopFailure 错误型进信息段' $e 3 'ratelimit'
 
 Fire '{"hook_event_name":"Notification","notification_' | Out-Null
-Check '截断的事件 JSON → 红档「事件数据不完整」而非静默吞' (((LastEffect) -match '-s error') -and ((LastEffect) -match '事件数据不完整')) (LastEffect)
+$e = LastEffect
+Check '截断的事件 JSON → 红档「事件数据不完整」而非静默吞' (($e -match '-s error') -and ((BodyText $e) -match '事件数据不完整')) $e
+# 这条事件没有 cwd 也没有标题 → 来源段整段省掉，不能凭空凑一个（信息段仍带着截断原因）
+CheckShape '截断 JSON（无来源可报）' $e '提醒' '事件数据不完整' 3
+CheckPart '截断 JSON 的截断原因在信息段' $e 2 '数据截断(Notification)'
 
 Fire '{"hook_event_name":"PostToolUseFailure","error":"boom","cwd":"D:\\repo"}' | Out-Null
 $e = LastEffect
-Check 'PostToolUseFailure → 红档 + 故障 + 错误摘要' (($e -match '-s error') -and ($e -match '故障') -and ($e -match 'boom')) $e
+# 工具挂了但对话还在跑 → 黄档「警告」（旧版一律红，和「对话被打断」分不开）
+Check 'PostToolUseFailure → 黄档（不再与对话中断同色）' ($e -match '-s warn') $e
+CheckShape 'PostToolUseFailure' $e '警告' '工具调用失败' 4
+CheckPart 'PostToolUseFailure 错误摘要进信息段' $e 3 'boom'
 
 # 真机回归：子进程按 GBK 写 stderr、上层按 UTF-8 解码时，错误原文只剩 U+FFFD 这类不可逆替换符。
 # 这种文本读不懂也晒不得——丢掉整段，退回工具名，卡片上不再成串出现乱码。
 $garbled = 'Out-File : ' + [string][char]0xFFFD + [char]0xFFFD + [char]0xFFFD + ' '
 Fire ('{"hook_event_name":"PostToolUseFailure","error":"' + $garbled + '","tool_name":"Bash","cwd":"D:\\repo"}') | Out-Null
 $e = LastEffect
-Check '乱码错误 → 退回工具名，不晒替换符' (($e -match 'Bash') -and ($e -notmatch 'Out-File')) $e
+CheckShape '乱码错误' $e '警告' '工具调用失败' 4
+CheckPart '乱码错误 → 信息段退回工具名，不晒替换符' $e 3 'Bash'
+Check '乱码不上屏（正文里没有 Out-File）' ($e -notmatch 'Out-File') $e
 
-# 主对话 / 子代理：Qoder 事件带 agent_id 就是子代理，档案（IDE 落在会话目录 subagents/agent-<id>.meta.json，
-# 该目录与同名 jsonl 平级）给 invocationName 与 description；没带字段的主对话必须明说「主对话」，
-# 否则并行跑子代理时两张卡分不出该回哪一路
+# 身份决定现况措辞：Qoder 事件带 agent_id 就是子实例，现况换成「子代理失败 / 子代理成功」，
+# 名字与「派下去干什么」进信息段（档案落在会话目录 subagents/agent-<id>.meta.json，与同名 jsonl 平级）；
+# 没带字段的主对话用另一套词——两类消息一眼分得清该回哪一路。
 $projDir = Join-Path $root 'projects\g--demo'
 New-Item -ItemType Directory -Force -Path (Join-Path $projDir 'sess-1\subagents') | Out-Null
 '{"agentType":"Explore","toolUseId":"call_1","description":"盘点前端数据需求","invocationName":"Explore","color":"cyan"}' |
     Set-Content (Join-Path $projDir 'sess-1\subagents\agent-aExplore-123.meta.json') -Encoding UTF8
 $tp = ($projDir -replace '\\', '\\') + '\\sess-1.jsonl'
-Fire ('{"hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"D:\\repo","agent_id":"aExplore-123","agent_type":"Explore","transcript_path":"' + $tp + '"}') 1 'qoder' | Out-Null
+$agentJson = '"agent_id":"aExplore-123","agent_type":"Explore","transcript_path":"' + $tp + '"'
+Fire ('{"hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"D:\\repo",' + $agentJson + '}') 1 'qoder' | Out-Null
 $e = LastEffect
-Check '子代理 → 标出子代理与调用名' (($e -match '子代理 Explore') -and ($e -match '盘点前端数据需求')) $e
-Check '子代理事件不误标主对话' (-not ($e -match '主对话')) $e
+CheckShape '子代理问话' $e '询问' '等待授权' 4
+CheckPart '子代理 → 名字与干什么都在信息段' $e 3 '子代理 Explore：盘点前端数据需求 / Bash'
+Fire ('{"hook_event_name":"Stop","cwd":"D:\\repo","last_assistant_message":"跑完了",' + $agentJson + '}') 1 'qoder' | Out-Null
+$e = LastEffect
+CheckShape '子代理跑完' $e '回复' '子代理成功' 4
+Check '子代理成功不误写成对话回合结束' ($e -notmatch '对话回合结束') $e
+Check '子代理完成卡不晒回复原文' ($e -notmatch '跑完了') $e
+Fire ('{"hook_event_name":"PostToolUseFailure","error":"boom","cwd":"D:\\repo",' + $agentJson + '}') 1 'qoder' | Out-Null
+$e = LastEffect
+CheckShape '子代理挂工具' $e '警告' '子代理失败' 4
+Check '子代理失败与主对话的工具调用失败分得开' ($e -notmatch '工具调用失败') $e
+
 Fire ('{"hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"D:\\repo"}') 1 'qoder' | Out-Null
-Check '主对话 → 明标主对话' ((LastEffect) -match '主对话') (LastEffect)
+$e = LastEffect
+Check '主对话 → 现况走主对话那套词、不挂子代理' (($e -match '等待授权') -and ($e -notmatch '子代理')) $e
 Fire ('{"hook_event_name":"PermissionRequest","tool_name":"Bash","cwd":"D:\\repo","agent_id":"aMissing-999","agent_type":"general-purpose"}') 1 'qoder' | Out-Null
 $e = LastEffect
-Check '档案读不到 → 退回 agent_type，不崩' (($e -match '子代理 general-purpose') -and -not ($e -match '盘点')) $e
+CheckShape '档案读不到' $e '询问' '等待授权' 4
+CheckPart '档案读不到 → 退回 agent_type，不崩' $e 3 '子代理 general-purpose / Bash'
 
 Fire '{"hook_event_name":"PostToolUseFailure","is_interrupt":true,"cwd":"D:\\repo"}' | Out-Null
-Check '中断的失败 → 文案写「中断」' ((LastEffect) -match '中断') (LastEffect)
+$e = LastEffect
+Check '人被中断 → 红档' ($e -match '-s error') $e
+CheckShape '人被中断（与工具自己挂了分开）' $e '故障' '意外中断对话' 3
+CheckPart '人被中断的来源段仍是项目名' $e 2 'repo'
 
 Fire '{"hook_event_name":"Notification","notification_type":"permission_prompt","title":"AskUserQuestion"}' | Out-Null
-Check 'Notification(提问) → 黄档 + 提问' ((LastEffect) -match '提问') (LastEffect)
+$e = LastEffect
+CheckShape 'Notification(提问)' $e '询问' '请求人类介入' 3
+CheckPart '提问的问题文本进信息段' $e 2 'AskUserQuestion'
 Fire '{"hook_event_name":"Notification","notification_type":"permission_prompt","title":"other"}' | Out-Null
-Check 'Notification(接管) → 黄档 + 接管' ((LastEffect) -match '接管') (LastEffect)
+CheckShape 'Notification(接管)' (LastEffect) '询问' '请求人类介入' 3
 
 # Trae 官方只发 idle_prompt（等待确认与任务完成都是它）：按平台语义分流
 Fire '{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"智能体已完成任务"}' 0 | Out-Null
 Check 'Trae 的 idle_prompt 静默（Stop 已报完成，不重复）' ((LineCount) -eq 0) "写到 $(LineCount) 行"
 Fire '{"hook_event_name":"Notification","notification_type":"idle_prompt"}' 1 'claude' | Out-Null
-Check 'Claude 的 idle_prompt → 接管黄档（空闲等人输入）' ((LastEffect) -match '接管') (LastEffect)
+CheckShape 'Claude 的 idle_prompt（空闲等人输入）' (LastEffect) '询问' '请求人类介入' 2
 Fire '{"hook_event_name":"Notification","notification_type":"weird_type"}' | Out-Null
-Check '未知通知类型 → 宁可多报不漏接管' ((LastEffect) -match '接管') (LastEffect)
+CheckShape '未知通知类型 → 宁可多报不漏' (LastEffect) '询问' '请求人类介入' 2
 Fire '{"hook_event_name":"Notification","notification_type":"auth_success"}' 0 | Out-Null
 Check 'auth_success 不打扰' ((LineCount) -eq 0) "写到 $(LineCount) 行"
 
 # Trae 没有 PostToolUseFailure：报错从 PostToolUse 的结果字段判
 Fire '{"hook_event_name":"PostToolUse","tool_name":"Shell","exit_code":1,"cwd":"D:\\repo"}' | Out-Null
-Check 'PostToolUse 退出码非 0 → 红档 + 故障' (((LastEffect) -match '-s error') -and ((LastEffect) -match '故障')) (LastEffect)
+$e = LastEffect
+CheckShape 'PostToolUse 退出码非 0' $e '警告' '工具调用失败' 4
+CheckPart 'PostToolUse 退出码进信息段' $e 3 '退出码 1'
+Check 'PostToolUse 退出码非 0 → 黄档（对话还在跑）' ($e -match '-s warn') $e
 Fire '{"hook_event_name":"PostToolUse","tool_response":{"is_error":true,"content":"boom-ish"}}' | Out-Null
-Check 'PostToolUse is_error → 红档带摘要' (((LastEffect) -match '-s error') -and ((LastEffect) -match 'boom-ish')) (LastEffect)
+$e = LastEffect
+CheckShape 'PostToolUse is_error' $e '警告' '工具调用失败' 3
+CheckPart 'PostToolUse 摘要进信息段' $e 2 'boom-ish'
 Fire '{"hook_event_name":"PostToolUse","tool_response":{"content":"all good"}}' 0 | Out-Null
 Check 'PostToolUse 结果正常 → 静默' ((LineCount) -eq 0) "写到 $(LineCount) 行"
 
 Fire '{"hook_event_name":"Stop","cwd":"D:\\repo"}' | Out-Null
 $e = LastEffect
-Check 'Stop → info 档 + 已完成' (($e -match '-s info') -and ($e -match '已完成')) $e
+Check 'Stop → info 档' ($e -match '-s info') $e
+CheckShape 'Stop' $e '回复' '对话回合结束' 3
+CheckPart 'Stop 的来源段' $e 2 'repo'
 
 # 真实回归：Qoder 的 Stop 带中文 last_assistant_message，GBK/UTF-8 错配时解析挂→误报红档；修好后必须走 info，
-# 且标题只认 vscdb 任务名——回复原文不得被当标题晒上屏
+# 且正文恰好三段（机械回复·现况·来源）——回复原文一个字都不许上屏
 Fire '{"hook_event_name":"Stop","cwd":"D:\\repo","last_assistant_message":"没有需要提交的内容，徽章已全部上屏。"}' | Out-Null
 $e = LastEffect
-Check '含中文长回复的 Stop → info 档、不晒回复原文' (($e -match '-s info') -and ($e -notmatch '数据不完整') -and ($e -notmatch '没有需要提交')) $e
+CheckShape '含中文长回复的 Stop' $e '回复' '对话回合结束' 3
+Check '不晒回复原文，也没有误判成数据不完整' (($e -notmatch '没有需要提交') -and ($e -notmatch '数据不完整')) $e
 
 Fire '{"hook_event_name":"Stop","stop_hook_active":true}' 0 | Out-Null
 Check 'stop_hook_active 的 Stop 静默（防死循环）' ((LineCount) -eq 0) "写到 $(LineCount) 行"

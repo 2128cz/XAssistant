@@ -7,15 +7,19 @@
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File agent-status.ps1 -Platform qoder
 #
-# 分档（与 qoder-status.ps1 的文案一脉相承，改了会连累已装机的用户习惯）：
-#   PostToolUseFailure               红：报错打断，需要人去查看
-#   PermissionRequest                黄：等授权，对话卡在人这一侧
-#   Notification(permission_prompt)  黄：同上（提问 / 接管）
-#   Stop                             普通：这轮回复完成（stop_hook_active 时静默，防死循环）
-# 来源段：Qoder 事件带 agent_id / agent_type 的就是**子代理**——拿 agent_id 去 IDE 落盘的
-#   `<projects>\<slug>\<会话>\subagents\agent-<agent_id>.meta.json` 取 invocationName（这次调用叫什么）、
-#   description（派下去干什么）、color（IDE 给这个子代理配的颜色）；主对话没有这两个字段，标「主对话」。
-#   文案因此变成「项目 · “任务名” · 来源 · 细节」，并行跑子代理时一眼看出该回哪一路。
+# 分档（颜色由 -s 段表达，正文不写颜色词）：
+#   PostToolUseFailure / PostToolUse(结果异常)   黄：工具挂了但对话还在跑，不需要按红色惊动
+#   StopFailure / is_interrupt                    红：整轮对话被打断（限流、配额、人中断），必须人回来
+#   PermissionRequest / Notification              黄：等人授权或回答
+#   Stop                                          普通：这轮回复完成（stop_hook_active 时静默，防死循环）
+# 正文四段固定：机械回复 · 现况 · 来源 · 信息（缺哪段省哪段，' · ' 只作段间分隔，信息段内部用 ' / '）
+#   机械回复＝提醒/警告/故障/询问/回复，是别的系统分流用的**固定领词**，不许现场造词；
+#   现况说清是哪一环：主对话 工具调用失败/意外中断对话/对话回合结束/等待授权/请求人类介入，
+#     子实例换成 子代理失败/子代理成功（Qoder 事件带 agent_id/agent_type 即子实例，主对话没这两个字段；
+#     名字与「派下去干什么」进信息段，取自 IDE 落盘的 <会话>\subagents\agent-<id>.meta.json）；
+#   来源＝这场对话的标题（IDE 的 vscdb 任务名 / 事件自带 session_title），拿不到退回项目目录名；
+#   信息＝定位用的额外内容（错误码 / 工具名 / 退出码 / 要人回的那个问题）。
+# **对话内容一律不上屏**：last_assistant_message 那种原文既读不到重点又泄上下文。
 # 铁律：永远 exit 0 —— 提醒脚本再坏也不许把对话流阻断。
 param(
     [string]$Platform = 'generic',
@@ -171,29 +175,44 @@ try {
     }
     if (-not $dialog) { $dialog = Get-TaskTitle ([string]$evt.session_id) $DbAppDirs[$Platform] }
 
-    # 文案格式固定为「事件词 · 请求人类介入：项目 · “对话标题” · 来源 · 细节」，缺哪段省哪段。
-    # 来源段专治「不知道该去看哪场对话」：并行跑子代理时，完成卡与报错卡混在一起，
-    # 不标出来就分不清是人该回的还是子代理返回的。
-    $who = @()
-    if ($project) { $who += $project }
-    if ($dialog) { $who += ('“' + $dialog + '”') }
+    # ---- 四段机械文案：机械回复 · 现况 · 来源 · 信息 ------------------------------------
+    # 机械回复是**固定领词**（提醒 / 警告 / 故障 / 询问 / 回复）：颜色与分流按它走，别的系统也在认它，
+    #   不许现场造词（旧写法把工具名塞进领词变成「授权(Bash)」就是个反例，现在工具名进信息段）。
+    # 现况说清「是哪一环出的事」：主对话用 工具调用失败 / 意外中断对话 / 对话回合结束 / 请求人类介入 /
+    #   等待授权；子实例换成 子代理失败 / 子代理成功——一眼分得清是人该回的还是机器自己挂的。
+    # 来源只有**这场对话的名字**（标题 → 退回项目目录名 → 都没有就省这一段）。对话内容一律不上屏：
+    #   last_assistant_message 那种原文晒出去既读不到重点又泄上下文。
+    # 信息是定位用的额外内容：错误码 / 工具名 / 退出码 / 子代理在干什么 / 要人回的那个问题。
+    # 缺哪段省哪段，段间统一 ' · '。
     $agentId = [string]$evt.agent_id
     $agentType = Cut ([string]$evt.agent_type) 24
+    $subTag = ''
     if ($agentId -or $agentType) {
-        # 带 agent 字段就是子代理：名字优先 IDE 的 invocationName（同类型并发也分得开），退回类型；
-        # description 是「派下去干什么」，比工具名更能指认是哪一路
+        # 带 agent 字段就是子实例。名字优先 IDE 的 invocationName（同类型并发也分得开），退回类型；
+        # description 是「派下去干什么」，比工具名更能指认是哪一路——它进信息段，不占来源段。
         $meta = Get-AgentMeta $agentId ([string]$evt.transcript_path)
         $label = Cut ([string]$meta.invocationName) 24
         if (-not $label) { $label = $agentType }
         $job = Cut ([string]$meta.description) 30
-        $seg = if ($label) { "子代理 $label" } else { '子代理' }
-        if ($job) { $seg += "：$job" }
-        $who += $seg
-    } elseif ($Platform -eq 'qoder') {
-        # 只有 Qoder 实测确认「主对话事件不带 agent 字段」，别的平台不拿缺字段当证据（Claude 未验证）
-        $who += '主对话'
+        $subTag = if ($label) { "子代理 $label" } else { '子代理' }
+        if ($job) { $subTag += "：$job" }
     }
-    $ctx = if ($who.Count -gt 0) { '：' + ($who -join ' · ') } else { '' }
+    $isSub = $subTag -ne ''
+    $source = if ($dialog) { '“' + $dialog + '”' } elseif ($project) { $project } else { '' }
+
+    function Notice([string]$lead, [string]$state, [string]$info) {
+        $bits = @($lead, $state)
+        if ($source) { $bits += $source }
+        if ($info) { $bits += (Cut $info 60) }
+        return ($bits -join ' · ')
+    }
+
+    # 现况措辞按身份换：带 agent 字段就是子实例（Qoder 1.1.57 实测主对话没这两个字段，别的安全平台不拿缺字段当证据）
+    function StateFail([string]$main) { if ($isSub) { '子代理失败' } else { $main } }
+    function StateDone([string]$main) { if ($isSub) { '子代理成功' } else { $main } }
+
+    # 信息段内部用 ' / ' 分隔：' · ' 只当四段之间那一个分隔用，正文按它拆才拆得出恰好四段
+    function InfoOf($bits) { (@(@($bits) | Where-Object { $_ }) -join ' / ') }
 
     function Show-Effect([string]$argLine) {
         # 来源标记进命令行：消息栈徽章拿它贴 IDE 图标；generic 不挂（没得认的就保持素条）
@@ -208,36 +227,37 @@ try {
 
     switch ($name) {
         'BrokenEvent' {
-            $detail = if ($evt.error_type) { ' · ' + (Cut ([string]$evt.error_type) 30) } else { '' }
-            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"提醒 · 请求人类介入：事件数据不完整$ctx$detail`""
+            $detail = Cut ([string]$evt.error_type) 30
+            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '提醒' '事件数据不完整' (InfoOf @($subTag, $detail)))`""
         }
         'Warning' {
-            # DSH 原生插件把 token 上限、策略阻断等非崩溃异常归到黄档，正文只留短摘要。
+            # DSH 原生插件把 token 上限、策略阻断等非崩溃异常归到黄档，信息段只留短摘要。
             $why = Cut (Trustworthy ([string]$evt.message)) 48
             if (-not $why) { $why = Cut ([string]$evt.warning_type) 30 }
-            $detail = if ($why) { ' · ' + $why } else { '' }
-            Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"警告 · 请求人类介入$ctx$detail`""
+            Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '警告' '运行告警' (InfoOf @($subTag, $why)))`""
         }
         'StopFailure' {
-            # 整轮回复被 API 错误打断（限流、配额溢出、过载…）：不是工具报错，是对话直接断了，同样归红
+            # 整轮回复被 API 错误打断（限流、配额溢出、过载…）：不是工具报错，是对话直接断了，归红
             $why = Cut $evt.error_type 30
             if (-not $why) { $why = Cut (Trustworthy ([string]$evt.error)) 40 }
-            $detail = if ($why) { ' · ' + $why } else { '' }
-            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"中断 · 请求人类介入$ctx$detail`""
+            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '故障' (StateFail '意外中断对话') (InfoOf @($subTag, $why)))`""
         }
         'PostToolUseFailure' {
-            # 报错只留定位信息：code = NNNNN 优先（IDE 错误都带这个码），其次错误首句——回复/详情原文不上屏
+            # 信息段只留定位信息：code = NNNNN 优先（IDE 错误都带这个码），其次错误首句，再退回工具名——
+            # 回复/详情原文不上屏。人被打断是故障（红），工具自己挂了是警告（黄：对话还在跑，不必按红色惊动）
             $errText = Trustworthy (Clean ([string]$evt.error))
             $code = if ($errText -match 'code\s*=\s*(\d+)') { 'code ' + $Matches[1] } elseif ($errText) { Cut $errText 40 } else { '' }
             if (-not $code) { $code = Cut $evt.tool_name 30 }
-            $lead = if ($evt.is_interrupt) { '中断' } else { '故障' }
-            $detail = if ($code) { ' · ' + $code } else { '' }
-            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$lead · 请求人类介入$ctx$detail`""
+            $stop = [bool]$evt.is_interrupt
+            $sev = if ($stop) { 'error' } else { 'warn' }
+            $lead = if ($stop) { '故障' } else { '警告' }
+            $state = if ($stop) { StateFail '意外中断对话' } else { StateFail '工具调用失败' }
+            Show-Effect "-s $sev 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice $lead $state (InfoOf @($subTag, $code)))`""
         }
         'PermissionRequest' {
+            # 工具名进信息段：领词得是固定的「询问」，不能现场变成「授权(Bash)」那种半截词
             $tool = Cut $evt.tool_name 30
-            $head = if ($tool) { "授权($tool)" } else { '授权' }
-            Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$head · 请求人类介入$ctx`""
+            Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '等待授权' (InfoOf @($subTag, $tool)))`""
         }
         'Notification' {
             # notification_type 的取值集合各家不同（实踩的坑）：Claude/Qoder 给确认发 permission_prompt，
@@ -245,16 +265,21 @@ try {
             # 先认提问词，确认类关键词归黄；idle_prompt 按平台语义分流；未知类型宁可多报不漏接管
             $type = [string]$evt.notification_type
             $t = $type + ' ' + ([string]$evt.title) + ' ' + ([string]$evt.message)
+            $note = Cut (Trustworthy ([string]$evt.message)) 48
+            if (-not $note) { $note = Cut (Trustworthy ([string]$evt.title)) 40 }
             if ($t -match 'ask.?user.?question') {
-                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"提问 · 请求人类介入$ctx`""
+                # 提问：信息段就是要人回的那句话（这是「该回什么」，不是对话原文）
+                $ask = Cut (Trustworthy ([string]$evt.message)) 60
+                if (-not $ask) { $ask = Cut (Trustworthy ([string]$evt.title)) 60 }
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $ask)))`""
             } elseif ($type -match 'auth_success') {
                 # 认证成功不是「需要人」，不打扰
             } elseif ($type -eq 'idle_prompt' -and $Platform -like 'trae*') {
                 # Trae 的 idle_prompt 是「任务完成」，Stop 已经报过，不重复
             } elseif ($type -match 'permission|confirm|await|elicitation|needs|input|prompt') {
-                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"接管 · 请求人类介入$ctx`""
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $note)))`""
             } else {
-                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"接管 · 请求人类介入$ctx`""
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $note)))`""
             }
         }
         'PostToolUse' {
@@ -269,15 +294,18 @@ try {
             $code = 0
             if ($evt.PSObject.Properties['exit_code']) { $code = [int]$evt.exit_code }
             if ($why -or $code -ne 0) {
-                $lead = if ($evt.is_interrupt) { '中断' } else { '故障' }
-                $detail = if ($why) { ' · ' + $why } elseif ($code -ne 0) { " · 退出码 $code" } else { '' }
-                Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$lead · 请求人类介入$ctx$detail`""
+                $stop = [bool]$evt.is_interrupt
+                $sev = if ($stop) { 'error' } else { 'warn' }
+                $lead = if ($stop) { '故障' } else { '警告' }
+                $state = if ($stop) { StateFail '意外中断对话' } else { StateFail '工具调用失败' }
+                $info = if ($why) { $why } elseif ($code -ne 0) { "退出码 $code" } else { '' }
+                Show-Effect "-s $sev 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice $lead $state (InfoOf @($subTag, $info)))`""
             }
         }
         'Stop' {
             # 本轮 Stop 若正是这个 hook 自己引发的，必须静默——否则 Stop→xa→Stop 无限循环
             if (-not $evt.stop_hook_active) {
-                Show-Effect "-s info 5 1 1 -border on 40 20 1 -lable on 22 `"回复 · 已完成$ctx`""
+                Show-Effect "-s info 5 1 1 -border on 40 20 1 -lable on 22 `"$(Notice '回复' (StateDone '对话回合结束') $subTag)`""
             }
         }
     }

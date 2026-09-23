@@ -156,17 +156,19 @@ xa -k -emergency -any 供电中断
 
 用 AI 编码代理写对话（尤其它接管屏幕、自己点鼠标时），AI 卡在你这一侧往往没人提醒。`mcp/agent-hooks/install-agent-hooks.ps1` 把各家的对话生命周期事件接进上面的 `xa`，三级分档：
 
-| 状态 | 触发事件 | 提醒（机械式文案） |
+| 状态 | 触发事件 | 提醒（四段机械文案：机械回复 · 现况 · 来源 · 信息） |
 |---|---|---|
-| 报错打断（红） | `PostToolUseFailure`（Claude/Qoder）；`StopFailure`（整轮回复被限流/配额/API 错误打断，如 token limit）；Trae 无这两个事件，走 `PostToolUse` 的 exit_code / tool_response.is_error | 全屏红带「故障 / 中断 · 请求人类介入：项目 · “标题” · <报错>」+ 四边渐变带 + 消息卡 |
-| 需人工接管（黄） | `PermissionRequest`、`Notification`（确认/提问类通知，**未知类型宁可多报不漏**） | 黄带「提问 / 接管 / 授权(工具) · 请求人类介入：项目 · “标题”」+ 消息卡 |
-| 对话结束（普通） | `Stop` | info 色「回复 · 已完成：项目 · “标题”」，5 秒 |
+| 对话断了（红） | `StopFailure`（整轮回复被限流/配额/API 错误打断，如 token limit）；`is_interrupt` 的 `PostToolUseFailure` / `PostToolUse` | 全屏红带「故障 · 意外中断对话 · “标题” · ratelimit」+ 四边渐变带 + 消息卡 |
+| 工具挂了（黄） | `PostToolUseFailure`（Claude/Qoder）；Trae 没这两个事件，走 `PostToolUse` 的 exit_code / tool_response.is_error；DSH `Warning`（token 上限 / 策略阻断） | 黄带「警告 · 工具调用失败 · “标题” · code 1」——工具挂了但对话还在跑，不必按红色惊动（旧版一律红，跟「对话被打断」分不开） |
+| 需人工接管（黄） | `PermissionRequest`、`Notification`（确认/提问类通知，**未知类型宁可多报不漏**） | 黄带「询问 · 等待授权 · “标题” · Bash」/「询问 · 请求人类介入 · “标题” · 要人回的那句话」+ 消息卡 |
+| 子实例（同档，只换措辞） | 上面任一事件带 `agent_id`/`agent_type`（Qoder 实测主对话没这两个字段） | 现况换成「子代理失败 / 子代理成功」，名字与「派下去干什么」进信息段 |
+| 对话结束（普通） | `Stop` | info 色「回复 · 对话回合结束 · “标题”」，5 秒 |
 
-文案格式固定为「事件词 · 行动指令：上下文」：项目名取事件 `cwd` 的叶目录；对话标题拿事件 `session_id` 去 IDE 的 `state.vscdb` 查真实任务名（就是对话列表里显示的那个名字，vscdb 被 IDE 独占所以用 FileShare.ReadWrite 开流拷字节查；查不到就整段省略）——**不把对话内容晒上屏**，曾拿 transcript 首句当标题把聊天原文弹到了桌面上，这是明确要避免的；报错只留定位信息（`code = 40441` 这类错误码优先，其次错误首句截断）。多项目并行时一眼看出是哪场对话卡住了；事件自带的机器码文案（如 `AskUserQuestion`）映射到事件词，缺哪段省哪段。提醒文案里不写颜色词，颜色由效果本身表达。
+正文四段固定「机械回复 · 现况 · 来源 · 信息」，缺哪段省哪段（` · ` 只当段间分隔，信息段内部用 ` / `，按 ` · ` 才拆得出恰好四段）：**机械回复**是固定领词（`提醒 / 警告 / 故障 / 询问 / 回复`，颜色与分流按它走，别的系统也在认它，不许现场造词）；**现况**说清是哪一环出的事，主对话与子实例两套词（这也是「工具报错」和「对话失败」第一次真正分开）；**来源**只有这场对话的名字——事件自带 `session_title` 优先，否则拿 `session_id` 去 IDE 的 `state.vscdb` 查真实任务名（就是对话列表里显示的那个名字；vscdb 被 IDE 独占，用 FileShare.ReadWrite 开流拷字节再 Latin1 定位、中文还原字节后 UTF8 解码），都拿不到就退回 `cwd` 的叶目录名，再没有就整段省略——**绝不拿对话内容当名字**（曾拿 transcript 首句当标题，把聊天原文弹到了桌面上）；**信息**只留定位用的内容（`code = 429` 这类错误码优先、工具名、退出码、要人回的那句话），事件自带的机器码文案（如 `AskUserQuestion`）也归到这里。多项目并行时一眼看出该回哪一路、挂在哪一环；提醒文案里不写颜色词，颜色由效果本身表达。
 
 **各平台的事件集合不一样，装错了等于没装**：Claude Code / Qoder 挂全套事件；Trae 官方只有 6 个事件（没有 `PermissionRequest`/`PostToolUseFailure`，挂上去永不触发），它的「等待确认」与「任务完成」都用 `Notification(idle_prompt)` 发——所以安装器按平台落地不同事件集，`agent-status.ps1` 里 `idle_prompt` 也按平台分流（Trae 当完成静默交给 Stop，其他平台当空闲等人归黄）。DSH 不走兼容 hooks 子集：安装器向目标 profile 挂一个原生 Cordis 插件，直接监听 `turn/end`、工具结果、授权审计和 `ask_user_question`，所以完成、模型/API 错误、token 上限、策略阻断、工具失败、授权与结构化提问都能覆盖；默认不提醒子代理，避免扇出任务刷屏。
 
-**hooks 盖不到的一类：模型层报错（quota 超限/限流）**——这种错误发生在「Qoder 向百炼发请求」这一层，不在任何 hook 事件流里（Qoder 没实现 `StopFailure`，transcript 也不落），且各家策略不同：Qoder CN 自动重试（每分钟限流，等一会自愈），国际版可能直接卡住等人工点重试。为此做成了一块**监视模块**（`Services/Modules/QoderWatchModule.cs`，面板「PART 4 / MODULES」里开关与调参）：尾随各 Qoder 最近一次启动会话的 `agent.log`，盯状态机迁移行 `prompting -> error`（同行带 code），命中就发红档命令「中断 · 请求人类介入：对话被 API 错误打断 · code 100400」；同一平台同一错误码 2 分钟只报一次（压掉自动重试期间的连刷），**首见日志只记游标、不回放历史旧错**；带「试弹一次红档」按钮。依赖主程序常驻；Trae / Codex / ZCode 等同类监视以后各写各的模块（共享的 `LogTailer` 尾随件在 `Services/Modules/LogTailWatch.cs`）。
+**hooks 盖不到的一类：模型层报错（quota 超限/限流）**——这种错误发生在「Qoder 向百炼发请求」这一层，不在任何 hook 事件流里（Qoder 没实现 `StopFailure`，transcript 也不落），且各家策略不同：Qoder CN 自动重试（每分钟限流，等一会自愈），国际版可能直接卡住等人工点重试。为此做成了一块**监视模块**（`Services/Modules/QoderWatchModule.cs`，面板「PART 4 / MODULES」里开关与调参）：尾随各 Qoder 最近一次启动会话的 `agent.log`，盯状态机迁移行 `prompting -> error`（同行带 code），命中就发红档命令「故障 · 意外中断对话 · code 100400 / qoder」；同一平台同一错误码 2 分钟只报一次（压掉自动重试期间的连刷），**首见日志只记游标、不回放历史旧错**；带「试弹一次红档」按钮。依赖主程序常驻；Trae / Codex / ZCode 等同类监视以后各写各的模块（共享的 `LogTailer` 尾随件在 `Services/Modules/LogTailWatch.cs`）。
 
 各平台的**接入状态卡**：Trae / ZCode / Codex / VS Code 各有一块（`Services/Modules/*WatchModule.cs`，基类 `IdeStatusModule` + 探测件 `IdeProbe`），只读如实读出「目标程序（跑着/装着/没找到）、对话数据、hooks 部署没有、最近一条真实事件」——Qoder 那种扫日志告警的前提（能拿到对话数据 + 格式已校准）在这上面一目了然；未接入的平台（Codex 本机未装、VS Code 无官方 hooks）用占位模块如实说明可行路径，不装样子；每块卡带「立即刷新」。
 
