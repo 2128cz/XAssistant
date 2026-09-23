@@ -343,8 +343,10 @@ public sealed partial class EffectsWindow : Window
         // 整组到点由渲染帧来触发退场（不另开一个定时器）：这一帧一帧地走，本来就是判到点的地方，
         // 多一个 DispatcherTimer 就多一条「谁先清状态」的竞路线
         var clock = Mono();
-        // 逐行判到点：谁的时间到了谁自己擦出去，剩下的继续摆着；边框在每行真正摘掉后重新定级
-        foreach (var row in _rows.Where(item => !item.Exiting && clock >= item.Until).ToArray()) ExitRow(row);
+        // 逐行判到点：谁到了自己擦出的时刻谁开始走，剩下那几条继续摆着。
+        // 擦出**住在这一行的预算里**（Until 就是它彻底消失的时刻），所以调度器交出屏幕的这一刻
+        // 正好是最后一条擦完的一刻——下一条不会把正在擦的上一行抹掉，边框也不会抢在正文走完前先收。
+        foreach (var row in _rows.Where(item => !item.Exiting && clock >= ExitAt(item)).ToArray()) ExitRow(row);
         if (_borderOnly && _borderUntil <= clock)
         {
             _borderOnly = false;
@@ -396,6 +398,8 @@ public sealed partial class EffectsWindow : Window
         public required string Text { get; init; }
         public required BannerSpec Spec { get; set; }
         public TimeSpan Until { get; set; }
+        /// <summary>入场擦边真正走完的时刻（错峰入场的行比打头那条晚）：擦出不许早于它。</summary>
+        public TimeSpan EntryDone { get; set; }
         public bool Exiting { get; set; }
         public Storyboard? Entry { get; set; }
         public Storyboard? Exit { get; set; }
@@ -490,8 +494,20 @@ public sealed partial class EffectsWindow : Window
     /// <summary>一条消息在屏上停多久：淡入（= 擦边）+ 持续 + 淡出（= 擦出）。</summary>
     private static TimeSpan Span(BannerSpec spec) => TimeSpan.FromSeconds(Math.Max(0.1, spec.ScreenSeconds));
 
-    /// <summary>还没开始退场的行数——边框按这些行的最高档定级，正在擦出去的几条不算数。</summary>
+    /// <summary>这一行开始擦出的时刻：整段退场动画走完，刚好落在 <see cref="BannerRow.Until"/> 上。</summary>
+    private static TimeSpan ExitAt(BannerRow row) => EffectTiming.ExitStart(
+        row.EntryDone, row.Until, EffectTiming.ExitSeconds(row.Spec.FadeOut, SweepSeconds));
+
+    /// <summary>还没开始退场的行数——一屏最多叠几行的上限按它算（正在擦出去的那条已经不算数了）。</summary>
     private int LiveRows => _rows.Count(row => !row.Exiting);
+
+    /// <summary>
+    /// 还在屏上占位的行（擦到一半的也算）：边框定级与四角让位的高度都按这些条走。
+    /// 「正在擦出去」的那一条还看得见，所以它那一档的颜色得撑到它彻底消失，
+    /// 不然就是用户说的「消息没播完 border 先关」。
+    /// </summary>
+    private List<BannerSpec> Occupied(TimeSpan now) =>
+        _rows.Where(row => row.Until > now).Select(row => row.Spec).ToList();
 
     /// <summary>
     /// 边框与四角按**此刻屏上还有什么**实时定级：只剩普通消息就用普通的颜色，混进一条紧急的就升到
@@ -500,7 +516,7 @@ public sealed partial class EffectsWindow : Window
     /// </summary>
     private void RefreshBorder(TimeSpan now, bool fresh)
     {
-        var live = _rows.Where(row => !row.Exiting).Select(row => row.Spec).ToList();
+        var live = Occupied(now);
         if (_borderOnly && _borderUntil > now && _borderSpec is { } only) live.Add(only);
         if (live.Count == 0)
         {
@@ -529,7 +545,7 @@ public sealed partial class EffectsWindow : Window
             AddBreath(top);
         }
         // 四角三角要让开整叠的高度：多行正文比一行高，量出来的实际高度才算数
-        double band = _rows.Where(row => !row.Exiting)
+        double band = _rows.Where(row => row.Until > now)
             .Select(row => row.Body.ActualHeight)
             .DefaultIfEmpty(top.FontSize * 1.25)
             .Max();
@@ -699,6 +715,7 @@ public sealed partial class EffectsWindow : Window
         var at = _nextEntryAt is { } pending && pending > now ? pending : now;
         _nextEntryAt = at + TimeSpan.FromSeconds(sweep);
         var delay = at - now;
+        row.EntryDone = at + TimeSpan.FromSeconds(sweep);
 
         StopRow(row);                                   // 重扫同一行：先把上一次挂在它身上的动画摘干净
         var hidden = HiddenRect(Width, Height);
@@ -785,7 +802,7 @@ public sealed partial class EffectsWindow : Window
     {
         if (row.Exiting) return;
         row.Exiting = true;
-        double fadeOut = Math.Clamp(row.Spec.FadeOut <= 0 ? SweepSeconds : row.Spec.FadeOut, 0.2, 3);
+        double fadeOut = EffectTiming.ExitSeconds(row.Spec.FadeOut, SweepSeconds);
         var shown = new Rect(0, 0, Width, Height);
         var hidden = HiddenRect(Width, Height);
 
