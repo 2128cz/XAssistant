@@ -271,10 +271,33 @@ Check '人被中断 → 红档' ($e -match '-s error') $e
 CheckShape '人被中断（与工具自己挂了分开）' $e '故障' '意外中断对话' 3
 CheckPart '人被中断的来源段仍是项目名' $e 2 'repo'
 
-Fire '{"hook_event_name":"Notification","notification_type":"permission_prompt","title":"AskUserQuestion"}' | Out-Null
+# 提问通知：真正的问句在 details.input.questions[].question，message 只是「requires confirmation」
+# 这种确认 boilerplate——要人回的是问句，所以问句优先，boilerplate 不许上屏
+Fire '{"hook_event_name":"Notification","notification_type":"permission_prompt","message":"Tool AskUserQuestion requires confirmation","details":{"toolName":"AskUserQuestion","input":{"questions":[{"question":"先合 dev 还是先出补丁？"}]}},"cwd":"D:\\repo"}' | Out-Null
 $e = LastEffect
-CheckShape 'Notification(提问)' $e '询问' '请求人类介入' 3
-CheckPart '提问的问题文本进信息段' $e 2 'AskUserQuestion'
+CheckShape 'Notification(提问) 四段齐' $e '询问' '请求人类介入' 4
+CheckPart '提问的问题原文进信息段' $e 3 '先合 dev 还是先出补丁？'
+Check '确认 boilerplate 不上屏' ($e -notmatch 'requires confirmation') $e
+
+Fire '{"hook_event_name":"Notification","notification_type":"permission_prompt","message":"Tool AskUserQuestion requires confirmation","details":{"input":{"questions":[{"question":"第一个问题"},{"question":"第二个问题"}]}}}' | Out-Null
+CheckPart '一次问好几句：只展首问并标注总数' (LastEffect) 2 '第一个问题 / 共 2 问'
+
+# 首问本身超长按 60 截断时，「共 N 问」不能被截掉（实测真事件：截完只剩「共 2 …」，等于没告诉人要答几句）
+$longQ = ('先' * 58)
+Fire ('{"hook_event_name":"Notification","notification_type":"permission_prompt","message":"Tool AskUserQuestion requires confirmation","details":{"input":{"questions":[{"question":"' + $longQ + '"},{"question":"第二问"}]}}}') | Out-Null
+$e = LastEffect
+Check '首问过长时「共 N 问」仍在结尾' ((BodyParts $e)[-1] -match '共 2 问$') $e
+
+# 授权请求的对象如果是提问工具，这条其实是「等我回话」，现况与问句都要跟着变
+Fire '{"hook_event_name":"PermissionRequest","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"这一步要不要删掉？"}]}}' | Out-Null
+$e = LastEffect
+CheckShape '提问工具的授权 → 现况是请求人类介入' $e '询问' '请求人类介入' 3
+CheckPart '提问工具的授权也带问题原文' $e 2 '这一步要不要删掉？'
+Fire '{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"ls"}}' | Out-Null
+CheckShape '普通工具的授权仍是等待授权 + 工具名' (LastEffect) '询问' '等待授权' 3
+
+Fire '{"hook_event_name":"Notification","notification_type":"permission_prompt","title":"AskUserQuestion"}' | Out-Null
+CheckShape '提问但没给问句时退回标题，不空段' (LastEffect) '询问' '请求人类介入' 3
 Fire '{"hook_event_name":"Notification","notification_type":"permission_prompt","title":"other"}' | Out-Null
 CheckShape 'Notification(接管)' (LastEffect) '询问' '请求人类介入' 3
 
@@ -316,6 +339,15 @@ Check '不晒回复原文，也没有误判成数据不完整' (($e -notmatch '�
 
 Fire '{"hook_event_name":"Stop","stop_hook_active":true}' 0 | Out-Null
 Check 'stop_hook_active 的 Stop 静默（防死循环）' ((LineCount) -eq 0) "写到 $(LineCount) 行"
+
+# 真机回归（2026-09-29）：Qoder 的 parent_business_info.name 装的是**用户自己打的那句话被截断**
+# （本机回放 2056 条真事件看到的："要，继续"、"unity我关了，你"、"优化spline的e"），不是任务名。
+# 它一旦进来源，屏幕上就变回「拿对话内容当消息」——用户明确禁止过的那件事。
+Fire '{"hook_event_name":"Stop","cwd":"D:\\repo","parent_business_info":{"name":"要，继续"},"last_assistant_message":"进度条做完了"}' | Out-Null
+$e = LastEffect
+Check '来源段不许用 parent_business_info.name（那是用户自己的话）' ($e -notmatch '要，继续') $e
+Check '正文里也不许出现回复原文' ($e -notmatch '进度条做完了') $e
+CheckPart '没有任务名时来源退回项目目录名' $e 2 'repo'
 
 Check '空 stdin 不报错' ((Fire '' 0) -eq 0)
 Check '坏 JSON 也不阻断（永远 exit 0）' ((Fire 'not json at all' 0) -eq 0)

@@ -33,24 +33,33 @@ exit code 表达决定**，所以分诊逻辑没有平台分支，平台差异�
   事件带 `agent_id`/`agent_type` 的就是子实例，换成 `子代理失败 / 子代理成功`——两类消息一眼分得清该回哪一路。
 - **来源**只有这场对话的名字（事件自带 `session_title` → IDE 的 vscdb 任务名 → 退回项目目录名，都没有就省这一段）。
   **对话内容一律不上屏**：`last_assistant_message` 那种原文既读不到重点又泄上下文。
+  也不要拿 `parent_business_info.name` 当标题——那是 IDE 用**用户首句**自动起的会话名，上屏就等于对话内容
+  （这条踩过一次：回放本机 12 条真事件，第 3 段全是「要，继续」「unity我关了，你」，用户点名禁止过）。
 - **信息**是定位用的额外内容（错误码 / 工具名 / 退出码 / 子代理在干什么 / 要人回的那个问题），段内部用 ` / ` 分隔，
   ` · ` 只留给四段之间，正文按它才拆得出恰好四段。缺哪段省哪段。
+  要人回的那句**问题原文**在 `details.input.questions[].question`（授权请求在 `tool_input.questions`），
+  `message` 里的 `Tool AskUserQuestion requires confirmation` 只是确认 boilerplate，不许顶替问句；
+  一次问好几句时只展首问并挂「/ 共 N 问」，问句太长先瘦身、计数留在结尾不被截掉。
 
-真机事件喂进脚本后跑出来的样子：
+各段能拿到什么，取决于平台愿意在事件里写多少（本机 Qoder 1.1.57 实测）：
+9 个 `state.vscdb`（globalStorage + 8 个 workspaceStorage）里搜不到事件的 `session_id`，
+`projects/<slug>/<会话>/state.json` 整份是密文，transcript 的顶层键也没有 title/name/summary——
+所以 Qoder 的**来源段通常只有项目目录名**；DSH 的事件直接带 `session_title`，那一段才是引号里的会话名。
+
+真机事件喂进脚本后跑出来的样子（前四条是把真事件回放进部署副本得到的原文）：
 
 ```
-警告 · 工具调用失败 · “修复构建脚本的编码问题” · code 1
-故障 · 意外中断对话 · “修复构建脚本的编码问题” · ratelimit
+警告 · 工具调用失败 · XericRp · Exit code 1 ('file_lines', 3365) ('has_b…
+询问 · 请求人类介入 · AI · 是否同意把本次安装的 Caddy 本地根证书导入你的 Windows 信任库？
+询问 · 请求人类介入 · XericDesktop · 把 XericUIGen 三个包接进哪个工程给你手测？（… / 共 2 问
+回复 · 对话回合结束 · com.lrss3.deconstruction
 询问 · 等待授权 · “修复构建脚本的编码问题” · Bash
-询问 · 请求人类介入 · “修复构建脚本的编码问题” · 这个问题我们需要怎么做——先合 dev 还是先出补丁？
-回复 · 对话回合结束 · “修复构建脚本的编码问题”
 回复 · 子代理成功 · XericCICD · 子代理 Explore
 警告 · 子代理失败 · XericCICD · 子代理 Explore / boom
-警告 · 工具调用失败 · XericCICD · 退出码 2
 ```
 
-最后四条分别说明：完成卡不带回复原文；子实例换成 `子代理成功 / 子代理失败`，名字与「派下去干什么」进信息段；
-拿不到会话标题时来源退回项目目录名（`XericCICD`）。
+后三条分别说明：DSH 那种带 `session_title` 的来源才加引号；子实例换成 `子代理成功 / 子代理失败`，
+名字与「派下去干什么」进信息段（不占来源段）；拿不到会话标题时来源退回项目目录名（`XericCICD`）。
 
 ## 平台对照
 

@@ -74,7 +74,10 @@ _sink.Clear(AlertTag);
 **IDE 消息模块这一族（`agent-status.ps1` 与 `QoderWatchModule` 那类）正文统一四段**：机械回复 · 现况 · 来源 · 信息，
 缺哪段省哪段；` · ` 只作段间分隔，信息段内部用 ` / `（按 ` · ` 拆才恰好四段，两边自测都是拆段逐段断言的）。
 **机械回复只能用固定领词**（`提醒 / 警告 / 故障 / 询问 / 回复`）：颜色与分流按它走，别的系统也在认它，别把参数现场拼进领词
-（「授权(Bash)」那种就不是领词了——工具名归信息段）。**来源**只放这场对话的名字（标题 → 项目目录名），对话内容一律不上屏。
+（「授权(Bash)」那种就不是领词了——工具名归信息段）。**来源**只放这场对话的名字（标题 → 项目目录名），对话内容一律不上屏：
+别拿 `parent_business_info.name` 当标题，它是 IDE 用用户首句自动起的会话名（这条踩过，屏幕上晒出来的就是用户原文）；
+**询问类信息段放真正的问题原文**——`details.input.questions[].question`（授权请求在 `tool_input.questions`），
+`Tool AskUserQuestion requires confirmation` 那种确认 boilerplate 不许顶替问句。
 设备类告警（UPS 的「紧急 · 供电中断 …」）保持自己已有的文案，别顺手改它——它的分档词与节奏是另一套口径。
 
 语法段速查（解析在 `Services/EffectCommand.cs`）：`-s <色|emergency/urgent> 持续 淡入 淡出`、`-border on 渐宽 延伸 呼吸周期`、`-lable on 字号 文本`、`-from <平台>`（消息卡徽章）、`-tag <名>`、`-replay <秒> [次]`、`-k [-tag X | -any 子串]`（杀除，不给条件=全停）。

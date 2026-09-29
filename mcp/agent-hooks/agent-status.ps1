@@ -167,12 +167,13 @@ try {
         }
         return ''
     }
+    # 来源段只许是「这场对话的名字」，顺序：事件自带 session_title（DSH 真给）→ IDE 的 vscdb 真实任务名
+    # → 项目目录名 → 都没有就整段省略。
+    # 这里曾经排过一条捷径 `parent_business_info.name`，注释还写着"就是这轮任务名"——那是错的：
+    # 本机 2056 条真事件回放出来，它装的是**用户自己打的那句话被截断**（"要，继续"、"unity我关了，你"、
+    # "优化spline的e"、"ArgumentOu"），而且它排在 vscdb 之前，把真任务名整个盖掉，
+    # 屏幕上就又变回了"拿对话内容当消息"——用户明确禁止过的那件事。
     $dialog = Cut ([string]$evt.session_title) 80
-    if (-not $dialog) {
-        # Qoder 的 Stop 直接带 parent_business_info.name（就是这轮任务名），比读 vscdb 便宜且不受独占影响
-        $pbi = $evt.parent_business_info
-        if ($pbi) { $dialog = Cut ([string]$pbi.name) 80 }
-    }
     if (-not $dialog) { $dialog = Get-TaskTitle ([string]$evt.session_id) $DbAppDirs[$Platform] }
 
     # ---- 四段机械文案：机械回复 · 现况 · 来源 · 信息 ------------------------------------
@@ -213,6 +214,28 @@ try {
 
     # 信息段内部用 ' / ' 分隔：' · ' 只当四段之间那一个分隔用，正文按它拆才拆得出恰好四段
     function InfoOf($bits) { (@(@($bits) | Where-Object { $_ }) -join ' / ') }
+
+    # AI 抛回来等人回的那个问题：Qoder 的确认通知把问句放在 details.input.questions[].question，
+    # 授权请求放在 tool_input.questions，DSH 直接给 message。真正的问句优先——
+    # "Tool AskUserQuestion requires confirmation" 这种确认 boilerplate 上屏等于什么都没说（实测事件如此）。
+    function AskOf($o) {
+        $qs = @()
+        if ($o.details.input.questions) { $qs = @($o.details.input.questions) }
+        elseif ($o.tool_input.questions) { $qs = @($o.tool_input.questions) }
+        if ($qs.Count -eq 0) { return '' }
+        # 先 Clean：问句里带引号会把后面的命令行拆坏
+        $q = Clean (Trustworthy ([string]$qs[0].question))
+        if (-not $q) { $q = Clean (Trustworthy ([string]$qs[0].header)) }
+        if (-not $q) { return '' }
+        if ($qs.Count -gt 1) {
+            # 「共 N 问」才是要人知道的重点，不能被外层 60 字截断截掉：先给问句瘦身再挂尾巴
+            $tail = " / 共 $($qs.Count) 问"
+            $room = 60 - $tail.Length
+            if ($q.Length -gt $room) { $q = $q.Substring(0, [Math]::Max(4, $room - 1)) + '…' + $tail }
+            else { $q += $tail }
+        }
+        return $q
+    }
 
     function Show-Effect([string]$argLine) {
         # 来源标记进命令行：消息栈徽章拿它贴 IDE 图标；generic 不挂（没得认的就保持素条）
@@ -255,9 +278,16 @@ try {
             Show-Effect "-s $sev 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice $lead $state (InfoOf @($subTag, $code)))`""
         }
         'PermissionRequest' {
-            # 工具名进信息段：领词得是固定的「询问」，不能现场变成「授权(Bash)」那种半截词
+            # 工具名进信息段：领词得是固定的「询问」，不能现场变成「授权(Bash)」那种半截词。
+            # 要授权的对象如果是提问工具，这条其实是「等我回话」而不是「等我点同意」：
+            # 现况换成请求人类介入，信息段放真正的问题（实测 Qoder 写在 tool_input.questions 里）。
+            $ask = Cut (AskOf $evt) 60
             $tool = Cut $evt.tool_name 30
-            Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '等待授权' (InfoOf @($subTag, $tool)))`""
+            if ($ask) {
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $ask)))`""
+            } else {
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '等待授权' (InfoOf @($subTag, $tool)))`""
+            }
         }
         'Notification' {
             # notification_type 的取值集合各家不同（实踩的坑）：Claude/Qoder 给确认发 permission_prompt，
@@ -269,7 +299,8 @@ try {
             if (-not $note) { $note = Cut (Trustworthy ([string]$evt.title)) 40 }
             if ($t -match 'ask.?user.?question') {
                 # 提问：信息段就是要人回的那句话（这是「该回什么」，不是对话原文）
-                $ask = Cut (Trustworthy ([string]$evt.message)) 60
+                $ask = Cut (AskOf $evt) 60
+                if (-not $ask) { $ask = Cut (Trustworthy ([string]$evt.message)) 60 }
                 if (-not $ask) { $ask = Cut (Trustworthy ([string]$evt.title)) 60 }
                 Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $ask)))`""
             } elseif ($type -match 'auth_success') {
