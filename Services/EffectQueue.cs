@@ -62,10 +62,13 @@ public sealed class EffectQueue
 
     private EffectQueue()
     {
+        // 「一屏摆得下几行」只有窗口量得出来（可用高度 ÷ 实测行高），调度器只管这个数——
+        // 所以是**函数**：窗口高度、当前字号、边框带宽都会变，容量得每次现问。
         _schedule = new EffectSchedule(
             () => DateTime.Now,
             Play,
-            Report);
+            Report,
+            rowCapacity: EffectsWindow.RowCapacityHint);
         _schedule.Changed += () => Changed?.Invoke();
         _ticker = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TickMilliseconds) };
         _ticker.Tick += (_, _) => _schedule.Tick();
@@ -130,7 +133,8 @@ public sealed class EffectQueue
         EffectsWindow.ShowCommand(command);
         // 重播与「同组又喊一遍」都不重复钉卡：一条无限重播每轮都往顶上叠一张一模一样的话，十张上限转眼就被它刷满，
         // 反而把别的提醒挤下去。第一张卡已经代表“这件事需要人来看”。
-        if (job.Carded || command.Text is not { Length: > 0 } text) return;
+        // -stack off 是逐条开关：这条只当场看一眼、不留卡（关键词彩蛋走的就是它）。
+        if (job.Carded || !command.Stack || command.Text is not { Length: > 0 } text) return;
         job.Carded = true;
         // 紧急档不往文案里贴 ⚠ 字形：卡片自己画一颗警告三角（urgent 参数），尺寸与颜色才能控制
         MessageStackWindow.Push(text, EffectCommand.BrushOf(command.Color) ?? Accent(), command.Source, command.Urgent);

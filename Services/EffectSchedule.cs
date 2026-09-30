@@ -59,18 +59,20 @@ public sealed class EffectJob
 /// 4. <b>重播不占队列名额</b>：下一次是等这一轮播完才生成的，还在间隔里时它待在 <see cref="Rearming"/>；
 ///    队列溢出淘汰时先丢最旧的一次性项，一条都不剩才动重播项里到期最远的那条——
 ///    否则「丢旧的」会连着把重播的到期节奏一起丢掉。
-/// 5. <b>同组合并不排队</b>：屏上正播着某组（<c>-group</c> &gt; <c>-tag</c> &gt; <c>-from</c>，三者都没写就不成组）时，
-///    同组的新消息立刻排成它下面的一行（最多 <see cref="MaxRows"/> 行）。**每行各有一条自己的时间表**：
+/// 5. <b>同组合并的是「上屏」不是「消灭」</b>：屏上正播着某组（<c>-group</c> &gt; <c>-tag</c> &gt; <c>-from</c>，三者都没写就不成组）时，
+///    同组的新消息排成它下面的一行；**一屏摆得下几行由宿主按屏幕高度算**（<see cref="RowCapacity"/>），
+///    摆满了就排队等位——不挤掉别人、也不丢。**每行各有一条自己的时间表**：
 ///    自己上屏、等满自己那一段、自己下屏；新来的一条只给自己上表，不给别人续命也不把别人提前掐掉。
-///    不同组照旧排队，紧急项照旧抢屏（抢的是整叠）。
+///    只有**显式 <c>-tag</c>** 才代表「同一条告警又喊了一遍」，归并到原行重新计时；正文相同但没 tag
+///    （两场对话的「请求人类介入」常常一模一样）各占一行。不同组照旧排队，紧急项照旧抢屏（抢的是整叠）。
 /// </summary>
 public sealed class EffectSchedule
 {
-    /// <summary>待播队列上限：超了就淘汰，免得一分钟前的告警排着队往屏幕上砸。</summary>
-    public const int DefaultMaxQueued = 8;
-
-    /// <summary>一屏最多叠几行同组消息：再多就不是「一叠」而是一堵墙，读不动了。</summary>
-    public const int MaxRows = 4;
+    /// <summary>
+    /// 兜底的队列上限：只在「宿主既没给在屏容量、也没给上限」时用得上（无头夹具、还没量过屏幕）。
+    /// 有屏幕的场景一律按在屏容量派生，别读这个数。
+    /// </summary>
+    public const int FallbackMaxQueued = 8;
 
     private readonly List<EffectJob> _waiting = new();
     private readonly List<EffectJob> _rearming = new();
@@ -78,7 +80,23 @@ public sealed class EffectSchedule
     private readonly Func<DateTime> _clock;
     private readonly Action<EffectJob> _start;
     private readonly Action<EffectJob, EffectOutcome>? _report;
+    private readonly Func<int>? _rowCapacity;
+    private readonly int? _maxQueued;
     private int _sequence;
+
+    /// <summary>
+    /// 一屏最多叠几行：**由宿主按屏幕高度算出来**（窗口量自己的可用高度 ÷ 实测行高），
+    /// 这一层不碰像素、也不写死行数。宿主没给（无头夹具、没窗口）就当没有行数上限——
+    /// 那种场景本来也没有"屏幕占满"这回事。
+    /// </summary>
+    public int RowCapacity
+    {
+        get
+        {
+            if (_rowCapacity is null) return int.MaxValue;
+            try { return Math.Max(1, _rowCapacity()); } catch { return FallbackMaxQueued; }
+        }
+    }
 
     /// <summary>
     /// 当前占着屏幕的那一组里打头的一条；null = 屏幕空闲。
@@ -104,22 +122,30 @@ public sealed class EffectSchedule
     /// <summary>状态有变动（入队、开播、播完、淘汰、停止）。宿主用它刷新面板。</summary>
     public event Action? Changed;
 
-    public int MaxQueued { get; }
+    /// <summary>
+    /// 待播队列上限：**由在屏容量派生**——一批突发最多占「两屏的量」，超出才淘汰。
+    /// 原来的 8 与屏幕多大毫无关系，屏幕摆得下几行、队列就配几行。宿主显式给数就听它的（夹具用）。
+    /// </summary>
+    public int MaxQueued => _maxQueued
+        ?? (RowCapacity == int.MaxValue ? FallbackMaxQueued : RowCapacity);
 
     public EffectSchedule(Func<DateTime> clock, Action<EffectJob> start, Action<EffectJob, EffectOutcome>? report = null,
-        int maxQueued = DefaultMaxQueued)
+        int? maxQueued = null, Func<int>? rowCapacity = null)
     {
         _clock = clock;
         _start = start;
         _report = report;
-        MaxQueued = Math.Max(1, maxQueued);
+        _maxQueued = maxQueued;
+        _rowCapacity = rowCapacity;
     }
 
     /// <summary>
     /// 交一条命令进来。三种去向，按顺序判：
-    /// 1. <b>按 tag 归并</b>——同一个告警喊八遍不该在屏幕上排八行；归到屏上那一行就重新计时并让它重扫一遍。
-    /// 2. <b>同组入屏</b>——屏上正播着同 <see cref="EffectJob.GroupKey"/> 的一组，这条直接排成它下面的一行，
-    ///    不排队等屏幕空（用户要的「同类消息提到前面来，垂直排列」）。
+    /// 1. <b>按 tag 归并</b>——只有**显式写了 <c>-tag</c>** 的才算「同一条告警又喊了一遍」，
+    ///    归到屏上那一行重新计时；没有 tag 的消息哪怕正文一字不差也各占一行（用户点名过：
+    ///    两场对话的「请求人类介入」正文常常一样，归并等于把上一条吃掉）。
+    /// 2. <b>同组入屏</b>——屏上正播着同 <see cref="EffectJob.GroupKey"/> 的一组且**这一屏还摆得下**，
+    ///    这条就排成它下面的一行；摆满了就去排队（Due=现在，谁下屏它就先上），不挤掉别人、也不被丢。
     /// 3. 其余：紧急项挤掉屏上那一组、自己开一组；普通项排队等屏幕空。
     /// </summary>
     public void Submit(EffectCommand command)
@@ -161,8 +187,13 @@ public sealed class EffectSchedule
             return;
         }
 
-        if (TryJoin(job, now))
+        // 同组、且这一屏还摆得下 → 排成它下面的一行（不排队等屏幕空）。摆满了 → 排队等位：
+        // Due=现在，谁下屏它就先上；既不挤掉别人，也不被丢。满屏这一支必须挡在 Preemptive 之前——
+        // 紧急消息撞上自己那一组时该排队，不该把整组掀掉。
+        if (job.GroupKey is { } group && _onScreen.Count > 0 && _onScreen[0].GroupKey == group)
         {
+            if (_onScreen.Count < RowCapacity) { JoinRow(job, now); }
+            else { InsertByDue(_waiting, job); EvictOverflow(); Pump(); }
             Changed?.Invoke();
             return;
         }
@@ -300,47 +331,6 @@ public sealed class EffectSchedule
     private void Reclock() =>
         _busyUntil = _onScreen.Count == 0 ? default : _onScreen.Max(row => row.RowUntil);
 
-    /// <summary>
-    /// 同组入屏：屏上正播着同键的一组，这条就排成它下面的一行，不排队等屏幕空。
-    /// 没有归组键（裸消息）不成组，照旧排队——「一条播完才播下一条」是拿真事故换来的，不能松。
-    /// 同一句话（同键同正文）再进来不算新行，把它顶到最前并重新扫一遍——重复告警排成两行等于没提醒。
-    /// 行数到顶时挤掉打头之后最老那一行：宁可让老消息回去排重播，也不把新告警挡在门外。
-    /// </summary>
-    private bool TryJoin(EffectJob job, DateTime now)
-    {
-        if (job.GroupKey is not { } key || _onScreen.Count == 0 || _onScreen[0].GroupKey != key) return false;
-
-        var twin = _onScreen.FirstOrDefault(row => row.Text == job.Text);
-        if (twin is not null)
-        {
-            _onScreen.Remove(twin);
-            _onScreen.Insert(0, twin);
-            twin.Remaining = job.Remaining;
-            ArmRow(twin, now);
-            _start(twin);
-            return true;
-        }
-
-        if (_onScreen.Count >= MaxRows)
-        {
-            var oldest = _onScreen[1];
-            _onScreen.Remove(oldest);
-            if (oldest.Remaining == 0)
-            {
-                Dropped++;
-                _report?.Invoke(oldest, EffectOutcome.Dropped);
-            }
-            else
-            {
-                oldest.Due = now.AddSeconds(Math.Max(0.1, oldest.Command.ReplayInterval));
-                _rearming.Add(oldest);
-                _report?.Invoke(oldest, EffectOutcome.Preempted);
-            }
-        }
-        JoinRow(job, now);
-        return true;
-    }
-
     /// <summary>把一行并到屏上那一叠里：只给它自己上表，别的行照自己的表走。</summary>
     private void JoinRow(EffectJob job, DateTime now)
     {
@@ -418,9 +408,9 @@ public sealed class EffectSchedule
     }
 
     /// <summary>
-    /// 屏幕空了（整组都下去了）才取队首——组内插行由 <see cref="TryJoin"/> 负责，不走这里。
-    /// 取走一条之后把同键的排队项一起带上屏：它们本来就是「同一件事的几条」，
-    /// 只是来的时候屏幕上还压着别组，不该因此被拆成前后两轮。
+    /// 屏幕空了（整组都下去了）才取队首——组内插行由 <see cref="Submit"/> 的同组那一支负责，不走这里。
+    /// 取走一条之后把同键的排队项一起带上屏（它们本来就是「同一件事的几条」，不该因为来时屏幕被占着
+    /// 就被拆成前后两轮），但**只带到这一屏摆得下为止**，剩下的留在队里等下一轮。
     /// </summary>
     private void Pump()
     {
@@ -431,6 +421,7 @@ public sealed class EffectSchedule
         if (next.GroupKey is not { } key) return;
         foreach (var mate in _waiting.Where(job => job.GroupKey == key).ToArray())
         {
+            if (_onScreen.Count >= RowCapacity) break;
             _waiting.Remove(mate);
             JoinRow(mate, _clock());
         }

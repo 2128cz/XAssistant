@@ -166,12 +166,43 @@ public sealed class KeywordWatcher : IDisposable
     /// <summary>手动触发一次（设置区的「试一下」按钮走这里，不必真去敲那个词）。</summary>
     public void Fire(KeywordRule rule) => Trigger(rule);
 
-    /// <summary>试一次：从顶部浮岛下方吐三颗并横一条警告带，不动主题。</summary>
+    /// <summary>试一次：与真触发走同一条路（同一套几何、同一套排队），不动主题。</summary>
     public void Preview()
     {
-        EffectsWindow.ShowBanner("试一次 · 敲到 white / black / flower 就会这样");
+        EffectQueue.Shared.Submit(KeywordCommand("试一次 · 敲到 white / black / flower 就会这样"));
         for (int i = 0; i < 3; i++) EffectsWindow.Emit(ToastWindow.Anchor, "🎲", null);
     }
+
+    /// <summary>彩蛋消息的固定组键：敲不同的词也排成同一叠，不再像以前那样把整叠换掉。</summary>
+    public const string KeywordGroup = "keyword";
+
+    /// <summary>
+    /// 彩蛋要走的那条消息：几何与老的 <c>ShowBanner</c> 一模一样（58 号、带子 60/36、共 7 秒），
+    /// 但它是**一条普通消息**——进同一条队列、和告警排同一条队。<c>-stack off</c>＝不留顶部卡片
+    /// （敲个词玩一下不该在顶栏堆一排卡），不写 tag＝重复敲同一个词各占一行（用户点名的堆叠）。
+    /// </summary>
+    public static EffectCommand KeywordCommand(string text)
+    {
+        double span = Math.Max(0.6, SlashParser.DefaultSeconds);
+        double fadeIn = Math.Min(EffectsWindow.BannerFadeInSeconds, span / 3);
+        double fadeOut = Math.Min(EffectsWindow.BannerFadeOutSeconds, span / 3);
+        return new EffectCommand
+        {
+            Text = text,
+            Hold = Math.Max(0.1, span - fadeIn - fadeOut),
+            FadeIn = fadeIn,
+            FadeOut = fadeOut,
+            BorderOn = true,
+            BorderWidth = 60,
+            BorderFade = 36,
+            BorderCycle = 0,
+            FontSize = EffectCommand.DefaultFontSize,
+            Group = KeywordGroup,
+            Stack = false,
+        };
+    }
+
+    public static EffectCommand KeywordCommand(KeywordRule rule) => KeywordCommand(rule.Banner ?? rule.Word);
 
     private void Trigger(KeywordRule rule)
     {
@@ -179,8 +210,9 @@ public sealed class KeywordWatcher : IDisposable
         {
             if (rule.ChangesTheme) ApplyTheme(rule);
             // 一条斜线警告带横在屏幕中间，斜线用当前主题色拼，中间写这条规则自带的文案（没写就写词）。
-            // 不再另弹 toast：两条公告渠道说同一件事，只会互相盖住（上一版就是叠了五个提示条）
-            EffectsWindow.ShowBanner(rule.Banner ?? rule.Word);
+            // 不再另弹 toast：两条公告渠道说同一件事，只会互相盖住（上一版就是叠了五个提示条）。
+            // 走消息队列＝关键词不再享有"说到就到"的特权：撞上正在播的告警就排队，不把别人的字幕顶掉。
+            EffectQueue.Shared.Submit(KeywordCommand(rule));
             if (rule.HasParticle)
             {
                 // 一次只从顶部浮岛下方吐几颗（规则不写就是 1 颗）：几十颗同屏既费渲染又像撒沙子

@@ -101,6 +101,12 @@ public sealed record EffectCommand
     public int AuroraBlobs { get; set; } = AuroraField.DefaultBlobCount;
 
     /// <summary>
+    /// 要不要钉进顶部持久消息栈（<c>-stack on|off</c>）。缺省 on＝与以前一致：首轮播完往顶上留一张卡。
+    /// 关掉的用途是「这条只是当场看一眼」——彩蛋关键词走的就是这条路，敲出来的词不该在顶栏堆一排卡片。
+    /// </summary>
+    public bool Stack { get; set; } = true;
+
+    /// <summary>
     /// 归组：显式 <c>-group</c> 最大，其次 <c>-tag</c>（同一个告警的多次播报当然是一组），
     /// 再次 <c>-from</c>（同一个 IDE 一路对话的多条提醒）。三者都没写就是 <b>null = 不成组</b>——
     /// 裸消息照旧一条播完才播下一条，这是当初「告警一密集就互相挤掉」那起事故换来的规矩，不能因为
@@ -161,7 +167,7 @@ public sealed record EffectCommand
 
     /// <summary>新语法的段开关。任一个出现就走新解析，否则整条按旧语法读。</summary>
     private static readonly string[] SectionSwitches =
-        ["-s", "-border", "-lable", "-label", "-from", "-tag", "-group", "-icon", "-aurora", "-replay", "-any", "-emergency", "-urgent", "-k", "-kill"];
+        ["-s", "-border", "-lable", "-label", "-from", "-tag", "-group", "-icon", "-aurora", "-stack", "-replay", "-any", "-emergency", "-urgent", "-k", "-kill"];
 
     /// <summary>
     /// 解析一整行命令。返回 false = 不是已知指令（整条跳过，不猜、不弹、不报错），
@@ -222,6 +228,8 @@ public sealed record EffectCommand
         // 流光段用可空表：空表分不出「写了 -aurora 没带参数」与「根本没写 -aurora」，
         // 而这两件事的意思正相反（前者=开，后者=关）
         List<string>? aurora = null;
+        // 同上：空表分不出「写了 -stack 没带词」与「根本没写」，而缺省是 on、-stack off 才是关
+        List<string>? stack = null;
         var replay = new List<string>();
         var any = new List<string>();
         List<string>? current = null;
@@ -237,6 +245,7 @@ public sealed record EffectCommand
                 case "-group": current = group; break;
                 case "-icon": current = icon; break;
                 case "-aurora": current = aurora = new List<string>(); break;
+                case "-stack": current = stack = new List<string>(); break;
                 case "-replay": current = replay; break;
                 case "-any": current = any; break;
                 // 无参开关：紧急档既能在 -s 里用颜色词表达，也能这样单独挂上（kill 的选择器靠它限定通道）
@@ -257,7 +266,21 @@ public sealed record EffectCommand
         if (command.Kill) { command.Text = any.Count > 0 ? string.Join(" ", any) : null; return true; }
         return ParseReplay(replay, command)
             && ParseShow(show, command) && ParseBorder(border, command) && ParseLabel(label, command)
-            && (aurora is null || ParseAurora(aurora, command));
+            && (aurora is null || ParseAurora(aurora, command))
+            && (stack is null || ParseStack(stack, command));
+    }
+
+    /// <summary>
+    /// <c>-stack on|off</c>：这条要不要留一张卡在顶部消息栈里。只写段名算 on（与 -aurora 同规矩），
+    /// 关掉只影响"钉不钉卡"，消息本身照样上屏、照样进队列。
+    /// </summary>
+    private static bool ParseStack(List<string> args, EffectCommand command)
+    {
+        if (args.Count == 0) { command.Stack = true; return true; }
+        if (args.Count != 1) return false;
+        if (!TrySwitch(args[0], out bool on)) return false;
+        command.Stack = on;
+        return true;
     }
 
     /// <summary>

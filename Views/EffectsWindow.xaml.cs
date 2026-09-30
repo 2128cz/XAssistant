@@ -67,8 +67,11 @@ public sealed partial class EffectsWindow : Window
     /// <summary>扫描头的宽度（与 XAML 里那个 Border 一致）：平移量的两端都按它算。</summary>
     private const double SweepWidth = 150;
 
-    /// <summary>一屏最多叠几行：与调度器同一个数，两边不许各说各话。</summary>
-    private const int MaxRows = EffectSchedule.MaxRows;
+    /// <summary>
+    /// 上下给边框带留的让位量（DIP）：正文叠到这个高度以内就不再往下长，免得压在渐隐带上。
+    /// 带子的实际跨度是 带宽 + 淡出长，取不到规格时用一档常见的值顶着。
+    /// </summary>
+    private const double FallbackEdgeSpan = 96;
 
     /// <summary>行间距（DIP）：斜线有高度，挤在一起会看成一片糊的。</summary>
     private const double RowGap = 12;
@@ -176,7 +179,8 @@ public sealed partial class EffectsWindow : Window
     /// <summary>
     /// 屏幕中间横一句警告语：左右两道斜线铺满屏宽，同时四边亮一圈。
     /// color 留空用当前强调色；seconds 是总时长（默认 = 淡入 1 s + 持续 5 s + 淡出 1 s），blinks 是闪几下。
-    /// 保持字面签名不动：<see cref="Services.Keywords.KeywordWatcher"/> 与测试夹具直接调这个。
+    /// 保持字面签名不动：老的调用点（测试夹具、外部脚本）直接调这个。
+    /// <b>关键词彩蛋已经不走这里</b>——它走 <c>EffectQueue</c> 排队（见 KeywordWatcher.KeywordCommand）。
     /// </summary>
     public static void ShowBanner(string text, Brush? color = null, double seconds = SlashParser.DefaultSeconds, int blinks = 1)
     {
@@ -579,25 +583,14 @@ public sealed partial class EffectsWindow : Window
         }
         Rows.Visibility = Visibility.Visible;
 
-        var twin = _rows.FirstOrDefault(row => !row.Exiting && row.Text == text);
-        if (twin is not null)
-        {
-            _rows.Remove(twin);
-            _rows.Insert(0, twin);
-            twin.Spec = spec;
-            twin.Until = now + Span(spec);
-            RowStack.Children.Remove(twin.Root);
-            RowStack.Children.Insert(0, twin.Root);
-            EnterRow(twin, now);
-        }
-        else
-        {
-            if (LiveRows >= MaxRows) EvictOldestRow();
-            var row = BuildRow(spec, text);
-            _rows.Add(row);
-            row.Until = now + Span(spec);
-            EnterRow(row, now);
-        }
+        // 正文一样就是两条消息：两场对话的「请求人类介入」正文常常一字不差，归并等于把上一条吃掉
+        // （用户点名过）。要防重复得靠命令自己写 -tag 声明「这是同一条告警又喊了一遍」，那一支在调度器里。
+        // 屏幕真的摆满了才动老行——摆得下几行按**量出来的行高**算（RowCapacity），不写死行数。
+        if (LiveRows >= RowCapacity()) EvictOldestRow();
+        var row = BuildRow(spec, text);
+        _rows.Add(row);
+        row.Until = now + Span(spec);
+        EnterRow(row, now);
 
         if (Rows.Opacity < 0.99) FadeIn(Rows, GroupOnSeconds);
         if (fresh) AddBlink(spec);
@@ -729,6 +722,32 @@ public sealed partial class EffectsWindow : Window
                 : new DoubleAnimation((double)to, duration) { FillBehavior = FillBehavior.HoldEnd };
         if (target is UIElement element) element.BeginAnimation(property, anim);
         else ((Animatable)target).BeginAnimation(property, anim);
+    }
+
+    /// <summary>
+    /// 一屏摆得下几行正文：**按量出来的行高算**，行数不写死。可用高度＝窗口高减去上下给边框带的让位量；
+    /// 行距＝行的实际高度 ＋ 它自带的上下外边距（ActualHeight 不含 Margin，不补这一项会高估容量）。
+    /// 一行都还没建起来时按字号估一档，第一条上屏后立刻换成实测值（换行会把行撑高，实测才作数）。
+    /// </summary>
+    private int RowCapacity()
+    {
+        double edge = _borderSpec is { } spec ? spec.BorderWidth + spec.BorderFade : FallbackEdgeSpan;
+        double usable = Math.Max(120, Height - 2 * edge);
+        double pitch = _rows.Count > 0
+            ? _rows.Average(row => row.Root.ActualHeight + row.Root.Margin.Top + row.Root.Margin.Bottom)
+            : EffectCommand.DefaultFontSize * 1.25 + 2 * RowGap;
+        return Math.Max(1, (int)Math.Floor(usable / Math.Max(1, pitch)));
+    }
+
+    /// <summary>
+    /// 给调度器问「这一屏摆得下几行」的入口：窗口不在（还没放过效果）＝没有"屏幕占满"这回事，还给无上限。
+    /// 容量是**每次现算**的（窗口高度、当前字号、边框带宽都会变），所以对外给的是函数、不是一次性的数。
+    /// </summary>
+    public static int RowCapacityHint()
+    {
+        EffectsWindow? window = _shared;
+        if (window is null || !window.IsVisible || window.ActualHeight <= 0) return int.MaxValue;
+        try { return window.RowCapacity(); } catch { return int.MaxValue; }
     }
 
     /// <summary>行数到顶：挤掉最老那一行（打头那条不动，它代表这一叠的开头）。</summary>
