@@ -79,8 +79,11 @@ _sink.Clear(AlertTag);
 **询问类信息段放真正的问题原文**——`details.input.questions[].question`（授权请求在 `tool_input.questions`），
 `Tool AskUserQuestion requires confirmation` 那种确认 boilerplate 不许顶替问句。
 设备类告警（UPS 的「紧急 · 供电中断 …」）保持自己已有的文案，别顺手改它——它的分档词与节奏是另一套口径。
+**同类消息不再互相消灭**：正文一模一样也算两条（只有显式 `-tag` 才归并到原行），一屏摆得下几行由窗口按屏幕高度现算、
+摆满了后来的排队等位——所以**会给同一件事反复发消息的模块（UPS 轮询那类）必须写 `-tag`**，否则几轮就把屏幕铺满。
+要不要在顶部消息栈留卡片也是逐条决定的：`-stack off` = 只上屏不留卡（打字彩蛋用它）。
 
-语法段速查（解析在 `Services/EffectCommand.cs`）：`-s <色|emergency/urgent> 持续 淡入 淡出`、`-border on 渐宽 延伸 呼吸周期`、`-lable on 字号 文本`、`-from <平台>`（消息卡徽章）、`-tag <名>`、`-replay <秒> [次]`、`-k [-tag X | -any 子串]`（杀除，不给条件=全停）。
+语法段速查（解析在 `Services/EffectCommand.cs`）：`-s <色|emergency/urgent> 持续 淡入 淡出`、`-border on 渐宽 延伸 呼吸周期`、`-lable on 字号 文本`、`-from <平台>`（消息卡徽章）、`-stack on|off`（要不要钉顶部消息卡，缺省 on）、`-tag <名>`、`-replay <秒> [次]`、`-k [-tag X | -any 子串]`（杀除，不给条件=全停）。
 
 **演练（「试弹」bool 行）绝不复用真实告警参数**：独立 tag、不带 `-replay`——否则一按就无限重播，还会把真告警一起杀掉。
 
