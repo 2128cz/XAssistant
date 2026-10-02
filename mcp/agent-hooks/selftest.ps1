@@ -353,6 +353,41 @@ Check '空 stdin 不报错' ((Fire '' 0) -eq 0)
 Check '坏 JSON 也不阻断（永远 exit 0）' ((Fire 'not json at all' 0) -eq 0)
 Check '记了原始事件日志' (Test-Path (Join-Path $logDir 'agent-status.log'))
 
+# ---- 每条消息都挂三段标签：来源,身份,类型（面板的按类型闸门与 xa -k -tag 都读它）----
+# 类型词表固定六个，与 C# 那份（Services/MessageGate.Kinds）必须一致：面板按它渲染开关，
+# 多一个词就有一个永远关不掉的开关，少一个词就有一类消息永远关不掉。
+$Kinds = 'ask', 'done', 'tool-fail', 'interrupt', 'error', 'notice'
+function TagOf([string]$line) {
+    $m = [regex]::Match($line, '-tag (\S+)')
+    return $m.Groups[1].Value
+}
+function CheckTag([string]$label, [string]$line, [string]$want) {
+    $got = TagOf $line
+    Check "$label 三段标签＝$want" ($got -eq $want) "实得「$got」  整行：$line"
+}
+
+Fire '{"hook_event_name":"Stop","cwd":"D:\\repo"}' 1 'qoder' | Out-Null
+CheckTag 'Stop' (LastEffect) 'qoder,main,done'
+Fire '{"hook_event_name":"PostToolUseFailure","tool_name":"Bash","error":"code = 1"}' 1 'qoder' | Out-Null
+CheckTag '工具失败' (LastEffect) 'qoder,main,tool-fail'
+Fire '{"hook_event_name":"PostToolUseFailure","tool_name":"Bash","is_interrupt":true}' 1 'qoder' | Out-Null
+CheckTag '被中断的工具失败算整轮断了' (LastEffect) 'qoder,main,interrupt'
+Fire '{"hook_event_name":"StopFailure","error_type":"rate_limit"}' 1 'qoder' | Out-Null
+CheckTag '整轮被打断' (LastEffect) 'qoder,main,interrupt'
+Fire '{"hook_event_name":"Notification","notification_type":"permission_prompt","message":"Tool AskUserQuestion requires confirmation"}' 1 'qoder' | Out-Null
+CheckTag '提问' (LastEffect) 'qoder,main,ask'
+Fire '{"hook_event_name":"PermissionRequest","tool_name":"Bash"}' 1 'qoder' | Out-Null
+CheckTag '等授权也算等人' (LastEffect) 'qoder,main,ask'
+Fire '{"hook_event_name":"Warning","message":"token limit"}' 1 'dsh' | Out-Null
+CheckTag '运行告警（来源换成 dsh）' (LastEffect) 'dsh,main,error'
+Fire '{"hook_event_name":"Stop","cwd":"D:\\repo","agent_id":"agent-abc","agent_type":"Explore"}' 1 'qoder' | Out-Null
+CheckTag '子实例的身份段写 subagent' (LastEffect) 'qoder,subagent,done'
+Fire '{"hook_event_name":"Notification","notification_type":"idle_prompt"}' 1 'claude' | Out-Null
+CheckTag '别的平台照写自己的来源词' (LastEffect) 'claude,main,ask'
+Check '标签第三段都在词表里（多写一个词＝面板上多一个永远关不掉的开关）' `
+    ((@('qoder,main,done', 'qoder,main,tool-fail', 'qoder,main,interrupt', 'qoder,main,ask', 'dsh,main,error') |
+        ForEach-Object { $Kinds -contains ($_ -split ',')[2] } | Where-Object { -not $_ }).Count -eq 0)
+
 $nodeOutput = & node $dshPluginTest 2>&1
 Check 'DSH 原生插件事件映射自测通过' ($LASTEXITCODE -eq 0) ($nodeOutput -join ' ')
 
