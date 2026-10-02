@@ -333,13 +333,17 @@ public partial class KeyboardHeatmap : UserControl
         count = 0;
         if (item is null) return false;
         // 生产数据全是 KeyCountItem：直读属性；反射只给鸭子类型的测试源兜底，
-        // 否则每次刷新要对几百条目做反射取值 + 字符串往返，纯浪费
+        // 否则每次刷新要对几百条目做反射取值 + 字符串往返，纯浪费。
+        // 这个具体类型只在主工程里编得动——tiltshot 夹具单编本文件不引用主工程，故用符号隔开，
+        // 那边自动退回下面的反射兜底（KeyCountItem 也有 Key/Count 属性，行为一致只是慢一点点）。
+#if KEYCOUNTITEM_FASTPATH
         if (item is XAssistant.ViewModels.KeyCountItem direct)
         {
             key = direct.Key;
             count = direct.Count;
             return key.Length > 0 && count >= 0;
         }
+#endif
         var type = item.GetType();
         if (!ItemProperties.TryGetValue(type, out var properties))
         {
