@@ -402,6 +402,10 @@ public sealed partial class EffectsWindow : Window
     private void StepAurora(double seconds)
     {
         if (_aurora.Count == 0) return;
+        // 流光一秒只算这么多步：每步要改 16 颗球的色停与位置，按显示刷新率（120 Hz 大屏上）
+        // 全量算一遍纯属浪费——它本来就是一层缓慢的柔光，20 Hz 肉眼分不出，
+        // 而每帧改渐变颜色会让这一层每帧重新光栅化（实测占掉约 1/4 个核心）。
+        if (seconds - _auroraClock < 0.05) return;
         _auroraClock = seconds;
         foreach (AuroraBall ball in _aurora)
         {
