@@ -86,6 +86,9 @@ public sealed class UpsModule : IWatchModule
     private DateTime? _recoverSince;     // 恢复判据开始成立的一刻
     private bool _outageAlerted;
 
+    /// <summary>监视中断已经喊过没有：只在"刚断"那一次放警，通了复位——否则每轮轮询都重扫一遍横幅。</summary>
+    private bool _watchdogAlerted;
+
     public UpsModule() : this(new WinPowerApi(), new EffectQueueAlertSink()) { }
 
     /// <summary>测试用的注入点：假接口 + 假告警出口。</summary>
@@ -106,11 +109,11 @@ public sealed class UpsModule : IWatchModule
         new("alertOnOutage", "断电时弹紧急警告", true),
         new("alertOnBatteryLow", "电池低电位时黄档预警", false),
         new("alertOnWatchdog", "监视中断时黄档提示", true),
-        new("baseUrl", "站点地址", "https://localhost:9623"),
+        new("baseUrl", "站点地址", "http://localhost:9623"),
         new("apiToken", "Bearer 令牌", "", "手填则优先用它，不再走登录"),
         new("username", "账号", "admin"),
         new("password", "密码", "", "只存本机，模块用它换令牌"),
-        new("loginPath", "登录接口路径", "/api/v1/login"),
+        new("loginPath", "登录接口路径", "/api/v1/auth/login"),
         new("deviceId", "只看某台设备", "", "留空 = 全部设备"),
         new("pollSeconds", "拉取间隔", 20.0),
         new("outageVoltBelow", "市电判据：输入电压低于", 120.0),
@@ -182,8 +185,8 @@ public sealed class UpsModule : IWatchModule
         UpsOutcome outcome;
         try
         {
-            outcome = await _api.Fetch(new UpsCredentials(String("baseUrl", "https://localhost:9623"),
-                String("loginPath", "/api/v1/login"), String("apiToken", ""), String("username", ""), String("password", "")));
+            outcome = await _api.Fetch(new UpsCredentials(String("baseUrl", "http://localhost:9623"),
+                String("loginPath", "/api/v1/auth/login"), String("apiToken", ""), String("username", ""), String("password", "")));
         }
         catch (Exception error)
         {
@@ -223,7 +226,13 @@ public sealed class UpsModule : IWatchModule
             SetStatus($"监视中断：{Truncate(snapshot.Error ?? "接口不可达")}");
             // 判据不明：既不确认断电也不确认恢复，迟滞计时器一起清零，免得恢复后立刻误收
             _outageSince = _recoverSince = null;
-            if (Bool("alertOnWatchdog")) RaiseWatchdog(snapshot.Error);
+            // 只在「刚刚变不可达」那一次放警：每轮都放＝每 20 秒把横幅重扫一遍（用户看到的就是"一报错就卡一下"），
+            // 而且告警本身带 -replay，屏上那条会自己留着，不用重复喊
+            if (Bool("alertOnWatchdog") && !_watchdogAlerted)
+            {
+                _watchdogAlerted = true;
+                RaiseWatchdog(snapshot.Error);
+            }
             return;
         }
         if (devices.Count == 0)
@@ -272,7 +281,11 @@ public sealed class UpsModule : IWatchModule
                 context.Log($"市电恢复，已收掉 {OutageTag}");
             }
         }
-        else _sink.Clear(WatchdogTag);
+        else
+        {
+            _watchdogAlerted = false;      // 通了就复位，下一次不可达才算"刚断"
+            _sink.Clear(WatchdogTag);
+        }
 
         // 电池低电位与断电警互不影响：市电正常时电池也可能拖快完了，两条通道各说各的事
         MaybeBattery(first);
@@ -327,7 +340,7 @@ public sealed class UpsModule : IWatchModule
         Clamp(context, values, "outageHoldSeconds", 0, 300);
         Clamp(context, values, "recoverHoldSeconds", 0, 600);
         if (values.TryGetValue("baseUrl", out var url) && url is string u && string.IsNullOrWhiteSpace(u))
-            context.Submit("baseUrl", "https://localhost:9623");
+            context.Submit("baseUrl", "http://localhost:9623");
 
         // 元数据随凭据变化：账号密码齐了才放开「强制重新登录」那一行
         bool canLogin = !string.IsNullOrWhiteSpace(String("username", "")) && !string.IsNullOrWhiteSpace(String("password", ""));
@@ -452,7 +465,8 @@ public sealed class WinPowerApi : IUpsApi
             var (status, body) = await _transport.Send("POST", url, payload, null);
             if (status is < 200 or >= 300) return (false, $"登录 HTTP {status}");
             string? token = TokenOf(body);
-            if (token is null) return (false, "登录响应里找不到令牌字段（把登录路径或响应结构贴过来即可适配）");
+            if (token is null)
+                return (false, $"登录响应里找不到令牌字段：{(body.Length > 120 ? body[..120] : body)}");
             _cachedToken = token;
             _tokenNote = $"账号登录换令牌 {DateTime.Now:HH:mm:ss}";
             return (true, _tokenNote);
@@ -544,6 +558,24 @@ public sealed class HttpUpsTransport : IUpsTransport
     });
 
     public async Task<(int Status, string Body)> Send(string method, string url, string? jsonBody, string? authorization)
+    {
+        try
+        {
+            return await SendOnce(method, url, jsonBody, authorization);
+        }
+        catch (Exception error) when (error.GetBaseException() is System.Security.Authentication.AuthenticationException or System.IO.IOException)
+        {
+            // WinPower G2 这台监听的是**明文 HTTP**：拿 https 去连，TLS 会把 HTTP 响应当坏帧读，
+            // 报出来的正是 "cannot determine the frame size or a corrupted frame was received"
+            // （本机实测：https 连不上、http GET /api/v1/deviceData/… 回 401「未登录」）。
+            // 本机/私网地址上换 http 再试一次，别让一个 scheme 写错就整晚收不到数。
+            var uri = new Uri(url);
+            if (uri.Scheme != Uri.UriSchemeHttps || !IsLocal(uri.Host)) throw;
+            return await SendOnce(method, url.Replace("https://", "http://", StringComparison.OrdinalIgnoreCase), jsonBody, authorization);
+        }
+    }
+
+    private static async Task<(int Status, string Body)> SendOnce(string method, string url, string? jsonBody, string? authorization)
     {
         using var request = new HttpRequestMessage(new HttpMethod(method), url);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
