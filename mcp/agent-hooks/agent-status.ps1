@@ -19,6 +19,11 @@
 #     名字与「派下去干什么」进信息段，取自 IDE 落盘的 <会话>\subagents\agent-<id>.meta.json）；
 #   来源＝这场对话的标题（IDE 的 vscdb 任务名 / 事件自带 session_title），拿不到退回项目目录名；
 #   信息＝定位用的额外内容（错误码 / 工具名 / 退出码 / 要人回的那个问题）。
+# 每条消息再挂一段标签：-tag <来源>,<main|subagent>,<类型>（进命令行，不进正文）
+#   面板的播放闸门按类型逐个开关，`xa -k -tag ask` 也按它收；类型词表固定 6 个，由调用点显式传：
+#     ask 等人（请求人类介入/等待授权）· done 回合结束 · tool-fail 工具挂了 · interrupt 整轮被打断
+#     error API/配额那类告警 · notice 其它仍要报的（缺省）
+#   标签只说「这是哪一类」，别说「这是同一件事」：**不写 -id**（归并身份是另一码事，别混用）。
 # **对话内容一律不上屏**：last_assistant_message 那种原文既读不到重点又泄上下文。
 # 铁律：永远 exit 0 —— 提醒脚本再坏也不许把对话流阻断。
 param(
@@ -237,9 +242,22 @@ try {
         return $q
     }
 
-    function Show-Effect([string]$argLine) {
+    # 每条发出去的消息都挂三段标签：-tag <来源>,<身份>,<类型>（面板的按类型闸门与 `xa -k -tag ask` 都读它）
+    #   来源＝-from 那个词，同一个词小写；身份＝事件带 agent 字段就是 subagent，否则 main；
+    #   类型＝调用点显式传进来的那档（缺省 notice），词表固定 6 个：
+    #     ask 等人（请求人类介入/等待授权）· done 这轮成了（对话回合结束/子代理成功）
+    #     tool-fail 工具挂了但没被中断 · interrupt 整轮被打断（StopFailure / is_interrupt / 数据截断）
+    #     error API/配额那类告警 · notice 其余仍要报的
+    # 类型按**事件**取，不按现况措辞取：子代理挂了工具，正文写「子代理失败」，类型仍是 tool-fail——
+    #   "是子代理"这件事已经由身份那一段说了，两段各管一件事，别在类型里重复编码。
+    # 只分类，**不写 -id**：归并身份是另一码事（两场对话正文撞车也不许互相吃掉，那是 -id 的活）。
+    function Show-Effect([string]$argLine, [string]$Kind = 'notice') {
+        # 词表外的类型不许漏到命令行（面板按词表逐个开关，多一个词就永远关不掉）：退回 notice
+        if ('ask', 'done', 'tool-fail', 'interrupt', 'error', 'notice' -notcontains $Kind) { $Kind = 'notice' }
         # 来源标记进命令行：消息栈徽章拿它贴 IDE 图标；generic 不挂（没得认的就保持素条）
         if ($Platform -and $Platform -ne 'generic') { $argLine += " -from $Platform" }
+        $tagSrc = if ($Platform) { $Platform.ToLowerInvariant() } else { 'generic' }
+        $argLine += " -tag $tagSrc,$(if ($isSub) { 'subagent' } else { 'main' }),$Kind"
         if ($NoEffect) {
             "$(Get-Date -Format 'HH:mm:ss')  [dry-run] $xa $argLine" | Add-Content -Path $log -Encoding UTF8
             return
@@ -251,19 +269,21 @@ try {
     switch ($name) {
         'BrokenEvent' {
             $detail = Cut ([string]$evt.error_type) 30
-            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '提醒' '事件数据不完整' (InfoOf @($subTag, $detail)))`""
+            # 截断本身就是一种「对话意外中断」→ interrupt
+            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '提醒' '事件数据不完整' (InfoOf @($subTag, $detail)))`"" 'interrupt'
         }
         'Warning' {
             # DSH 原生插件把 token 上限、策略阻断等非崩溃异常归到黄档，信息段只留短摘要。
             $why = Cut (Trustworthy ([string]$evt.message)) 48
             if (-not $why) { $why = Cut ([string]$evt.warning_type) 30 }
-            Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '警告' '运行告警' (InfoOf @($subTag, $why)))`""
+            # token 上限 / 策略阻断这类是 API·配额口径的告警，不是等人也不是整轮断了 → error
+            Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '警告' '运行告警' (InfoOf @($subTag, $why)))`"" 'error'
         }
         'StopFailure' {
             # 整轮回复被 API 错误打断（限流、配额溢出、过载…）：不是工具报错，是对话直接断了，归红
             $why = Cut $evt.error_type 30
             if (-not $why) { $why = Cut (Trustworthy ([string]$evt.error)) 40 }
-            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '故障' (StateFail '意外中断对话') (InfoOf @($subTag, $why)))`""
+            Show-Effect "-s error 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '故障' (StateFail '意外中断对话') (InfoOf @($subTag, $why)))`"" 'interrupt'
         }
         'PostToolUseFailure' {
             # 信息段只留定位信息：code = NNNNN 优先（IDE 错误都带这个码），其次错误首句，再退回工具名——
@@ -275,7 +295,9 @@ try {
             $sev = if ($stop) { 'error' } else { 'warn' }
             $lead = if ($stop) { '故障' } else { '警告' }
             $state = if ($stop) { StateFail '意外中断对话' } else { StateFail '工具调用失败' }
-            Show-Effect "-s $sev 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice $lead $state (InfoOf @($subTag, $code)))`""
+            # 类型跟分档同源：被中断＝整轮断了（interrupt），否则只是工具自己挂了（tool-fail）
+            $kind = if ($stop) { 'interrupt' } else { 'tool-fail' }
+            Show-Effect "-s $sev 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice $lead $state (InfoOf @($subTag, $code)))`"" $kind
         }
         'PermissionRequest' {
             # 工具名进信息段：领词得是固定的「询问」，不能现场变成「授权(Bash)」那种半截词。
@@ -284,9 +306,9 @@ try {
             $ask = Cut (AskOf $evt) 60
             $tool = Cut $evt.tool_name 30
             if ($ask) {
-                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $ask)))`""
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $ask)))`"" 'ask'
             } else {
-                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '等待授权' (InfoOf @($subTag, $tool)))`""
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '等待授权' (InfoOf @($subTag, $tool)))`"" 'ask'
             }
         }
         'Notification' {
@@ -302,15 +324,17 @@ try {
                 $ask = Cut (AskOf $evt) 60
                 if (-not $ask) { $ask = Cut (Trustworthy ([string]$evt.message)) 60 }
                 if (-not $ask) { $ask = Cut (Trustworthy ([string]$evt.title)) 60 }
-                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $ask)))`""
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $ask)))`"" 'ask'
             } elseif ($type -match 'auth_success') {
                 # 认证成功不是「需要人」，不打扰
             } elseif ($type -eq 'idle_prompt' -and $Platform -like 'trae*') {
                 # Trae 的 idle_prompt 是「任务完成」，Stop 已经报过，不重复
             } elseif ($type -match 'permission|confirm|await|elicitation|needs|input|prompt') {
-                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $note)))`""
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $note)))`"" 'ask'
             } else {
-                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $note)))`""
+                # 类型认不出来，但正文摆的是「请求人类介入」：标签跟着正文走，
+                # 否则面板关了 ask 却还在收「要你回话」的卡——正是这次要修的毛病
+                Show-Effect "-s warn 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice '询问' '请求人类介入' (InfoOf @($subTag, $note)))`"" 'ask'
             }
         }
         'PostToolUse' {
@@ -330,13 +354,14 @@ try {
                 $lead = if ($stop) { '故障' } else { '警告' }
                 $state = if ($stop) { StateFail '意外中断对话' } else { StateFail '工具调用失败' }
                 $info = if ($why) { $why } elseif ($code -ne 0) { "退出码 $code" } else { '' }
-                Show-Effect "-s $sev 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice $lead $state (InfoOf @($subTag, $info)))`""
+                $kind = if ($stop) { 'interrupt' } else { 'tool-fail' }
+                Show-Effect "-s $sev 8 1 1 -border on 60 30 1 -lable on 26 `"$(Notice $lead $state (InfoOf @($subTag, $info)))`"" $kind
             }
         }
         'Stop' {
             # 本轮 Stop 若正是这个 hook 自己引发的，必须静默——否则 Stop→xa→Stop 无限循环
             if (-not $evt.stop_hook_active) {
-                Show-Effect "-s info 5 1 1 -border on 40 20 1 -lable on 22 `"$(Notice '回复' (StateDone '对话回合结束') $subTag)`""
+                Show-Effect "-s info 5 1 1 -border on 40 20 1 -lable on 22 `"$(Notice '回复' (StateDone '对话回合结束') $subTag)`"" 'done'
             }
         }
     }
