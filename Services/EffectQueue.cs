@@ -29,6 +29,7 @@ public sealed record EffectLogEntry(
         EffectOutcome.Played => "已播完",
         EffectOutcome.Repeating => "待续期",
         EffectOutcome.Dropped => "被挤掉",
+        EffectOutcome.Blocked => "被模块挡下",
         EffectOutcome.Preempted => "让位",
         _ => "已停止",
     };
@@ -90,8 +91,23 @@ public sealed class EffectQueue
     public int Dropped => _schedule.Dropped;
     public int MaxQueued => _schedule.MaxQueued;
 
-    /// <summary>交一条命令进队列（常驻与无头两条路都走这里）。</summary>
-    public void Submit(EffectCommand command) => _schedule.Submit(command);
+    /// <summary>
+    /// 交一条命令进队列（常驻与无头两条路都走这里）。**入队前先过闸门**：
+    /// 面板上关掉的卡，它的消息在这一步就被挡下——钩子卸载要等 IDE 重启，这一层是立刻的。
+    /// 挡下只记一条历史（看得见"被挡了几条"），不进队列、不上屏、不占位。
+    /// </summary>
+    public void Submit(EffectCommand command)
+    {
+        if (MessageGate.Shared.Blocks(command))
+        {
+            History.Insert(0, new EffectLogEntry(0, DateTime.Now, EffectChannel.Normal,
+                command.TagKey, command.Text ?? "", EffectOutcome.Blocked, 0));
+            while (History.Count > MaxHistory) History.RemoveAt(History.Count - 1);
+            Changed?.Invoke();
+            return;
+        }
+        _schedule.Submit(command);
+    }
 
     /// <summary>按 tag / 通道 / 正文子串杀除。杀完屏幕上没东西了就顺手收起。</summary>
     public int Kill(EffectChannel? channel, string? tag, string? contains)

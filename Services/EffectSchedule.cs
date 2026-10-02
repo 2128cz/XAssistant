@@ -8,7 +8,8 @@ namespace XAssistant.Services;
 public enum EffectChannel { Normal, Emergency }
 
 /// <summary>一条效果在队列里的生命周期。</summary>
-public enum EffectOutcome { Played, Repeating, Dropped, Preempted, Stopped }
+/// <summary>一条效果在队列里的生命周期。<see cref="Blocked"/> 从不进调度器：它是闸门的判决，只进历史。</summary>
+public enum EffectOutcome { Played, Repeating, Dropped, Preempted, Stopped, Blocked }
 
 /// <summary>
 /// 一条待播 / 在播 / 待续期的效果。<b>可变</b>：重播次数与到期时间都在播完之后就地更新，

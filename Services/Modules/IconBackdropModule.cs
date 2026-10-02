@@ -28,6 +28,34 @@ public abstract class IconBackdropModule : IWatchModule
     public const string OnKey = "bdOn", IconKey = "bdIcon", SizeKey = "bdSize",
                         XKey = "bdX", YKey = "bdY", OpacityKey = "bdOpacity", PreviewKey = "bdPreview";
 
+    // 钩子与播放闸门那几行带 hk 前缀：装不装钩子、哪几类消息允许上屏
+    public const string HooksKey = "hkOn", HooksStateKey = "hkState",
+                        PlayAskKey = "hkAsk", PlayDoneKey = "hkDone", PlayToolFailKey = "hkToolFail",
+                        PlayInterruptKey = "hkInterrupt", PlayErrorKey = "hkError";
+
+    /// <summary>类型开关 → 词表里的词。**只列有开关的五个**：`notice` 是兜底那类，没有开关
+    /// （卡开着就放行），否则"说不清的消息"会被整片吞掉。</summary>
+    private static readonly (string Key, string Kind)[] PlaySwitches =
+    [
+        (PlayAskKey, "ask"), (PlayDoneKey, "done"), (PlayToolFailKey, "tool-fail"),
+        (PlayInterruptKey, "interrupt"), (PlayErrorKey, "error"),
+    ];
+
+    /// <summary>
+    /// 钩子与闸门这几行：<b>卡开＝登记闸门（立刻生效）＋按开关装钩子；卡关＝注销＋卸钩子＋收掉在屏消息</b>。
+    /// 装卸钩子只改 IDE 的配置文件，而 Qoder/Claude 的 hooks 不热重载——所以"关掉立刻不播"靠的是闸门那一半。
+    /// </summary>
+    private readonly List<ModuleField> _hookFields =
+    [
+        new(HooksKey, "安装 hooks", true),
+        new(PlayAskKey, "播放 · 请求人类介入", true),
+        new(PlayDoneKey, "播放 · 回合结束", true),
+        new(PlayToolFailKey, "播放 · 工具失败", true),
+        new(PlayInterruptKey, "播放 · 对话中断", true),
+        new(PlayErrorKey, "播放 · 运行告警", true),
+        new(HooksStateKey, "hooks 状态", "…"),
+    ];
+
     /// <summary>面板与发布表共用的默认摆放：居中、屏高 62%、16% 不透明度——压得住屏又不抢正文的读位。</summary>
     public const double DefaultSize = IconBackdrop.NeutralSizePercent,
                       DefaultCenter = IconBackdrop.NeutralXPercent,
@@ -78,9 +106,9 @@ public abstract class IconBackdropModule : IWatchModule
     /// <summary>子类自己的元数据行。</summary>
     protected virtual IReadOnlyList<ModuleMeta> OwnMetas() => [];
 
-    public IReadOnlyList<ModuleField> Fields() => _fields ??= [.. OwnFields(), .. _backdropFields];
+    public IReadOnlyList<ModuleField> Fields() => _fields ??= [.. OwnFields(), .. _backdropFields, .. _hookFields];
 
-    public IReadOnlyList<ModuleMeta> Metas() => [.. OwnMetas(), .. BackdropMetas()];
+    public IReadOnlyList<ModuleMeta> Metas() => [.. OwnMetas(), .. BackdropMetas(), .. HookMetas()];
 
     // ===== 生命周期：基类占住接口，子类实现 OnIdeXxx 钩子 =====
 
@@ -89,6 +117,9 @@ public abstract class IconBackdropModule : IWatchModule
         Context = context;
         OnIdeActivate(context);
         SyncBackdrop();
+        SyncGate();
+        SyncHooksState();
+        if (Flag(HooksKey)) InstallHooks();
         SyncRowVisibility();
     }
 
@@ -97,14 +128,21 @@ public abstract class IconBackdropModule : IWatchModule
         Context = context;
         OnIdeUpdate(context);
         SyncBackdrop();
+        SyncHooksState();
     }
 
-    /// <summary>关闭即撤回：不留一份「面板上已经关了但屏上还垫着」的立绘，顺手收掉试弹那条。</summary>
+    /// <summary>
+    /// 关闭即撤回：立绘、试弹、**闸门登记**、钩子与这一路在屏消息全收掉——
+    /// 面板上关掉卡之后还在刷屏，就是前几样漏了其中一样的历史事故。
+    /// </summary>
     public void OnDeactivate()
     {
         OnIdeDeactivate();
         RetractBackdrop();
         _sink.Clear(PreviewTag);
+        MessageGate.Shared.Unregister(IdeSource);
+        _sink.Clear(IdeSource);          // 这一路在屏与在栈的消息一并收掉
+        if (Flag(HooksKey)) RemoveHooks();
         Context = null;
     }
 
@@ -123,6 +161,13 @@ public abstract class IconBackdropModule : IWatchModule
         }
         SyncBackdrop();
         SyncRowVisibility();
+        // 闸门每次回灌都重登记一次：类型开关一翻，下一帧就生效（不等 IDE、不等重装钩子）
+        SyncGate();
+        if (values.ContainsKey(HooksKey))
+        {
+            if (Flag(HooksKey)) InstallHooks();
+            else RemoveHooks();
+        }
     }
 
     /// <summary>子类钩子：与原来的 OnActivate/OnUpdate/OnDeactivate/OnValuesPushed 同一时机，只是不用管立绘。</summary>
@@ -167,6 +212,87 @@ public abstract class IconBackdropModule : IWatchModule
         foreach (string key in new[] { SizeKey, XKey, YKey, OpacityKey, PreviewKey })
             ctx.MutateMeta(key, meta => meta.Visible = on);
     }
+
+    // ===== 闸门与钩子：这张卡的状态 ⇄ IDE 里的钩子 ⇄ 哪几类消息允许上屏 =====
+
+    private DateTime? _lastHooksProbe;
+    private string? _lastHooksState;
+
+    /// <summary>这一路现在允许的类型：五个开关 + 兜底的 notice（它没有开关，卡开着就放行）。</summary>
+    private string[] EnabledKinds() =>
+    [
+        .. PlaySwitches.Where(s => Flag(s.Key)).Select(s => s.Kind),
+        "notice",
+    ];
+
+    /// <summary>
+    /// 装/卸写的是 IDE 的配置文件，所以在**自测**里把它指到一个临时根（等价安装器的 <c>-Root</c>），
+    /// 免得测试去动真机的 <c>.qoder-cn</c> / <c>.trae-cn</c>；生产路径保持 null＝各平台自己的默认根。
+    /// </summary>
+    public static string? HooksRootOverride { get; set; }
+
+    /// <summary>
+    /// 把这张卡的类型开关登记进闸门（每次回灌都重登记，翻一下开关下一帧就生效）。
+    /// 卡不在激活态就注销——注销＝这一路**一律放行**（闸门只管有主的消息，见 MessageGate 的口径 1）。
+    /// </summary>
+    private void SyncGate()
+    {
+        if (Context is not { IsEnabled: true }) { MessageGate.Shared.Unregister(IdeSource); return; }
+        MessageGate.Shared.Register(IdeSource, EnabledKinds());
+    }
+
+    private void InstallHooks() => RunInstaller(install: true);
+    private void RemoveHooks() => RunInstaller(install: false);
+
+    /// <summary>
+    /// 装/卸放后台线程：OnActivate 在 UI 线程上跑，装一次要起一个 PowerShell（几百毫秒），
+    /// 卡在 UI 上会让人以为面板死了。结果回来用 Submit 写进状态行——写的是安装器自己的解释
+    /// （它连「重启 IDE 才生效」都写在输出里），不是我们另编一句话。
+    /// </summary>
+    private void RunInstaller(bool install)
+    {
+        string source = IdeSource;
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            AgentHooksResult result = install
+                ? AgentHooksInstaller.Install(source, HooksRootOverride)
+                : AgentHooksInstaller.Remove(source, HooksRootOverride);
+            string head = result.Success ? (install ? "已安装" : "已卸载") : $"操作失败（退出码 {result.ExitCode}）";
+            Context?.Submit(HooksStateKey, $"{head} · {HooksDetail(source)}");
+        });
+    }
+
+    /// <summary>状态行：文件探测（缓存 5 秒，别每 tick 读一次配置）+ 给人看的形态说明。</summary>
+    private void SyncHooksState()
+    {
+        if (Context is not { } ctx) return;
+        if (_lastHooksProbe is { } last && (ctx.Now - last).TotalSeconds < 5) return;
+        _lastHooksProbe = ctx.Now;
+        string detail = HooksDetail(IdeSource);
+        if (detail == _lastHooksState) return;
+        _lastHooksState = detail;
+        ctx.Submit(HooksStateKey, detail);
+    }
+
+    /// <summary>一行话：装没装 + 这个平台的形态（不支持的平台直说，不假装能装）。</summary>
+    private static string HooksDetail(string source)
+    {
+        AgentHooksStatus status = AgentHooksInstaller.Status(source, HooksRootOverride);
+        return status.Platform is null
+            ? $"这个平台没有校准过的装法 · {status.Detail}"
+            : $"{status.Hint}（{status.Platform.Installable switch { true => "可装卸", false => "只读" }}）";
+    }
+
+    private static IReadOnlyList<ModuleMeta> HookMetas() =>
+    [
+        new(HooksKey) { Hint = "打开这张卡就把它写进 IDE 的 hooks 配置；取消勾选＝卸掉（只摘指向 agent-status.ps1 的条目，你自己的条目原样保留）" },
+        new(PlayAskKey) { Hint = "请求人类介入 / 等待授权这类消息要不要上屏" },
+        new(PlayDoneKey) { Hint = "对话回合结束 / 子代理成功要不要上屏" },
+        new(PlayToolFailKey) { Hint = "工具调用失败要不要上屏" },
+        new(PlayInterruptKey) { Hint = "整轮被打断（限流、配额、人按停）要不要上屏" },
+        new(PlayErrorKey) { Hint = "运行告警（token 上限、策略阻断）要不要上屏" },
+        new(HooksStateKey) { Editable = false, Hint = "配置里装没装 + 要不要重启 IDE 才生效；工具类平台（VS Code / ZCode）只读" },
+    ];
 
     private static IReadOnlyList<ModuleMeta> BackdropMetas() =>
     [
