@@ -134,8 +134,13 @@ public sealed class WatchModuleRegistry : IDisposable
         entry.ApplyFromUi(key, value);
         // 不另开计时器：记下“最早什么时候可以回灌”，由宿主 tick 到点再冲——面板连改几行会合并成一次投递
         entry.PushDueAt = DateTime.Now.AddMilliseconds(PushDebounceMs);
+        // 用户填的值必须落盘：以前只有「开关这张卡」才写配置，于是填进去的账号密码只活在内存里，
+        // 重启就没了——而 UPS 的登录失败报的正是「没填账号或密码」（实测踩过）。
+        _valuesDirty = true;
         Changed?.Invoke();
     }
+
+    private bool _valuesDirty;
 
     /// <summary>面板实测出这一格能用多大后回传（仅参考，模块自己决定内部怎么排）。</summary>
     public void ReportSpace(string id, double width, double height)
@@ -160,14 +165,25 @@ public sealed class WatchModuleRegistry : IDisposable
                 entry.FlushPush();
             }
         }
+        // 值改动攒到这里一次性落盘（面板连改几行＝一次写）
+        if (_valuesDirty)
+        {
+            _valuesDirty = false;
+            WriteConfig();
+        }
         foreach (var entry in _entries)
             if (entry.Enabled) entry.Update();
     }
 
-    /// <summary>程序退出：对所有激活中的模块各走一次 OnDeactivate。</summary>
+    /// <summary>程序退出：把没落盘的值先写下去，再对所有激活中的模块各走一次 OnDeactivate。</summary>
     public void Dispose()
     {
         _timer.Stop();
+        if (_valuesDirty)
+        {
+            _valuesDirty = false;
+            WriteConfig();
+        }
         foreach (var entry in _entries.Where(e => e.Enabled)) entry.Deactivate();
     }
 

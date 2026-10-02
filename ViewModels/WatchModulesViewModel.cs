@@ -131,7 +131,9 @@ public sealed class ModuleRowViewModel : INotifyPropertyChanged
         set
         {
             _box = value;
-            if (_box is not null) _box.Password = _text;
+            // 正在这个框里打字时别回填：模块每轮上报都会重建行，
+            // 回填会把你刚敲进去、还没失焦提交的那串字符清掉（填了密码却像没填的另一半原因）。
+            if (_box is not null && !_box.IsKeyboardFocusWithin) _box.Password = _text;
         }
     }
 
