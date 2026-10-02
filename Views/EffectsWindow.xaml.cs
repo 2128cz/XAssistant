@@ -1285,9 +1285,16 @@ public sealed partial class EffectsWindow : Window
             Duration = TimeSpan.FromSeconds(spec.BorderCycle),
             RepeatBehavior = new RepeatBehavior(rounds),
         };
-        breath.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0), ease));
-        breath.KeyFrames.Add(new EasingDoubleKeyFrame(BreathLow, KeyTime.FromPercent(0.5), ease));
-        breath.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(1), ease));
+        // 阶梯采样而不是连续插值：连续插值每帧都要新值 ⇒ 整块全屏窗每帧重画 + 整张位图推给合成器
+        // （实测 1080p 下 app 25% + dwm 18% 单核，呼吸占其中一半）。阶梯只在这些时间点变，
+        // WPF 就只在这些点重画——1 秒的呼吸取 12 档，肉眼看是一圈柔和的明暗，代价降一个量级。
+        int steps = 12;
+        for (int i = 0; i <= steps; i++)
+        {
+            double percent = (double)i / steps;
+            double value = percent <= 0.5 ? 1 - (1 - BreathLow) * (percent * 2) : BreathLow + (1 - BreathLow) * ((percent - 0.5) * 2);
+            breath.KeyFrames.Add(new DiscreteDoubleKeyFrame(value, KeyTime.FromPercent(percent)));
+        }
         Storyboard.SetTarget(breath, EdgePulse);
         Storyboard.SetTargetProperty(breath, new PropertyPath(OpacityProperty));
         _breathStory = new Storyboard { Children = { breath } };
