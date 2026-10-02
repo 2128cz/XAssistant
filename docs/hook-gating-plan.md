@@ -112,7 +112,21 @@ Qoder / Claude 的 hooks **不支持热重载**。⇒ 光把钩子卸掉，正�
 - 待定 Q1：关掉卡时是否**顺手收掉该来源在屏/在栈的消息**（我倾向"是"，但它会改变现有 `off` 的语义边界）。
 - 待定 Q2：`claude` 平台（协议源头、未本机实测）要不要一并给安装开关。
 
-## 5. 验收（观感与"真的不播了"归用户）
+## 5. 进度（2026-10-02）
+
+| 步骤 | 状态 | 证据 |
+|---|---|---|
+| 1 标签通道 | ✅ | `EffectCommand.Tags/-id/TagKey/HasTag/Producer`；`EffectSchedule` 按 `Id` 归并、`Kill` 命中「身份或任一标签」；`effect-schedule-check` 140 → 164 全绿 |
+| 2 闸门 | ✅ | `Services/MessageGate.cs`（三条口径 + 计数）+ `EffectQueue.Submit` 入队前拦截、挡下记历史（新结局「被模块挡下」）；夹具 12 条闸门判据 |
+| 3 hook 写标签 | ✅ | `Show-Effect` 统一追加 `-tag <来源>,<main\|subagent>,<类型>`；三处部署副本 md5 一致；`selftest.ps1` 185 → 195 |
+| 4 安装器接线 | ✅ | `Services/AgentHooksInstaller.cs`（Platforms/Find/Status/Install/Remove/ScriptPath）；夹具在临时根上真跑装→查→卸→查 |
+| 5 卡面接线 | ✅ | `IconBackdropModule` 追加安装开关 + 五个类型开关 + 只读状态行；激活＝登记闸门＋装钩子（后台线程）、关闭＝注销＋卸钩子＋收消息；`module-protocol-check` 74 → 86 |
+| 6 文档与门禁 | ✅ | 文档已同步（CLAUDE / README / hooks README / 技能卡）；`run-gates` 六段全绿（1/2/3 一段一跑、4/5/6 一段一跑各 `VERDICT PASS`，`shots/suite-123c.txt` 与 `shots/suite-6b.txt`） |
+
+**已知取舍**：类型词表在 C# 与 PowerShell 各有一份（跨语言没法共享常量），两边各配一条判据钉住它——
+`MessageGate.Kinds` 的夹具判据 + `selftest.ps1` 的聚合判据；改词表要两边一起改。
+
+## 6. 验收（观感与"真的不播了"归用户）
 
 1. 关掉 Qoder 卡 → 立刻再触发一条对话消息 → 屏幕与顶部栈都不该出现；历史里能看到"被挡下"。
 2. 重新打开卡 → 恢复播放；卡上"安装 hooks"取消勾选 → IDE 配置里我们的条目消失（用户自己的条目还在）。
