@@ -43,6 +43,13 @@ WorkingSet64 / PrivateMemorySize64；效果由真机 `xa` 触发。
 
 - 流光的每帧全量重算：限到 20 Hz（`Views/EffectsWindow.xaml.cs:StepAurora`）。实测流光从
   **+24% 单核降到 +2~5%**（`aurora #1/#2` 71/76% vs `banner` 69/71%），观感不变。
+- **动态特效总开关**（工作台「MESSAGE / 消息与播放队列」板上那个勾选框，落盘在
+  `General.DynamicEffects`）：不勾＝**静态模式**——四边带、粒子、流光、立绘、行内滑动/扫描/呼吸全不做，
+  到点直接收，只留一条能读的消息。**实测（`scratch/static-mode-probe.ps1`）**：
+  同一条消息从 **55~78% 单核 → 6%**，四边带探针从 1500-3400 暖像素 → **19**（等于没有带子），
+  消息本身照常可读（行探针 bands=3 span=164 px）。
+  实现走的是"不触发任何动画 ⇒ WPF 只在出现/消失那两帧重画"，所以窗口仍是铺满虚拟屏幕的那一块，
+  但成本与屏幕面积脱钩了。
 
 **试过但没用**（别重复）：给呼吸那一层挂 `CacheMode="BitmapCache"`（`EffectsWindow.xaml` 的 `EdgePulse`）——
 实测没有收益（呼吸开仍是 77%）。WPF 的软件路径对被动画属性所在元素自己的缓存不生效；"内容不变、只动

@@ -4,6 +4,8 @@ using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using XAssistant.Services;
+using XAssistant.Services.Interfaces;
+using XAssistant.Views;
 
 namespace XAssistant.ViewModels;
 
@@ -31,6 +33,7 @@ public sealed class EffectRow
 public sealed partial class MessageQueueViewModel : ViewModelBase, IDisposable
 {
     private readonly EffectQueue _queue;
+    private readonly IConfigurationService? _config;
 
     public ObservableCollection<EffectRow> Active { get; } = new();
 
@@ -39,14 +42,30 @@ public sealed partial class MessageQueueViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty] private string _summary = "屏幕空闲，队列里没有待播的消息";
 
+    /// <summary>
+    /// 动态特效总开关。勾着＝完整动效；不勾＝静态模式：四边带、粒子、流光、立绘、行内滑动/扫描/呼吸
+    /// 全不做，只留一条能读的消息。放在这块面板上是因为它管的就是"消息怎么播"。
+    /// </summary>
+    [ObservableProperty] private bool _dynamicEffects;
+
     /// <summary>一行都没有时整块收起，不留一个空面板在工作台尾巴上占地方。</summary>
     [ObservableProperty] private bool _hasRows;
 
-    public MessageQueueViewModel(EffectQueue queue)
+    public MessageQueueViewModel(EffectQueue queue, IConfigurationService? config = null)
     {
         _queue = queue;
+        _config = config;
+        _dynamicEffects = config?.GetDynamicEffects() ?? true;
+        EffectsWindow.DynamicEffects = _dynamicEffects;   // 启动时就把上次的选择装上
         _queue.Changed += Refresh;
         Refresh();
+    }
+
+    partial void OnDynamicEffectsChanged(bool value)
+    {
+        // 当场生效：还没播的那几条立刻按新模式走，不必等重启
+        EffectsWindow.DynamicEffects = value;
+        _config?.SetDynamicEffects(value);
     }
 
     public void Dispose() => _queue.Changed -= Refresh;

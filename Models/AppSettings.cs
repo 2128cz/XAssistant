@@ -32,4 +32,8 @@ public class GeneralSettings
     public string Theme { get; set; } = "Dark"; // 界面主题：Light / Dark
     public string LayoutMode { get; set; } = "Auto"; // 分区排布：Auto 按页面宽度逐行判，Wide 只要塞得进就分栏，Tall 整页单栏
     public bool KeywordEffects { get; set; } = true; // 打字关键词彩蛋（white / black / flower …）：换肤与掉粒子
+    /// <summary>动态特效总开关（面板「消息与播放队列」板上那个勾选框）：勾着＝完整动效，
+    /// 不勾＝静态模式（四边带/粒子/流光/立绘/行内滑动全不做，只留一条能读的消息）。
+    /// 大屏上值得关——效果层铺满虚拟屏幕且是分层窗（软件光栅化），一处动画就要整屏每帧重画。</summary>
+    public bool DynamicEffects { get; set; } = true;
 }

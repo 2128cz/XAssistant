@@ -95,6 +95,15 @@ public sealed partial class EffectsWindow : Window
     private const double BoxRatio = 1.8;
 
     private static EffectsWindow? _shared;
+
+    /// <summary>
+    /// 动态特效总开关（工作台的「消息与播放队列」板上那个勾选框；落盘在 appsettings.json）。
+    /// 勾着＝现在这套完整动效；不勾＝<b>静态模式</b>：四边带、粒子、流光、立绘、行内滑动/扫描/呼吸全不做，
+    /// 只留一条能读的消息。存在的原因见 docs/perf-plan.md 的实测：效果层铺满 5120×1440 且是
+    /// 分层窗（软件光栅化），<b>窗口里只要有一处动画在跑，每帧就要重画整块屏幕</b>——
+    /// 呼吸一项 74% 单核、文字行 51%、静止的四边带只要 3%。大屏上不值得，交给用户自己选。
+    /// </summary>
+    public static bool DynamicEffects { get; set; } = true;
     private readonly List<Particle> _live = new();
     private TimeSpan? _lastFrame;
     private bool _loopAttached;
@@ -111,7 +120,7 @@ public sealed partial class EffectsWindow : Window
         string? Text, Brush Color, double Hold, double FadeIn, double FadeOut, int Blinks,
         bool BorderOn, double BorderWidth, double BorderFade, double BorderCycle, double FontSize,
         bool Urgent, string Key, IconBackdropStyle? Backdrop, string? Glyph, string? IconPath,
-        bool Aurora, int AuroraCount)
+        bool Aurora, int AuroraCount, bool Static = false)
     {
         /// <summary>这一行占屏多久：与 <see cref="EffectCommand.ScreenSeconds"/> 同一口径。</summary>
         public double ScreenSeconds => FadeIn + Hold + FadeOut;
@@ -226,6 +235,10 @@ public sealed partial class EffectsWindow : Window
         if (app is null) return;
         if (command.Hide) { HideBanner(); return; }
         if (command.Text is null && !command.BorderOn) return;
+        // 静态模式（面板上「动态特效」没勾）：忽略一切特效——不铺四边、不甩粒子、不铺流光、
+        // 不铺立绘，行内也不滑动/不扫描/不呼吸。只留一条能读的消息，成本从"每帧重画整块屏幕"
+        // 掉到"出现、消失各重画一次"（实测：静止的四边带只要 3% 单核，动画态是 77%）。
+        bool staticMode = !DynamicEffects;
         app.Dispatcher.Invoke(() =>
         {
             _shared ??= new EffectsWindow();
@@ -236,8 +249,8 @@ public sealed partial class EffectsWindow : Window
                 Hold: command.Hold,
                 FadeIn: command.FadeIn,
                 FadeOut: command.FadeOut,
-                Blinks: command.Blinks,
-                BorderOn: command.BorderOn,
+                Blinks: staticMode ? 0 : command.Blinks,
+                BorderOn: staticMode ? false : command.BorderOn,
                 BorderWidth: command.BorderWidth,
                 BorderFade: command.BorderFade,
                 BorderCycle: command.BorderCycle,
@@ -247,10 +260,12 @@ public sealed partial class EffectsWindow : Window
                 // 同一句裸话重发仍然并到同一行，不会在屏上叠出两行一模一样的
                 Key: command.GroupKey ?? "solo:" + command.Text,
                 // 立绘按来源查发布表：没有模块认领这个来源、又没写 -icon，就是 null = 这一层什么都不画
-                Backdrop: IconBackdrop.Resolve(command),
+                Backdrop: staticMode ? null : IconBackdrop.Resolve(command),
                 // 上屏同时甩一颗粒子：图是这台 IDE 的图标，角标是这条消息的类型（询问 ❓ / 完成 ✔ / 错误 ❌）
-                Glyph: Notice.GlyphOf(command), IconPath: IconBackdrop.BadgePathFor(command),
-                Aurora: command.Aurora, AuroraCount: command.AuroraBlobs));
+                Glyph: staticMode ? null : Notice.GlyphOf(command),
+                IconPath: staticMode ? null : IconBackdrop.BadgePathFor(command),
+                Aurora: staticMode ? false : command.Aurora, AuroraCount: command.AuroraBlobs,
+                Static: staticMode));
         });
     }
     
@@ -858,6 +873,19 @@ public sealed partial class EffectsWindow : Window
     /// </summary>
     private void EnterRow(BannerRow row, TimeSpan now)
     {
+        // 静态模式：不扫描、不快入，直接摆上去。成本上这等于「这一帧画一次，之后不动」，
+        // 而任何一处动画都会让整块 7.4 M 像素的窗口每帧重画（实测依据见 DynamicEffects 的注释）。
+        if (row.Spec.Static)
+        {
+            StopRow(row);
+            row.Mask.Rect = new Rect(0, 0, Width, Height);
+            row.Root.Opacity = 1;
+            row.EntryDone = now;
+            RowStack.Visibility = Visibility.Visible;
+            Rows.Visibility = Visibility.Visible;
+            Rows.Opacity = 1;
+            return;
+        }
         double sweep = Math.Clamp(row.Spec.FadeIn <= 0 ? SweepSeconds : row.Spec.FadeIn, 0.15, 1.5);
         var at = _nextEntryAt is { } pending && pending > now ? pending : now;
         _nextEntryAt = at + TimeSpan.FromSeconds(sweep);
@@ -949,6 +977,14 @@ public sealed partial class EffectsWindow : Window
     {
         if (row.Exiting) return;
         row.Exiting = true;
+        // 静态模式：不擦出、不平移，到点直接收掉（同样是为了不触发整窗每帧重画）
+        if (row.Spec.Static)
+        {
+            StopRow(row);
+            row.Root.Opacity = 0;
+            DropRow(row);
+            return;
+        }
         double fadeOut = EffectTiming.ExitSeconds(row.Spec.FadeOut, SweepSeconds);
         var shown = new Rect(0, 0, Width, Height);
         var hidden = HiddenRect(Width, Height);
@@ -990,14 +1026,23 @@ public sealed partial class EffectsWindow : Window
         {
             if (!ReferenceEquals(row.Exit, story)) return;
             row.Exit = null;
-            if (!_rows.Remove(row)) return;
-            RowStack.Children.Remove(row.Root);
-            _bannerOn = _rows.Count > 0 || _borderOnly;
-            RefreshBorder(Mono(), fresh: false);
-            if (_rows.Count == 0 && !_borderOnly && _live.Count == 0) Close();
+            DropRow(row);
         };
         row.Exit = story;
         story.Begin();
+    }
+
+    /// <summary>
+    /// 把一行从这一叠里摘掉：退场动画完成时走、静态模式到点也走（两处必须同一套收尾，
+    /// 少一步就是"层永远不收"或"边框等级不跟着降"）。
+    /// </summary>
+    private void DropRow(BannerRow row)
+    {
+        if (!_rows.Remove(row)) return;
+        RowStack.Children.Remove(row.Root);
+        _bannerOn = _rows.Count > 0 || _borderOnly;
+        RefreshBorder(Mono(), fresh: false);
+        if (_rows.Count == 0 && !_borderOnly && _live.Count == 0) Close();
     }
 
     /// <summary>把某层的 Opacity 在若干秒内带到 0（边框与四角降级时用；正文那条自己会擦出去）。</summary>

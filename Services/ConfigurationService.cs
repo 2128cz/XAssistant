@@ -118,4 +118,12 @@ public class ConfigurationService : IConfigurationService
         _appSettings.General.KeywordEffects = enabled;
         Save();
     }
+
+    public bool GetDynamicEffects() => _appSettings.General.DynamicEffects;
+
+    public void SetDynamicEffects(bool enabled)
+    {
+        _appSettings.General.DynamicEffects = enabled;
+        Save();
+    }
 }

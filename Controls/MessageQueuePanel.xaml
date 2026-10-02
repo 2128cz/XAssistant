@@ -13,6 +13,12 @@
     <Button Content="全部停止" Command="{Binding StopAllCommand}" DockPanel.Dock="Right" Padding="10,4" Focusable="False"/>
    </DockPanel>
    <TextBlock Text="{Binding Summary}" Foreground="{DynamicResource TextHint}" FontSize="11" Margin="0,8,0,12" TextWrapping="Wrap"/>
+   <!--  动态特效总开关：效果层铺满虚拟屏幕且是分层窗（软件光栅化），窗口里只要有一处动画在跑，
+         每帧就要重画整块屏幕（实测：呼吸 74% 单核、文字行动画 51%，静止的边框带只要 3%）。
+         大屏上关掉这个，换来的是一条安静的静态消息。  -->
+   <CheckBox IsChecked="{Binding DynamicEffects}" Content="动态特效（四边带 · 粒子 · 流光 · 行内滑动 / 扫描 / 呼吸）"
+             FontSize="12" Foreground="{DynamicResource TextSecondary}" Focusable="False"
+             ToolTip="不勾＝静态模式：只留一条能读的消息，不做任何动画。大屏上动画要整屏每帧重画，会卡。" Margin="0,0,0,12"/>
    <ItemsControl ItemsSource="{Binding Active}">
     <ItemsControl.ItemTemplate>
      <DataTemplate>

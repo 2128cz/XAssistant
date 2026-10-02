@@ -62,4 +62,10 @@ public interface IConfigurationService
 
     /// <summary>设置关键词彩蛋开关并持久化</summary>
     void SetKeywordEffects(bool enabled);
+
+    /// <summary>动态特效总开关（关掉＝静态模式：只留能读的消息，不做四边带/粒子/流光/行内动画）</summary>
+    bool GetDynamicEffects();
+
+    /// <summary>设置动态特效开关并持久化</summary>
+    void SetDynamicEffects(bool enabled);
 }
