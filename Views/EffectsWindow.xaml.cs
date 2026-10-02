@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using System.Windows.Data;
 using XAssistant.Services;
 using XAssistant.Services.Keywords;
@@ -506,7 +507,7 @@ public sealed partial class EffectsWindow : Window
                 _live.RemoveAt(i);
             }
         }
-        if (_live.Count == 0 && !_bannerOn) Close();
+        if (_live.Count == 0 && !_bannerOn) Park();
     }
     // ===== 一叠警告：同组竖排、逐条扫入、整组一起退 =====
 
@@ -1042,7 +1043,7 @@ public sealed partial class EffectsWindow : Window
         RowStack.Children.Remove(row.Root);
         _bannerOn = _rows.Count > 0 || _borderOnly;
         RefreshBorder(Mono(), fresh: false);
-        if (_rows.Count == 0 && !_borderOnly && _live.Count == 0) Close();
+        if (_rows.Count == 0 && !_borderOnly && _live.Count == 0) Park();
     }
 
     /// <summary>把某层的 Opacity 在若干秒内带到 0（边框与四角降级时用；正文那条自己会擦出去）。</summary>
@@ -1092,7 +1093,38 @@ public sealed partial class EffectsWindow : Window
     {
         _bannerOn = false;
         StopAnimation();
-        if (_live.Count == 0) Close();
+        Park();
+    }
+
+    /// <summary>
+    /// 空闲回收窗（秒）：最后一条效果收尾后先**留着窗口复用**，超过这么久没有新的才真的关。
+    /// 依据是实测（`dotnet-counters` 挂在这台机器上量的）：每建一次整窗（全屏分层窗）＋它的渲染面，
+    /// 一秒内要分配 30-40 MB、GC 时间到 9%，还会诱发一次 gen2（堆 85→55 MB）——
+    /// 这就是「偶尔卡」的来源，而且窗口越小、看起来越不该卡，所以更显眼。
+    /// 复用＝下次上屏不再重建；静一会儿再关＝不长期占着内存（它是池子，不是常驻 UI）。
+    /// </summary>
+    private const double ParkSeconds = 45;
+    private DispatcherTimer? _parkTimer;
+
+    /// <summary>收工但留着复用：停动画、清内容、藏起来；定时器到点还没人用才真关。</summary>
+    private void Park()
+    {
+        StopAnimation();
+        _bannerOn = false;
+        _borderOnly = false;
+        _groupKey = null;
+        Visibility = Visibility.Hidden;
+        _parkTimer ??= NewParkTimer();
+        _parkTimer.Stop();
+        _parkTimer.Start();
+    }
+
+    private DispatcherTimer NewParkTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(ParkSeconds) };
+        // 到点时还藏着＝这一段没人用它，真关（Close 会走 OnClosed 把 _shared 置空）
+        timer.Tick += (_, _) => { timer.Stop(); if (!IsVisible) Close(); };
+        return timer;
     }
 
     /// <summary>
