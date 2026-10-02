@@ -34,10 +34,28 @@ public sealed class EffectJob
     /// <summary>消息栈卡片钉过没有：钉过就不再钉，重复喊同一句不该在顶上叠两张一样的卡。</summary>
     public bool Carded { get; set; }
 
-    /// <summary>归组键（<c>-group</c> &gt; <c>-tag</c> &gt; <c>-from</c>）；null = 不成组，按老规矩排队。</summary>
+    /// <summary>归组键（<c>-group</c> &gt; <c>-id</c> &gt; <c>-from</c>）；null = 不成组，按老规矩排队。</summary>
     public string? GroupKey => Command.GroupKey;
 
     public string? Tag => Command.Tag;
+
+    /// <summary>这条的全部标签（来源 / main·subagent / 类型）。</summary>
+    public IReadOnlyList<string> Tags => Command.Tags;
+
+    /// <summary>标签的规范串（面板历史行读它）。归并身份是 <see cref="MergeId"/>，不是标签。</summary>
+    public string? TagKey => Command.TagKey;
+
+    /// <summary>归并身份（<c>-id</c>）：非空时同一身份的再次提交归到屏上那一行，不新增行。</summary>
+    public string? MergeId => Command.Id;
+
+    public bool HasTag(string tag) => Command.HasTag(tag);
+
+    /// <summary>
+    /// kill 的选择器：命中归并身份或任一标签都算（<c>-k -tag ask</c> 与 <c>-k -id ups-loss</c> 同一个入口）。
+    /// </summary>
+    public bool Matches(string key) =>
+        string.Equals(MergeId, key, StringComparison.OrdinalIgnoreCase) || HasTag(key);
+
     public string Text => Command.Text ?? "";
     public double ScreenSeconds => Command.ScreenSeconds;
     /// <summary>剩余次数文案：无限就写 ∞。</summary>
@@ -163,7 +181,7 @@ public sealed class EffectSchedule
             Preemptive = command.Urgent,
         };
 
-        var same = FindByTag(job.Tag);
+        var same = FindByMergeId(job.MergeId);
         if (same is not null)
         {
             // 归并：把到期时间与剩余次数按这一次的说法刷新；正在播的那条不中断，它自己会续下一次
@@ -245,7 +263,7 @@ public sealed class EffectSchedule
     {
         bool Loose(EffectJob job) =>
             (channel is null || job.Channel == channel)
-            && (tag is null || string.Equals(job.Tag, tag, StringComparison.OrdinalIgnoreCase))
+            && (tag is null || job.Matches(tag))
             && (contains is null || job.Text.Contains(contains, StringComparison.OrdinalIgnoreCase));
 
         var hits = AllJobs().Where(Loose).ToArray();
@@ -298,9 +316,14 @@ public sealed class EffectSchedule
         foreach (var job in _rearming) yield return job;
     }
 
-    private EffectJob? FindByTag(string? tag) => tag is null
+    /// <summary>
+    /// 「同一条告警又喊了一遍」= 归并身份（<c>-id</c>）相同。**标签不参与归并**：
+    /// 两条不同对话的 <c>qoder,main,ask</c> 标签串完全一样，按标签归并就等于把上一条吃掉——
+    /// 那正是用户点名要拆掉的行为（旧版按 tag 归并就是这个雷）。
+    /// </summary>
+    private EffectJob? FindByMergeId(string? id) => id is null
         ? null
-        : AllJobs().FirstOrDefault(job => string.Equals(job.Tag, tag, StringComparison.OrdinalIgnoreCase));
+        : AllJobs().FirstOrDefault(job => string.Equals(job.MergeId, id, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>按 Due 升序、同 Due 按提交序号升序插到正确位置——「按时间戳重新插入」就是这一步。</summary>
     private static void InsertByDue(List<EffectJob> list, EffectJob job)

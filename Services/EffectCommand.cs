@@ -74,14 +74,40 @@ public sealed record EffectCommand
     public string? Source { get; set; }
     
     /// <summary>
-    /// 识别符（<c>-tag ups-loss</c>）：重播警告得能被找回来。<see cref="Kill"/> 就靠它精确杀，
-    /// 没写 tag 时退到用 <c>-any</c> 在正文里做子串匹配。
+    /// 归并身份（<c>-id ups-outage</c>）：写了它，同一身份的再次提交就**归到屏上那一行**重新计时，
+    /// 不再新增行 —— 1 秒轮询一次的告警（UPS 供电中断）靠它才不会把屏幕铺满。
+    /// 不写就没有身份可言：两条消息各占一行，哪怕正文与标签完全相同
+    /// （两场对话的「请求人类介入」正文常常一字不差，按正文或按标签归并等于把上一条吃掉）。
     /// </summary>
-    public string? Tag { get; set; }
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// 标签集合（<c>-tag qoder,subagent,tool-fail</c>，逗号分隔，也可写多个 <c>-tag</c> 段）。
+    /// 一条消息同时说清三件事：**从哪来**（来源词，与 <c>-from</c> 同词）、**谁发的**（main / subagent）、
+    /// **哪一类**（ask / done / tool-fail / interrupt / error / notice）——面板按它逐个开关播放，
+    /// <c>xa -k -tag 任一标签</c> 也能针对性收掉。标签只做分类，不参与归并（那是 <see cref="Id"/> 的事）。
+    /// </summary>
+    public List<string> Tags { get; } = [];
+
+    /// <summary>主标签 = 第一个。面板历史行与旧口径的 <c>-k -tag</c> 都读它。</summary>
+    public string? Tag => Tags.Count > 0 ? Tags[0] : null;
+
+    /// <summary>标签的规范形态（小写、按给定顺序用逗号连）：面板历史行读它。</summary>
+    public string? TagKey => Tags.Count == 0 ? null : string.Join(',', Tags);
+
+    /// <summary>命中任一标签就算命中（kill 与闸门都按这个口径，不再要求整串相等）。</summary>
+    public bool HasTag(string tag) => Tags.Any(x => string.Equals(x, tag, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// 这条消息的**生产者**：面板上的闸门表按它登记（IDE 消息就是 <c>-from</c> 那个来源词，
+    /// 设备类模块没有来源时退到自己的 <c>-id</c>）。两者都没有 = 裸命令，不归任何模块管，一律放行。
+    /// </summary>
+    public string? Producer => Source ?? Id;
 
     /// <summary>
     /// 组合键（<c>-group ai-hooks</c>）：同键的消息不算「排队等别人播完」，而是**在同一屏上竖着排成一叠**，
-    /// 边框按组里最高那一档亮，整组到点一起退。不写就退到 tag → from（见 <see cref="GroupKey"/>），三者都没有就不成组、照旧排队。
+    /// 边框按组里最高那一档亮，整组到点一起退。不写就退到 id → from（见 <see cref="GroupKey"/>），
+    /// 三者都没有就不成组、照旧排队。分类标签**不参与分组**——同来源的不同类型必须还能排进同一叠。
     /// </summary>
     public string? Group { get; set; }
 
@@ -107,12 +133,13 @@ public sealed record EffectCommand
     public bool Stack { get; set; } = true;
 
     /// <summary>
-    /// 归组：显式 <c>-group</c> 最大，其次 <c>-tag</c>（同一个告警的多次播报当然是一组），
+    /// 归组：显式 <c>-group</c> 最大，其次 <c>-id</c>（同一个告警的多次播报当然是一组），
     /// 再次 <c>-from</c>（同一个 IDE 一路对话的多条提醒）。三者都没写就是 <b>null = 不成组</b>——
     /// 裸消息照旧一条播完才播下一条，这是当初「告警一密集就互相挤掉」那起事故换来的规矩，不能因为
-    /// 有了分组就把它丢掉。
+    /// 有了分组就把它丢掉。<b>分类标签不在这一串里</b>：同一条消息可以同时是 <c>qoder</c> 与 <c>ask</c>，
+    /// 分组要看的是"这批消息该排成一叠"，不是"这条属于哪一类"。
     /// </summary>
-    public string? GroupKey => Group ?? Tag ?? Source;
+    public string? GroupKey => Group ?? Id ?? Source;
     
     /// <summary>紧急档（<c>-s emergency</c> 或单独的 <c>-emergency</c>）：走紧急通道、画自绘三角感叹号。</summary>
     public bool Urgent { get; set; }
@@ -167,7 +194,7 @@ public sealed record EffectCommand
 
     /// <summary>新语法的段开关。任一个出现就走新解析，否则整条按旧语法读。</summary>
     private static readonly string[] SectionSwitches =
-        ["-s", "-border", "-lable", "-label", "-from", "-tag", "-group", "-icon", "-aurora", "-stack", "-replay", "-any", "-emergency", "-urgent", "-k", "-kill"];
+        ["-s", "-border", "-lable", "-label", "-from", "-tag", "-id", "-group", "-icon", "-aurora", "-stack", "-replay", "-any", "-emergency", "-urgent", "-k", "-kill"];
 
     /// <summary>
     /// 解析一整行命令。返回 false = 不是已知指令（整条跳过，不猜、不弹、不报错），
@@ -223,6 +250,7 @@ public sealed record EffectCommand
         var label = new List<string>();
         var from = new List<string>();
         var tag = new List<string>();
+        var id = new List<string>();
         var group = new List<string>();
         var icon = new List<string>();
         // 流光段用可空表：空表分不出「写了 -aurora 没带参数」与「根本没写 -aurora」，
@@ -242,6 +270,7 @@ public sealed record EffectCommand
                 case "-lable" or "-label": current = label; break;
                 case "-from": current = from; break;
                 case "-tag": current = tag; break;
+                case "-id": current = id; break;
                 case "-group": current = group; break;
                 case "-icon": current = icon; break;
                 case "-aurora": current = aurora = new List<string>(); break;
@@ -258,7 +287,8 @@ public sealed record EffectCommand
             }
         }
         if (from.Count > 0) command.Source = from[0].ToLowerInvariant();   // 多写只认第一个：平台名就一个词
-        if (tag.Count > 0) command.Tag = tag[0];                           // tag 是个词，多写也只认第一个
+        if (tag.Count > 0 && !AddTags(command, tag)) return false;         // 逗号可写多个，见 AddTags
+        if (id.Count > 0) command.Id = id[0];                              // 归并身份就是一个词，多写只认第一个
         if (group.Count > 0) command.Group = group[0];
         if (icon.Count > 0) command.Icon = string.Join(" ", icon);          // 路径可以带空格，整段收下来                     // 同上：组合键就是一个词
         if (any.Count > 0) command.MatchAny = string.Join(" ", any);
@@ -280,6 +310,26 @@ public sealed record EffectCommand
         if (args.Count != 1) return false;
         if (!TrySwitch(args[0], out bool on)) return false;
         command.Stack = on;
+        return true;
+    }
+
+    /// <summary>
+    /// <c>-tag</c> 段：逗号可写多个标签（<c>-tag qoder,main,ask</c>），多个 <c>-tag</c> 段也累加。
+    /// 统一小写存下来——比较走忽略大小写，规范形态留给面板、闸门与 <c>TagKey</c> 比身份用。
+    /// 带空白或引号的段不当是标签：那多半是发起方没把命令行切干净，宁可整条不认。
+    /// </summary>
+    private static bool AddTags(EffectCommand command, List<string> args)
+    {
+        foreach (string raw in args)
+        {
+            foreach (string piece in raw.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string tag = piece.Trim();
+                if (tag.Length == 0) continue;
+                if (tag.Any(c => char.IsWhiteSpace(c) || c is '"' or '\'' or '“' or '”')) return false;
+                command.Tags.Add(tag.ToLowerInvariant());
+            }
+        }
         return true;
     }
 

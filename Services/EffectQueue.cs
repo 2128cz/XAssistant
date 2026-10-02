@@ -103,7 +103,7 @@ public sealed class EffectQueue
 
     /// <summary>按一条解析好的 -k 命令杀除：没给任何选择条件就是全停。</summary>
     public int Kill(EffectCommand selector) =>
-        Kill(selector.Urgent ? EffectChannel.Emergency : null, selector.Tag, selector.MatchAny);
+        Kill(selector.Urgent ? EffectChannel.Emergency : null, selector.Id ?? selector.Tag, selector.MatchAny);
 
     /// <summary>收起当前这一条（<c>xa off</c>）：不算取消告警，带重播的下一轮照旧。</summary>
     public void SkipCurrent()
@@ -155,7 +155,7 @@ public sealed class EffectQueue
 
     private void Append(EffectJob job, EffectOutcome outcome)
     {
-        History.Insert(0, new EffectLogEntry(job.Id, DateTime.Now, job.Channel, job.Tag, job.Text, outcome, job.Plays));
+        History.Insert(0, new EffectLogEntry(job.Id, DateTime.Now, job.Channel, job.TagKey, job.Text, outcome, job.Plays));
         while (History.Count > MaxHistory) History.RemoveAt(History.Count - 1);
         Changed?.Invoke();
     }

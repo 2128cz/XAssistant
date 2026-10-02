@@ -108,7 +108,7 @@ public sealed class QoderWatchModule : IconBackdropModule
         if (Flag("testAlert"))
         {
             // 文案与 hook 共用同一套四段机械格式：机械回复 · 现况 ·（来源缺）· 信息
-            _sink.Raise($"-s error 5 1 1 -border on 60 30 1 -lable on 26 故障 · 意外中断对话 · 演练 / Qoder 报错监视 -tag {DrillTag} -from {IdeSource}");
+            _sink.Raise($"-s error 5 1 1 -border on 60 30 1 -lable on 26 故障 · 意外中断对话 · 演练 / Qoder 报错监视 -id {DrillTag} -from {IdeSource}");
             Context?.Submit("testAlert", false);
         }
     }

@@ -133,7 +133,7 @@ public abstract class IconBackdropModule : IWatchModule
 
     /// <summary>试弹：一条普通档告警，带本卡的来源，于是这条消息就照这份立绘配置摆。</summary>
     protected virtual void Preview() => _sink.Raise(
-        $"-s warn 5 1 1 -border on 50 30 1 -lable on 30 立绘 · 试弹 · {Title} -tag {PreviewTag} -from {IdeSource}");
+        $"-s warn 5 1 1 -border on 50 30 1 -lable on 30 立绘 · 试弹 · {Title} -id {PreviewTag} -from {IdeSource}");
 
     // ===== 发布表：这张卡当前该不该替自己的来源垫立绘 =====
 

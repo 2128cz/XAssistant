@@ -252,7 +252,7 @@ public sealed class UpsModule : IWatchModule
             {
                 _outageAlerted = true;
                 var detail = string.Join("、", down.Select(d => $"{d.Name} 输入 {Text(d.InputVolts)}V"));
-                _sink.Raise($"-s emergency 9 1 1 -border on 60 30 1 -lable on 30 紧急 · 供电中断 {detail} 负载 {Text(first.LoadPercent)}% 后备 {first.BackupMinutes ?? 0} 分钟 -tag {OutageTag} -replay 20");
+                _sink.Raise($"-s emergency 9 1 1 -border on 60 30 1 -lable on 30 紧急 · 供电中断 {detail} 负载 {Text(first.LoadPercent)}% 后备 {first.BackupMinutes ?? 0} 分钟 -id {OutageTag} -replay 20");
                 context.Log($"断电告警已上屏（tag {OutageTag}）");
             }
             return;
@@ -292,17 +292,17 @@ public sealed class UpsModule : IWatchModule
         if (!Bool("alertOnBatteryLow")) return;
         double floor = Number("batteryLowVolts", 24);
         if (device.BatteryVolts is not { } bv || bv >= floor) return;
-        _sink.Raise($"-s warn 6 1 1 -border on 40 20 1 -lable on 26 电池低电位 {device.Name} {Text(bv)}V 低于 {Text(floor)}V -tag {BatteryTag} -replay 60");
+        _sink.Raise($"-s warn 6 1 1 -border on 40 20 1 -lable on 26 电池低电位 {device.Name} {Text(bv)}V 低于 {Text(floor)}V -id {BatteryTag} -replay 60");
     }
 
     private void RaiseWatchdog(string? reason)
-        => _sink.Raise($"-s warn 6 1 1 -lable on 26 UPS 监视中断 {Truncate(reason ?? "")} -tag {WatchdogTag} -replay 120");
+        => _sink.Raise($"-s warn 6 1 1 -lable on 26 UPS 监视中断 {Truncate(reason ?? "")} -id {WatchdogTag} -replay 120");
 
     private void TestAlert()
     {
         // 演练：一次就收（不带 -replay），走独立 tag，也不把状态机的「已弹」标志位抬起来——
         // 试完弹紧接着真断电还得能弹。
-        _sink.Raise($"-s emergency 9 1 1 -border on 60 30 1 -lable on 30 演练 · 紧急警告测试（不会重播） -tag {DrillTag}");
+        _sink.Raise($"-s emergency 9 1 1 -border on 60 30 1 -lable on 30 演练 · 紧急警告测试（不会重播） -id {DrillTag}");
         _ctx?.Submit("testAlert", false);   // 复位；前端按下时本地已经 true，收不到复位也不卡
     }
 
